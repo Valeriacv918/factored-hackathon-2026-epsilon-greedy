@@ -1,0 +1,9 @@
+[project]
+name = "repo"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = [
+    "duckdb>=1.5.6",
+    "pandas>=3.0.6",
+    "tabulate>=0.10.0",
+]

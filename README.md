@@ -5,9 +5,7 @@ AI-first **transaction-dispute intake** agent for a LATAM bank (Spanish and Port
 > The LLM understands and writes. Deterministic code decides, acts and verifies.
 
 
-
 ## Quick start
-
 
 
 ## Repository layout
