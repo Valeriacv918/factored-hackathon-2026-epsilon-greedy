@@ -1,0 +1,18 @@
+{
+  "version": "1.0.0",
+  "table": "daily_exchange_rates",
+  "columns": [
+    "date",
+    "source_currency",
+    "target_currency",
+    "exchange_rate",
+    "buy_rate",
+    "sell_rate",
+    "source"
+  ],
+  "raw_type": "STRING",
+  "nullable": true,
+  "encoding": "utf-8-sig",
+  "delimiter": ",",
+  "quotechar": "\""
+}

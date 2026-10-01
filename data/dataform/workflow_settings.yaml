@@ -1,0 +1,7 @@
+# @dataform/core is pinned in package.json.
+defaultProject: hackaton-509923
+defaultLocation: us-central1
+defaultDataset: bank_stage
+defaultAssertionDataset: bank_ops
+vars:
+  run_id: preview
