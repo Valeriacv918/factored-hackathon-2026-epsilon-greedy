@@ -1,0 +1,28 @@
+{
+  "version": "1.0.0",
+  "table": "products",
+  "columns": [
+    "product_id",
+    "customer_id",
+    "product_type",
+    "product_number",
+    "currency",
+    "current_balance",
+    "credit_limit",
+    "interest_rate",
+    "opening_date",
+    "expiration_date",
+    "opening_branch_id",
+    "product_status",
+    "opening_channel",
+    "has_linked_app",
+    "days_past_due",
+    "last_transaction_date",
+    "last_updated"
+  ],
+  "raw_type": "STRING",
+  "nullable": true,
+  "encoding": "utf-8-sig",
+  "delimiter": ",",
+  "quotechar": "\""
+}

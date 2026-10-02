@@ -1,0 +1,33 @@
+{
+  "version": "1.0.0",
+  "table": "transactions",
+  "columns": [
+    "transaction_id",
+    "transaction_date",
+    "process_date",
+    "product_id",
+    "customer_id",
+    "transaction_type",
+    "transaction_category",
+    "amount",
+    "currency",
+    "amount_usd",
+    "channel",
+    "branch_id",
+    "merchant_name",
+    "merchant_category",
+    "transaction_country",
+    "transaction_city",
+    "transaction_status",
+    "response_code",
+    "is_fraud",
+    "fraud_score",
+    "latitude",
+    "longitude"
+  ],
+  "raw_type": "STRING",
+  "nullable": true,
+  "encoding": "utf-8-sig",
+  "delimiter": ",",
+  "quotechar": "\""
+}

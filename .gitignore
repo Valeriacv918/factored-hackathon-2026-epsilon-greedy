@@ -3,3 +3,49 @@ __pycache__/
 .data/
 .DS_Store
 .ipynb_checkpoints/
+
+# Application and data pipeline artifacts
+# Runtime and local configuration
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+node_modules/
+.pnpm-store/
+coverage/
+htmlcov/
+*.log
+last_compilation.json
+existing_job.json
+compiled.json
+.df-credentials.json
+.aws/
+.gcloud/
+credentials*.json
+*service-account*.json
+*.pem
+*.key
+# Data and generated deliveries
+*.csv
+*.parquet
+*.avro
+*.zip
+*.pdf
+*.xlsx
+local-data/
+artifacts/
+evals/results/local/
+# Infrastructure local state
+.terraform/
+*.tfstate*
+*.tfvars
+!*.tfvars.example
+.DS_Store
+Thumbs.db
+
+# Local cloud audit exports
+gcp-audit-*/
