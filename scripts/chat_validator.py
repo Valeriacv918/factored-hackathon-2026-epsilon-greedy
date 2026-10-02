@@ -13,14 +13,18 @@ Comandos dentro del chat:
 import argparse
 import json
 from datetime import date
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "apps" / "agent" / "src"))
 
 from dotenv import load_dotenv
 
 load_dotenv()  # lee el archivo .env si existe
 
-from validation_agent.agent_1validator import ValidationAgent
-from validation_agent.repository import (CustomerRecord, InMemoryCustomerRepository, Product)
-from validation_agent.validator import IdentityValidator
+from bank_agent.validator_agent.agent import ValidationAgent
+from bank_agent.clients.repository import (CustomerRecord, InMemoryCustomerRepository, Product)
+from bank_agent.validator_agent.validator import IdentityValidator
 
 # Clientes SINTÉTICOS para probar sin BigQuery
 DEMO_CUSTOMERS = {
@@ -41,7 +45,7 @@ def main():
     args = ap.parse_args()
 
     if args.bq:
-        from validation_agent.repository import BigQueryCustomerRepository
+        from bank_agent.clients.repository import BigQueryCustomerRepository
         repo = BigQueryCustomerRepository()
         print("Conectado a BigQuery.")
     else:

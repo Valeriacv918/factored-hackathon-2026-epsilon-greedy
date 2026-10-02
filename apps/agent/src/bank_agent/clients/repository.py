@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Optional, Protocol
 
-from .config import BigQueryConfig, settings
+from ..config.settings import BigQueryConfig, settings
 
 
 @dataclass(frozen=True)
