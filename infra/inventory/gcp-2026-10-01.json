@@ -1,0 +1,1958 @@
+{
+  "project": "hackaton-509923",
+  "collected_at": "2026-10-01T23:29:38.336375+00:00",
+  "repository": {
+    "name": "projects/hackaton-509923/locations/us-central1/repositories/bank-transformations",
+    "serviceAccount": "bank-curation@hackaton-509923.iam.gserviceaccount.com",
+    "gitRemoteConfigured": false
+  },
+  "jobs": [
+    {
+      "name": "projects/hackaton-509923/locations/us-central1/jobs/bank-ingestion-service-agents",
+      "serviceAccount": "bank-ingestion@hackaton-509923.iam.gserviceaccount.com",
+      "timeout": "3600s",
+      "maxRetries": 0,
+      "taskCount": 1,
+      "parallelism": 1,
+      "containers": [
+        {
+          "image": "us-central1-docker.pkg.dev/hackaton-509923/bank-pipeline/ingestion@sha256:51335c68a64f1ed415c024c9f92dd9ab7949b0fc26af6c86e592ca9ecae0e5a2",
+          "resources": {
+            "limits": {
+              "cpu": "1",
+              "memory": "512Mi"
+            }
+          },
+          "env": {
+            "PROJECT_ID": "hackaton-509923",
+            "BQ_LOCATION": "us-central1",
+            "OPS_BUCKET": "hackaton-509923-ingestion-ops",
+            "AUDIT_DATASET": "bank_ops",
+            "SOURCE_URI": "gs://factoredia_hackaton/dataset_v1_raw/data/service_agents.csv",
+            "CONTRACT_URI": "gs://factoredia_hackaton/contracts/service_agents_v1.json",
+            "DESTINATION_TABLE": "hackaton-509923.bank_raw.service_agents",
+            "PIPELINE_VERSION": "1.0.0"
+          }
+        }
+      ],
+      "latestCreatedExecution": {
+        "name": "bank-ingestion-service-agents-d58bh",
+        "createTime": "2026-10-01T05:28:08.451121Z",
+        "completionTime": "2026-10-01T05:31:22.760929Z",
+        "completionStatus": "EXECUTION_SUCCEEDED"
+      }
+    },
+    {
+      "name": "projects/hackaton-509923/locations/us-central1/jobs/bank-ingestion-branches",
+      "serviceAccount": "bank-ingestion@hackaton-509923.iam.gserviceaccount.com",
+      "timeout": "3600s",
+      "maxRetries": 0,
+      "taskCount": 1,
+      "parallelism": 1,
+      "containers": [
+        {
+          "image": "us-central1-docker.pkg.dev/hackaton-509923/bank-pipeline/ingestion@sha256:51335c68a64f1ed415c024c9f92dd9ab7949b0fc26af6c86e592ca9ecae0e5a2",
+          "resources": {
+            "limits": {
+              "cpu": "1",
+              "memory": "512Mi"
+            }
+          },
+          "env": {
+            "PROJECT_ID": "hackaton-509923",
+            "BQ_LOCATION": "us-central1",
+            "OPS_BUCKET": "hackaton-509923-ingestion-ops",
+            "AUDIT_DATASET": "bank_ops",
+            "SOURCE_URI": "gs://factoredia_hackaton/dataset_v1_raw/data/branches.csv",
+            "CONTRACT_URI": "gs://factoredia_hackaton/contracts/branches_v1.json",
+            "DESTINATION_TABLE": "hackaton-509923.bank_raw.branches",
+            "PIPELINE_VERSION": "1.0.0"
+          }
+        }
+      ],
+      "latestCreatedExecution": {
+        "name": "bank-ingestion-branches-g7rmc",
+        "createTime": "2026-10-01T04:33:37.291009Z",
+        "completionTime": "2026-10-01T04:37:37.231192Z",
+        "completionStatus": "EXECUTION_SUCCEEDED"
+      }
+    },
+    {
+      "name": "projects/hackaton-509923/locations/us-central1/jobs/bank-ingestion-complaints",
+      "serviceAccount": "bank-ingestion@hackaton-509923.iam.gserviceaccount.com",
+      "timeout": "3600s",
+      "maxRetries": 0,
+      "taskCount": 1,
+      "parallelism": 1,
+      "containers": [
+        {
+          "image": "us-central1-docker.pkg.dev/hackaton-509923/bank-pipeline/ingestion@sha256:51335c68a64f1ed415c024c9f92dd9ab7949b0fc26af6c86e592ca9ecae0e5a2",
+          "resources": {
+            "limits": {
+              "cpu": "1",
+              "memory": "512Mi"
+            }
+          },
+          "env": {
+            "PROJECT_ID": "hackaton-509923",
+            "BQ_LOCATION": "us-central1",
+            "OPS_BUCKET": "hackaton-509923-ingestion-ops",
+            "AUDIT_DATASET": "bank_ops",
+            "SOURCE_URI": "gs://factoredia_hackaton/dataset_v1_raw/data/complaints/",
+            "CONTRACT_URI": "gs://factoredia_hackaton/contracts/complaints_v1.json",
+            "DESTINATION_TABLE": "hackaton-509923.bank_raw.complaints",
+            "PIPELINE_VERSION": "1.0.0"
+          }
+        }
+      ],
+      "latestCreatedExecution": {
+        "name": "bank-ingestion-complaints-n2757",
+        "createTime": "2026-10-01T02:44:30.147910Z",
+        "completionTime": "2026-10-01T02:50:40.127791Z",
+        "completionStatus": "EXECUTION_SUCCEEDED"
+      }
+    },
+    {
+      "name": "projects/hackaton-509923/locations/us-central1/jobs/bank-ingestion-daily-exchange-rates",
+      "serviceAccount": "bank-ingestion@hackaton-509923.iam.gserviceaccount.com",
+      "timeout": "3600s",
+      "maxRetries": 0,
+      "taskCount": 1,
+      "parallelism": 1,
+      "containers": [
+        {
+          "image": "us-central1-docker.pkg.dev/hackaton-509923/bank-pipeline/ingestion@sha256:51335c68a64f1ed415c024c9f92dd9ab7949b0fc26af6c86e592ca9ecae0e5a2",
+          "resources": {
+            "limits": {
+              "cpu": "1",
+              "memory": "512Mi"
+            }
+          },
+          "env": {
+            "PROJECT_ID": "hackaton-509923",
+            "BQ_LOCATION": "us-central1",
+            "OPS_BUCKET": "hackaton-509923-ingestion-ops",
+            "AUDIT_DATASET": "bank_ops",
+            "SOURCE_URI": "gs://factoredia_hackaton/dataset_v1_raw/data/daily_exchange_rates.csv",
+            "CONTRACT_URI": "gs://factoredia_hackaton/contracts/daily_exchange_rates_v1.json",
+            "DESTINATION_TABLE": "hackaton-509923.bank_raw.daily_exchange_rates",
+            "PIPELINE_VERSION": "1.0.0"
+          }
+        }
+      ],
+      "latestCreatedExecution": {
+        "name": "bank-ingestion-daily-exchange-rates-64gks",
+        "createTime": "2026-09-30T21:14:12.007575Z",
+        "completionTime": "2026-09-30T21:17:10.420932Z",
+        "completionStatus": "EXECUTION_SUCCEEDED"
+      }
+    },
+    {
+      "name": "projects/hackaton-509923/locations/us-central1/jobs/bank-ingestion-transactions",
+      "serviceAccount": "bank-ingestion@hackaton-509923.iam.gserviceaccount.com",
+      "timeout": "3600s",
+      "maxRetries": 0,
+      "taskCount": 1,
+      "parallelism": 1,
+      "containers": [
+        {
+          "image": "us-central1-docker.pkg.dev/hackaton-509923/bank-pipeline/ingestion@sha256:51335c68a64f1ed415c024c9f92dd9ab7949b0fc26af6c86e592ca9ecae0e5a2",
+          "resources": {
+            "limits": {
+              "cpu": "1",
+              "memory": "512Mi"
+            }
+          },
+          "env": {
+            "PROJECT_ID": "hackaton-509923",
+            "BQ_LOCATION": "us-central1",
+            "OPS_BUCKET": "hackaton-509923-ingestion-ops",
+            "AUDIT_DATASET": "bank_ops",
+            "SOURCE_URI": "gs://factoredia_hackaton/dataset_v1_raw/data/transactions/",
+            "CONTRACT_URI": "gs://factoredia_hackaton/contracts/transactions_v1.json",
+            "DESTINATION_TABLE": "hackaton-509923.bank_raw.transactions",
+            "PIPELINE_VERSION": "1.0.0"
+          }
+        }
+      ],
+      "latestCreatedExecution": {
+        "name": "bank-ingestion-transactions-br4hp",
+        "createTime": "2026-09-29T23:56:15.190514Z",
+        "completionTime": "2026-09-30T00:03:38.939130Z",
+        "completionStatus": "EXECUTION_SUCCEEDED"
+      }
+    },
+    {
+      "name": "projects/hackaton-509923/locations/us-central1/jobs/bank-ingestion-products",
+      "serviceAccount": "bank-ingestion@hackaton-509923.iam.gserviceaccount.com",
+      "timeout": "3600s",
+      "maxRetries": 0,
+      "taskCount": 1,
+      "parallelism": 1,
+      "containers": [
+        {
+          "image": "us-central1-docker.pkg.dev/hackaton-509923/bank-pipeline/ingestion@sha256:51335c68a64f1ed415c024c9f92dd9ab7949b0fc26af6c86e592ca9ecae0e5a2",
+          "resources": {
+            "limits": {
+              "cpu": "1",
+              "memory": "512Mi"
+            }
+          },
+          "env": {
+            "PROJECT_ID": "hackaton-509923",
+            "BQ_LOCATION": "us-central1",
+            "OPS_BUCKET": "hackaton-509923-ingestion-ops",
+            "AUDIT_DATASET": "bank_ops",
+            "SOURCE_URI": "gs://factoredia_hackaton/dataset_v1_raw/data/products.csv",
+            "CONTRACT_URI": "gs://factoredia_hackaton/contracts/products_v1.json",
+            "DESTINATION_TABLE": "hackaton-509923.bank_raw.products",
+            "PIPELINE_VERSION": "1.0.0"
+          }
+        }
+      ],
+      "latestCreatedExecution": {
+        "name": "bank-ingestion-products-5fs6f",
+        "createTime": "2026-09-29T23:33:21.120234Z",
+        "completionTime": "2026-09-29T23:37:21.725198Z",
+        "completionStatus": "EXECUTION_SUCCEEDED"
+      }
+    },
+    {
+      "name": "projects/hackaton-509923/locations/us-central1/jobs/bank-ingestion-customers",
+      "serviceAccount": "bank-ingestion@hackaton-509923.iam.gserviceaccount.com",
+      "timeout": "3600s",
+      "maxRetries": 0,
+      "taskCount": 1,
+      "parallelism": 1,
+      "containers": [
+        {
+          "image": "us-central1-docker.pkg.dev/hackaton-509923/bank-pipeline/ingestion@sha256:51335c68a64f1ed415c024c9f92dd9ab7949b0fc26af6c86e592ca9ecae0e5a2",
+          "resources": {
+            "limits": {
+              "cpu": "1",
+              "memory": "512Mi"
+            }
+          },
+          "env": {
+            "PROJECT_ID": "hackaton-509923",
+            "BQ_LOCATION": "us-central1",
+            "OPS_BUCKET": "hackaton-509923-ingestion-ops",
+            "AUDIT_DATASET": "bank_ops",
+            "SOURCE_URI": "gs://factoredia_hackaton/dataset_v1_raw/data/customers.csv",
+            "CONTRACT_URI": "gs://factoredia_hackaton/contracts/customers_v1.json",
+            "DESTINATION_TABLE": "hackaton-509923.bank_raw.customers",
+            "PIPELINE_VERSION": "1.0.0"
+          }
+        }
+      ],
+      "latestCreatedExecution": {
+        "name": "bank-ingestion-customers-jn4wt",
+        "createTime": "2026-09-28T03:39:07.279141Z",
+        "completionTime": "2026-09-28T03:40:53.765637Z",
+        "completionStatus": "EXECUTION_SUCCEEDED"
+      }
+    }
+  ],
+  "contracts": [
+    {
+      "name": "contracts/branches_v1.json",
+      "generation": "1790829192264045",
+      "sha256": "4ecc49e54db76151bbce3d77357ff1e125552747530cd2c85b00c9d185617ae6",
+      "state": "MATCH",
+      "export": "structural_fields_only"
+    },
+    {
+      "name": "contracts/complaints_v1.json",
+      "generation": "1790822625678975",
+      "sha256": "cd3348ff1d91ae6f04a572ddde2d38e34fb7c8e76f49db7052e2ca6d2d044f84",
+      "state": "MATCH",
+      "export": "structural_fields_only"
+    },
+    {
+      "name": "contracts/customers_v1.json",
+      "generation": "1790556063902472",
+      "sha256": "8a6db3b74edfdf8de8587e76f9dbc252676abe1fe9c97908aeae583a6f4021a6",
+      "state": "MISSING_LOCALLY",
+      "export": "structural_fields_only"
+    },
+    {
+      "name": "contracts/daily_exchange_rates_v1.json",
+      "generation": "1790712044042883",
+      "sha256": "4c6605234fd9f09b288a6ce86b0246017c651666f7d6df4f46b0e2aea0fb30aa",
+      "state": "MISSING_LOCALLY",
+      "export": "structural_fields_only"
+    },
+    {
+      "name": "contracts/products_v1.json",
+      "generation": "1790567208738076",
+      "sha256": "c037a74adb79d0ec3f1738a7d63a112080babb0fdcd74439e327d976b5d57c3b",
+      "state": "MISSING_LOCALLY",
+      "export": "structural_fields_only"
+    },
+    {
+      "name": "contracts/service_agents_v1.json",
+      "generation": "1790832462836381",
+      "sha256": "22166a8c8bee41ab0397e03764d685a7577984ef278af0e07679d995c97cd4aa",
+      "state": "MATCH",
+      "export": "structural_fields_only"
+    },
+    {
+      "name": "contracts/transactions_v1.json",
+      "generation": "1790726106141469",
+      "sha256": "a65f3ea20f73fba0157d32674f042e809579649d539051c98f9c9b741b05e080",
+      "state": "MISSING_LOCALLY",
+      "export": "structural_fields_only"
+    }
+  ],
+  "datasets": [
+    {
+      "dataset": "bank_raw",
+      "location": "us-central1"
+    },
+    {
+      "dataset": "bank_curated",
+      "location": "us-central1"
+    },
+    {
+      "dataset": "bank_ops",
+      "location": "us-central1"
+    },
+    {
+      "dataset": "bank_stage",
+      "location": "us-central1"
+    },
+    {
+      "dataset": "bank_quarantine",
+      "location": "us-central1"
+    }
+  ],
+  "buckets": [
+    {
+      "name": "factoredia_hackaton",
+      "location": "US-CENTRAL1",
+      "versioning": null,
+      "lifecycle": null,
+      "iamConfiguration": {
+        "bucketPolicyOnly": {
+          "enabled": true,
+          "lockedTime": "2026-12-26T23:32:12.926Z"
+        },
+        "uniformBucketLevelAccess": {
+          "enabled": true,
+          "lockedTime": "2026-12-26T23:32:12.926Z"
+        },
+        "publicAccessPrevention": "enforced"
+      }
+    },
+    {
+      "name": "hackaton-509923-ingestion-ops",
+      "location": "US-CENTRAL1",
+      "versioning": null,
+      "lifecycle": {
+        "rule": [
+          {
+            "action": {
+              "type": "Delete"
+            },
+            "condition": {
+              "age": 2,
+              "matchesPrefix": [
+                "staging/"
+              ]
+            }
+          },
+          {
+            "action": {
+              "type": "Delete"
+            },
+            "condition": {
+              "age": 30,
+              "matchesPrefix": [
+                "audit/"
+              ]
+            }
+          }
+        ]
+      },
+      "iamConfiguration": {
+        "bucketPolicyOnly": {
+          "enabled": true,
+          "lockedTime": "2026-12-27T03:29:00.849Z"
+        },
+        "uniformBucketLevelAccess": {
+          "enabled": true,
+          "lockedTime": "2026-12-27T03:29:00.849Z"
+        },
+        "publicAccessPrevention": "enforced"
+      }
+    }
+  ],
+  "tables": [
+    {
+      "dataset": "bank_raw",
+      "table": "customers",
+      "schema": {
+        "fields": [
+          {
+            "name": "customer_id",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "document_number",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "document_type",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "first_name",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "last_name",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "date_of_birth",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "gender",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "email",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "mobile_phone",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "landline_phone",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "address",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "city",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "state",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "country",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "postal_code",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "detected_accent",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "segment",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "credit_score",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "estimated_monthly_income",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "occupation",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "marital_status",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "education_level",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "registration_date",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "registration_branch_id",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "customer_status",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "last_updated",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "accepts_marketing",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          }
+        ]
+      },
+      "numRows": "150000",
+      "location": "us-central1",
+      "timePartitioning": null,
+      "clustering": null,
+      "lastModifiedTime": "1790566843350"
+    },
+    {
+      "dataset": "bank_raw",
+      "table": "products",
+      "schema": {
+        "fields": [
+          {
+            "name": "product_id",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "customer_id",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "product_type",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "product_number",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "currency",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "current_balance",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "credit_limit",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "interest_rate",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "opening_date",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "expiration_date",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "opening_branch_id",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "product_status",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "opening_channel",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "has_linked_app",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "days_past_due",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "last_transaction_date",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "last_updated",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          }
+        ]
+      },
+      "numRows": "400000",
+      "location": "us-central1",
+      "timePartitioning": null,
+      "clustering": null,
+      "lastModifiedTime": "1790725033231"
+    },
+    {
+      "dataset": "bank_raw",
+      "table": "transactions",
+      "schema": {
+        "fields": [
+          {
+            "name": "transaction_id",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "transaction_date",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "process_date",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "product_id",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "customer_id",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "transaction_type",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "transaction_category",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "amount",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "currency",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "amount_usd",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "channel",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "branch_id",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "merchant_name",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "merchant_category",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "transaction_country",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "transaction_city",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "transaction_status",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "response_code",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "is_fraud",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "fraud_score",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "latitude",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "longitude",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          }
+        ]
+      },
+      "numRows": "4425008",
+      "location": "us-central1",
+      "timePartitioning": null,
+      "clustering": null,
+      "lastModifiedTime": "1790726611337"
+    },
+    {
+      "dataset": "bank_raw",
+      "table": "complaints",
+      "schema": {
+        "fields": [
+          {
+            "name": "complaint_id",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "creation_date",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "process_date",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "customer_id",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "case_type",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "category",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "subcategory",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "reception_channel",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "affected_product_id",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "related_branch_id",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "origin_interaction_id",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "description",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "claimed_amount",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "currency",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "priority",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "status",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "assigned_agent_id",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "assignment_date",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "first_response_date",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "resolution_date",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "closing_date",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "sla_breached",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "resolution_days",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "resolution",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "compensation_granted",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "resolution_satisfaction",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "is_repeat_complainer",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          }
+        ]
+      },
+      "numRows": "67095",
+      "location": "us-central1",
+      "timePartitioning": null,
+      "clustering": null,
+      "lastModifiedTime": "1790823028853"
+    },
+    {
+      "dataset": "bank_raw",
+      "table": "branches",
+      "schema": {
+        "fields": [
+          {
+            "name": "branch_id",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "branch_code",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "branch_name",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "branch_type",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "address",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "city",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "state",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "country",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "postal_code",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "geographic_zone",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "phone",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "email",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "opening_time",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "closing_time",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "has_atms",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "atm_count",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "has_teller_windows",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "teller_window_count",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "latitude",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "longitude",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "branch_opening_date",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "branch_status",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          }
+        ]
+      },
+      "numRows": "350",
+      "location": "us-central1",
+      "timePartitioning": null,
+      "clustering": null,
+      "lastModifiedTime": "1790829445495"
+    },
+    {
+      "dataset": "bank_raw",
+      "table": "service_agents",
+      "schema": {
+        "fields": [
+          {
+            "name": "agent_id",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "employee_code",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "first_name",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "last_name",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "email",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "phone",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "native_accent",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "country_of_origin",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "assigned_branch_id",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "agent_type",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "experience_level",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "languages",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "specialty",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "hire_date",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "avg_csat",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "total_monthly_interactions",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "agent_status",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "work_shift",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          }
+        ]
+      },
+      "numRows": "1200",
+      "location": "us-central1",
+      "timePartitioning": null,
+      "clustering": null,
+      "lastModifiedTime": "1790832675360"
+    },
+    {
+      "dataset": "bank_raw",
+      "table": "daily_exchange_rates",
+      "schema": {
+        "fields": [
+          {
+            "name": "date",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "source_currency",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "target_currency",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "exchange_rate",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "buy_rate",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "sell_rate",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "source",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          }
+        ]
+      },
+      "numRows": "13164",
+      "location": "us-central1",
+      "timePartitioning": null,
+      "clustering": null,
+      "lastModifiedTime": "1790803020563"
+    },
+    {
+      "dataset": "bank_curated",
+      "table": "customers",
+      "schema": {
+        "fields": [
+          {
+            "name": "customer_id",
+            "type": "STRING"
+          },
+          {
+            "name": "document_number",
+            "type": "STRING"
+          },
+          {
+            "name": "document_type",
+            "type": "STRING"
+          },
+          {
+            "name": "first_name",
+            "type": "STRING"
+          },
+          {
+            "name": "last_name",
+            "type": "STRING"
+          },
+          {
+            "name": "date_of_birth",
+            "type": "DATE"
+          },
+          {
+            "name": "gender",
+            "type": "STRING"
+          },
+          {
+            "name": "email",
+            "type": "STRING"
+          },
+          {
+            "name": "mobile_phone",
+            "type": "STRING"
+          },
+          {
+            "name": "landline_phone",
+            "type": "STRING"
+          },
+          {
+            "name": "address",
+            "type": "STRING"
+          },
+          {
+            "name": "city",
+            "type": "STRING"
+          },
+          {
+            "name": "state",
+            "type": "STRING"
+          },
+          {
+            "name": "country",
+            "type": "STRING"
+          },
+          {
+            "name": "postal_code",
+            "type": "STRING"
+          },
+          {
+            "name": "detected_accent",
+            "type": "STRING"
+          },
+          {
+            "name": "segment",
+            "type": "STRING"
+          },
+          {
+            "name": "credit_score",
+            "type": "INTEGER"
+          },
+          {
+            "name": "estimated_monthly_income",
+            "type": "NUMERIC"
+          },
+          {
+            "name": "occupation",
+            "type": "STRING"
+          },
+          {
+            "name": "marital_status",
+            "type": "STRING"
+          },
+          {
+            "name": "education_level",
+            "type": "STRING"
+          },
+          {
+            "name": "registration_date",
+            "type": "TIMESTAMP"
+          },
+          {
+            "name": "registration_branch_id",
+            "type": "STRING"
+          },
+          {
+            "name": "customer_status",
+            "type": "STRING"
+          },
+          {
+            "name": "last_updated",
+            "type": "TIMESTAMP"
+          },
+          {
+            "name": "accepts_marketing",
+            "type": "BOOLEAN"
+          },
+          {
+            "name": "_curation_run_id",
+            "type": "STRING"
+          },
+          {
+            "name": "_contract_version",
+            "type": "STRING"
+          },
+          {
+            "name": "_source_snapshot_at",
+            "type": "TIMESTAMP"
+          }
+        ]
+      },
+      "numRows": "150000",
+      "location": "us-central1",
+      "timePartitioning": null,
+      "clustering": null,
+      "lastModifiedTime": "1790647704861"
+    },
+    {
+      "dataset": "bank_curated",
+      "table": "products",
+      "schema": {
+        "fields": [
+          {
+            "name": "product_id",
+            "type": "STRING"
+          },
+          {
+            "name": "customer_id",
+            "type": "STRING"
+          },
+          {
+            "name": "product_type",
+            "type": "STRING"
+          },
+          {
+            "name": "product_number",
+            "type": "STRING"
+          },
+          {
+            "name": "currency",
+            "type": "STRING"
+          },
+          {
+            "name": "current_balance",
+            "type": "NUMERIC"
+          },
+          {
+            "name": "credit_limit",
+            "type": "NUMERIC"
+          },
+          {
+            "name": "interest_rate",
+            "type": "NUMERIC"
+          },
+          {
+            "name": "opening_date",
+            "type": "DATE"
+          },
+          {
+            "name": "expiration_date",
+            "type": "DATE"
+          },
+          {
+            "name": "opening_branch_id",
+            "type": "STRING"
+          },
+          {
+            "name": "product_status",
+            "type": "STRING"
+          },
+          {
+            "name": "opening_channel",
+            "type": "STRING"
+          },
+          {
+            "name": "has_linked_app",
+            "type": "BOOLEAN"
+          },
+          {
+            "name": "days_past_due",
+            "type": "INTEGER"
+          },
+          {
+            "name": "last_transaction_date",
+            "type": "TIMESTAMP"
+          },
+          {
+            "name": "last_updated",
+            "type": "TIMESTAMP"
+          },
+          {
+            "name": "_curation_run_id",
+            "type": "STRING"
+          },
+          {
+            "name": "_contract_version",
+            "type": "STRING"
+          },
+          {
+            "name": "_source_snapshot_at",
+            "type": "TIMESTAMP"
+          }
+        ]
+      },
+      "numRows": "399988",
+      "location": "us-central1",
+      "timePartitioning": null,
+      "clustering": null,
+      "lastModifiedTime": "1790732644088"
+    },
+    {
+      "dataset": "bank_curated",
+      "table": "transactions",
+      "schema": {
+        "fields": [
+          {
+            "name": "transaction_id",
+            "type": "STRING"
+          },
+          {
+            "name": "transaction_date",
+            "type": "TIMESTAMP"
+          },
+          {
+            "name": "process_date",
+            "type": "DATE"
+          },
+          {
+            "name": "product_id",
+            "type": "STRING"
+          },
+          {
+            "name": "customer_id",
+            "type": "STRING"
+          },
+          {
+            "name": "transaction_type",
+            "type": "STRING"
+          },
+          {
+            "name": "transaction_category",
+            "type": "STRING"
+          },
+          {
+            "name": "amount",
+            "type": "NUMERIC"
+          },
+          {
+            "name": "currency",
+            "type": "STRING"
+          },
+          {
+            "name": "amount_usd",
+            "type": "NUMERIC"
+          },
+          {
+            "name": "channel",
+            "type": "STRING"
+          },
+          {
+            "name": "branch_id",
+            "type": "STRING"
+          },
+          {
+            "name": "merchant_name",
+            "type": "STRING"
+          },
+          {
+            "name": "merchant_category",
+            "type": "STRING"
+          },
+          {
+            "name": "transaction_country",
+            "type": "STRING"
+          },
+          {
+            "name": "transaction_city",
+            "type": "STRING"
+          },
+          {
+            "name": "transaction_status",
+            "type": "STRING"
+          },
+          {
+            "name": "response_code",
+            "type": "STRING"
+          },
+          {
+            "name": "is_fraud",
+            "type": "BOOLEAN"
+          },
+          {
+            "name": "fraud_score",
+            "type": "NUMERIC"
+          },
+          {
+            "name": "latitude",
+            "type": "NUMERIC"
+          },
+          {
+            "name": "longitude",
+            "type": "NUMERIC"
+          },
+          {
+            "name": "_curation_run_id",
+            "type": "STRING"
+          },
+          {
+            "name": "_contract_version",
+            "type": "STRING"
+          },
+          {
+            "name": "_source_snapshot_at",
+            "type": "TIMESTAMP"
+          }
+        ]
+      },
+      "numRows": "4424878",
+      "location": "us-central1",
+      "timePartitioning": {
+        "type": "DAY",
+        "field": "process_date"
+      },
+      "clustering": {
+        "fields": [
+          "product_id",
+          "customer_id"
+        ]
+      },
+      "lastModifiedTime": "1790821615254"
+    },
+    {
+      "dataset": "bank_curated",
+      "table": "complaints",
+      "schema": {
+        "fields": [
+          {
+            "name": "complaint_id",
+            "type": "STRING"
+          },
+          {
+            "name": "creation_date",
+            "type": "TIMESTAMP"
+          },
+          {
+            "name": "process_date",
+            "type": "DATE"
+          },
+          {
+            "name": "customer_id",
+            "type": "STRING"
+          },
+          {
+            "name": "case_type",
+            "type": "STRING"
+          },
+          {
+            "name": "category",
+            "type": "STRING"
+          },
+          {
+            "name": "subcategory",
+            "type": "STRING"
+          },
+          {
+            "name": "reception_channel",
+            "type": "STRING"
+          },
+          {
+            "name": "affected_product_id",
+            "type": "STRING"
+          },
+          {
+            "name": "related_branch_id",
+            "type": "STRING"
+          },
+          {
+            "name": "origin_interaction_id",
+            "type": "STRING"
+          },
+          {
+            "name": "description",
+            "type": "STRING"
+          },
+          {
+            "name": "claimed_amount",
+            "type": "NUMERIC"
+          },
+          {
+            "name": "currency",
+            "type": "STRING"
+          },
+          {
+            "name": "priority",
+            "type": "STRING"
+          },
+          {
+            "name": "status",
+            "type": "STRING"
+          },
+          {
+            "name": "assigned_agent_id",
+            "type": "STRING"
+          },
+          {
+            "name": "assignment_date",
+            "type": "TIMESTAMP"
+          },
+          {
+            "name": "first_response_date",
+            "type": "TIMESTAMP"
+          },
+          {
+            "name": "resolution_date",
+            "type": "TIMESTAMP"
+          },
+          {
+            "name": "closing_date",
+            "type": "TIMESTAMP"
+          },
+          {
+            "name": "sla_breached",
+            "type": "BOOLEAN"
+          },
+          {
+            "name": "resolution_days",
+            "type": "INTEGER"
+          },
+          {
+            "name": "resolution",
+            "type": "STRING"
+          },
+          {
+            "name": "compensation_granted",
+            "type": "NUMERIC"
+          },
+          {
+            "name": "resolution_satisfaction",
+            "type": "INTEGER"
+          },
+          {
+            "name": "is_repeat_complainer",
+            "type": "BOOLEAN"
+          },
+          {
+            "name": "_product_owner_mismatch",
+            "type": "BOOLEAN"
+          },
+          {
+            "name": "_quality_warnings",
+            "type": "STRING",
+            "mode": "REPEATED"
+          },
+          {
+            "name": "_curation_run_id",
+            "type": "STRING"
+          },
+          {
+            "name": "_contract_version",
+            "type": "STRING"
+          },
+          {
+            "name": "_source_snapshot_at",
+            "type": "TIMESTAMP"
+          }
+        ]
+      },
+      "numRows": "67094",
+      "location": "us-central1",
+      "timePartitioning": {
+        "type": "DAY",
+        "field": "process_date"
+      },
+      "clustering": {
+        "fields": [
+          "customer_id",
+          "affected_product_id"
+        ]
+      },
+      "lastModifiedTime": "1790825681403"
+    },
+    {
+      "dataset": "bank_curated",
+      "table": "branches",
+      "schema": {
+        "fields": [
+          {
+            "name": "branch_id",
+            "type": "STRING"
+          },
+          {
+            "name": "branch_code",
+            "type": "STRING"
+          },
+          {
+            "name": "branch_name",
+            "type": "STRING"
+          },
+          {
+            "name": "branch_type",
+            "type": "STRING"
+          },
+          {
+            "name": "address",
+            "type": "STRING"
+          },
+          {
+            "name": "city",
+            "type": "STRING"
+          },
+          {
+            "name": "state",
+            "type": "STRING"
+          },
+          {
+            "name": "country",
+            "type": "STRING"
+          },
+          {
+            "name": "postal_code",
+            "type": "STRING"
+          },
+          {
+            "name": "geographic_zone",
+            "type": "STRING"
+          },
+          {
+            "name": "phone",
+            "type": "STRING"
+          },
+          {
+            "name": "email",
+            "type": "STRING"
+          },
+          {
+            "name": "opening_time",
+            "type": "TIME"
+          },
+          {
+            "name": "closing_time",
+            "type": "TIME"
+          },
+          {
+            "name": "has_atms",
+            "type": "BOOLEAN"
+          },
+          {
+            "name": "atm_count",
+            "type": "INTEGER"
+          },
+          {
+            "name": "has_teller_windows",
+            "type": "BOOLEAN"
+          },
+          {
+            "name": "teller_window_count",
+            "type": "INTEGER"
+          },
+          {
+            "name": "latitude",
+            "type": "NUMERIC"
+          },
+          {
+            "name": "longitude",
+            "type": "NUMERIC"
+          },
+          {
+            "name": "branch_opening_date",
+            "type": "DATE"
+          },
+          {
+            "name": "branch_status",
+            "type": "STRING"
+          },
+          {
+            "name": "_curation_run_id",
+            "type": "STRING"
+          },
+          {
+            "name": "_contract_version",
+            "type": "STRING"
+          },
+          {
+            "name": "_source_snapshot_at",
+            "type": "TIMESTAMP"
+          }
+        ]
+      },
+      "numRows": "350",
+      "location": "us-central1",
+      "timePartitioning": null,
+      "clustering": null,
+      "lastModifiedTime": "1790832219032"
+    },
+    {
+      "dataset": "bank_curated",
+      "table": "service_agents",
+      "schema": {
+        "fields": [
+          {
+            "name": "agent_id",
+            "type": "STRING"
+          },
+          {
+            "name": "employee_code",
+            "type": "STRING"
+          },
+          {
+            "name": "first_name",
+            "type": "STRING"
+          },
+          {
+            "name": "last_name",
+            "type": "STRING"
+          },
+          {
+            "name": "email",
+            "type": "STRING"
+          },
+          {
+            "name": "phone",
+            "type": "STRING"
+          },
+          {
+            "name": "native_accent",
+            "type": "STRING"
+          },
+          {
+            "name": "country_of_origin",
+            "type": "STRING"
+          },
+          {
+            "name": "assigned_branch_id",
+            "type": "STRING"
+          },
+          {
+            "name": "agent_type",
+            "type": "STRING"
+          },
+          {
+            "name": "experience_level",
+            "type": "STRING"
+          },
+          {
+            "name": "languages",
+            "type": "STRING"
+          },
+          {
+            "name": "specialty",
+            "type": "STRING"
+          },
+          {
+            "name": "hire_date",
+            "type": "DATE"
+          },
+          {
+            "name": "avg_csat",
+            "type": "NUMERIC"
+          },
+          {
+            "name": "total_monthly_interactions",
+            "type": "INTEGER"
+          },
+          {
+            "name": "agent_status",
+            "type": "STRING"
+          },
+          {
+            "name": "work_shift",
+            "type": "STRING"
+          },
+          {
+            "name": "_branch_reference_status",
+            "type": "STRING"
+          },
+          {
+            "name": "_quality_warnings",
+            "type": "STRING",
+            "mode": "REPEATED"
+          },
+          {
+            "name": "_curation_run_id",
+            "type": "STRING"
+          },
+          {
+            "name": "_contract_version",
+            "type": "STRING"
+          },
+          {
+            "name": "_source_snapshot_at",
+            "type": "TIMESTAMP"
+          }
+        ]
+      },
+      "numRows": "1174",
+      "location": "us-central1",
+      "timePartitioning": null,
+      "clustering": null,
+      "lastModifiedTime": "1790833234426"
+    },
+    {
+      "dataset": "bank_curated",
+      "table": "daily_exchange_rates",
+      "schema": {
+        "fields": [
+          {
+            "name": "date",
+            "type": "DATE"
+          },
+          {
+            "name": "source_currency",
+            "type": "STRING"
+          },
+          {
+            "name": "target_currency",
+            "type": "STRING"
+          },
+          {
+            "name": "exchange_rate",
+            "type": "NUMERIC"
+          },
+          {
+            "name": "buy_rate",
+            "type": "NUMERIC"
+          },
+          {
+            "name": "sell_rate",
+            "type": "NUMERIC"
+          },
+          {
+            "name": "source",
+            "type": "STRING"
+          },
+          {
+            "name": "_curation_run_id",
+            "type": "STRING"
+          },
+          {
+            "name": "_contract_version",
+            "type": "STRING"
+          },
+          {
+            "name": "_source_snapshot_at",
+            "type": "TIMESTAMP"
+          }
+        ]
+      },
+      "numRows": "13164",
+      "location": "us-central1",
+      "timePartitioning": null,
+      "clustering": {
+        "fields": [
+          "source_currency",
+          "target_currency"
+        ]
+      },
+      "lastModifiedTime": "1790833805484"
+    }
+  ],
+  "scope": "Observed read-only configuration snapshot; not deployment manifests or effective IAM evidence."
+}

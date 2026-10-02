@@ -1,0 +1,45 @@
+name: Sync Dataform
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "data/dataform/**"
+      - ".github/workflows/dataform-sync.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: dataform-development
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Test Dataform graph
+        run: node data/dataform/tests/test.js
+
+  sync-and-compile:
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_DATAFORM_DEPLOYER }}
+          token_format: access_token
+      - name: Sync workspace and compile
+        env:
+          GCP_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+        run: python3 data/dataform/upload_workspace.py

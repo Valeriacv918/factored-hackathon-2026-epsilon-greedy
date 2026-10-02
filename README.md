@@ -4,68 +4,127 @@ AI-first **transaction-dispute intake** agent for a LATAM bank (Spanish and Port
 
 > The LLM understands and writes. Deterministic code decides, acts and verifies.
 
+## Status
 
-## Quick start
+This repository combines the existing analysis notebook with the GCP data
+pipelines and starter folders for the future LangGraph agent and MCP server.
+The application folders are scaffolding: no agent, MCP endpoint, or end-to-end
+orchestrator has been implemented yet.
 
 ## Repository structure
 
-```
-.
-├── data/                   # Input data (not versioned, see "Data")
-├── docs/
-│   ├── policies.md         # Policies / business rules used in the analysis
-│   └── findings_tables.txt # Tables with the profiling findings
-├── profiling.ipynb         # Main data profiling notebook
-├── pyproject.toml          # Project dependencies
-├── uv.lock                 # Exact dependency versions
-└── .python-version         # Project Python version
+```text
+apps/
+  agent/                 # LangGraph: graphs, nodes, prompts, clients, config, tests
+  mcp-server/            # MCP: tools, services, repositories, sql, config, tests
+data/
+  ingestion/            # Existing Cloud Run ingestion engine and tests
+  contracts/raw/        # Available structural CSV contracts
+  profiling/            # BigQuery profiles and diagnostics
+  dataform/             # Curated contracts, transformations and execution scripts
+contracts/mcp/          # Future tool input/output schemas
+config/environments/    # Future non-secret application configuration
+infra/                  # cloud-run, workflows, iam placeholders
+scripts/                # deploy, run, verify
+tests/integration/     # Future integration tests
+evals/                 # Synthetic cases, runners and local result conventions
+docs/                  # Architecture, operations, quality and existing policies
+profiling.ipynb         # Existing local analysis notebook (preserved)
+pyproject.toml          # Existing analysis dependencies (preserved)
+uv.lock                 # Existing dependency lock (preserved)
+.python-version         # Existing Python version (preserved)
 ```
 
-## Requirements
+## Local analysis setup
 
-- [uv](https://docs.astral.sh/uv/) (Python environment and dependency manager)
-- Git
-To install uv on macOS or Linux:
+With Git and uv installed:
 
 ```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
+git clone https://github.com/Valeriacv918/factored-hackathon-2026-epsilon-greedy.git
+cd factored-hackathon-2026-epsilon-greedy
+uv sync --locked
 ```
 
-You don't need to install Python separately. uv downloads the version specified in `.python-version`.
+The root Python environment remains the analysis environment. App-specific
+pyproject.toml files, lockfiles and entry points will be added when the agent
+and MCP server are implemented. `.env.example` describes proposed app settings;
+the existing data scripts do not automatically read it.
 
-## Setup
+## Data and source files
+
+`data/` now contains **versioned pipeline source code**. Dataset files are not
+versioned: `.gitignore` excludes CSV, Parquet, Avro and generated deliveries.
+The existing notebook keeps its `data/<table_name>/**/*.csv` paths; place local
+input data there as needed without changing the notebook. Do not replace the
+source subdirectories with dataset exports.
+
+Do not commit credentials, runtime .env files, service account keys, notebook
+outputs containing customer data, or `last_compilation.json`. Git ignore rules
+do not remove sensitive content from an already tracked notebook; review its
+outputs before committing notebook changes.
+
+## GCP pipelines
+
+Existing target: project `hackaton-509923`, region `us-central1`.
+Review configuration and permissions before running cloud commands.
+
+- Ingestion: `data/ingestion` validates CSV contracts, reconciles row counts,
+  publishes raw tables and writes audit events.
+- Transformation: `data/dataform` contains the seven curated table pipelines.
+- Profiling: `data/profiling` writes observations to BigQuery audit tables.
+- Orchestration across Cloud Run and Dataform remains pending.
+
+In Cloud Shell, from the repository root:
 
 ```bash
-git clone <repo-URL>
-cd <repo-name>
-uv sync
+cd data/dataform
+python3 upload_workspace.py
+# Only after COMPILED, select the intended table:
+python3 execute_compilation.py --table daily_exchange_rates
 ```
 
-`uv sync` creates the virtual environment in `.venv/` and installs the exact versions pinned in `uv.lock`.
+These commands upload and execute cloud work. They are not local setup commands.
+Wait for completion, then use the corresponding `verify_*.sql`. Do not execute
+all tags together or concurrent runs. See [the runbook](docs/runbook.md).
+`data/ingestion/setup.sh` provisions resources and deploys customers; it is not
+a routine command or a deployment script for every existing job.
 
-## Data
+All seven structural raw contracts are now present. The missing four were recovered
+from the October 1 GCP export; see [contract inventory](data/contracts/raw/README.md)
+and [GCP audit results](docs/gcp-audit-2026-10-01.md). The `Sync Dataform` GitHub
+Actions workflow now validates, uploads, and compiles Dataform changes on `main`;
+it becomes active after the one-time Workload Identity Federation setup in
+[GitHub to Google Cloud](docs/github-gcp-connection.md). It does not execute SQL.
 
-The `data/` folder is not committed to the repository. To run the analysis:
+## Local verification
 
-1. Create the folder if it doesn't exist: `mkdir -p data`
-2. Place the input files there:
-   <!-- TODO: list the expected files, for example:
-   - `data/source_file.csv`: description
-   -->
-3. <!-- TODO: explain where to get them (shared drive, database, etc.) -->
+With Python and Node on PATH, run from the repository root:
+
+```bash
+python scripts/verify/check_local.py
+```
+
+This runs CSV validation unit tests and all seven Dataform generation tests.
+It requires no cloud credentials and does not deploy anything. Full ingestion
+integration mocks additionally require `data/ingestion/requirements.txt`.
+Local tests do not replace Dataform compilation and BigQuery execution.
 
 ## Documentation
 
-- **`docs/policies.md`**: rules and criteria used in the analysis. <!-- TODO: adjust description -->
-- **`docs/findings_tables.txt`**: tables with the profiling findings.
+- [Architecture](docs/architecture.md)
+- [Operations and recovery](docs/runbook.md)
+- [Data quality rules and exceptions](docs/data-quality.md)
+- [Business policy research](docs/policies.md)
+- [Original profiling findings](docs/findings_tables.txt)
+- [Migration inventory](docs/migration-inventory.md)
 
-
+Each deployable component stays independently configurable. Future MCP tools
+must handle data quality flags and unresolved references explicitly. A complaint
+link to a product does not establish ownership or authorize product access.
 
 ## Submission checklist (due Oct 5 to hackathon.admin@factored.ai)
 
 - [ ] Deployed link
-- [ ] 4–6 slide presentation
+- [ ] 4Ã¢â‚¬â€œ6 slide presentation
 - [ ] Video pitch: working demo + core architecture decisions
 - [ ] Demo cases in ES and PT: normal resolution, ambiguous/unsupported, human-required
-
-

@@ -1,0 +1,6 @@
+node_modules/
+.df-credentials.json
+compiled.json
+.env
+last_compilation.json
+__pycache__/
