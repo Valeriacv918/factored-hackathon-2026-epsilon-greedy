@@ -1,6 +1,7 @@
 """Upload source files to an existing Dataform workspace; never executes SQL."""
 import base64
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -18,8 +19,9 @@ run_id = 'r_' + uuid.uuid4().hex
 
 
 def request(url, data=None):
-    # Token is obtained at runtime and never saved or printed.
-    token = subprocess.check_output(['gcloud','auth','print-access-token'],text=True).strip()
+    # Accept GitHub Actions' short-lived WIF token or use the local gcloud login.
+    token = os.environ.get('GCP_ACCESS_TOKEN') or subprocess.check_output(
+        ['gcloud','auth','print-access-token'],text=True).strip()
     req = urllib.request.Request(url, data=None if data is None else json.dumps(data).encode(),
         headers={'Authorization':'Bearer '+token, 'Content-Type':'application/json'},
         method='GET' if data is None else 'POST')

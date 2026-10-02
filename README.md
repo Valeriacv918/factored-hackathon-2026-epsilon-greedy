@@ -91,8 +91,10 @@ a routine command or a deployment script for every existing job.
 
 All seven structural raw contracts are now present. The missing four were recovered
 from the October 1 GCP export; see [contract inventory](data/contracts/raw/README.md)
-and [GCP audit results](docs/gcp-audit-2026-10-01.md). Dataform workspace source
-matches the repository at that snapshot; automatic GitHub deployment is not configured.
+and [GCP audit results](docs/gcp-audit-2026-10-01.md). The `Sync Dataform` GitHub
+Actions workflow now validates, uploads, and compiles Dataform changes on `main`;
+it becomes active after the one-time Workload Identity Federation setup in
+[GitHub to Google Cloud](docs/github-gcp-connection.md). It does not execute SQL.
 
 ## Local verification
 
