@@ -34,9 +34,19 @@ class ValidationPolicy:
 
 
 @dataclass(frozen=True)
+class FraudPolicy:
+    """Umbrales deterministicos del flujo de fraude (docs/STATE_MACHINE2.md, DSP-005/DSP-013)."""
+    fraud_score_threshold: float = float(os.getenv("DSP_FRAUD_SCORE_THRESHOLD", "30"))
+    high_amount_usd_threshold: float = float(os.getenv("DSP_HIGH_AMOUNT_USD", "500"))
+    dispute_window_days: int = int(os.getenv("DSP_WINDOW_DAYS", "90"))
+    max_charges_per_case: int = int(os.getenv("DSP_MAX_CHARGES_PER_CASE", "3"))   # ASK_MORE_CHARGES
+
+
+@dataclass(frozen=True)
 class Settings:
     bq: BigQueryConfig = field(default_factory=BigQueryConfig)
     policy: ValidationPolicy = field(default_factory=ValidationPolicy)
+    fraud_policy: FraudPolicy = field(default_factory=FraudPolicy)
     llm_model: str = os.getenv("LLM_MODEL", "groq:openai/gpt-oss-120b")
 
 
