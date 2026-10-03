@@ -40,13 +40,15 @@ def build_graph(services, *, checkpointer, policy=None):
                 else:
                     result = function(s, services, policy)
             except SessionExpired:
-                result = finish(s, "authentication_required", "Inicia sesión para continuar.", "Entre na sua conta para continuar.")
+                result = finish(s, "authentication_required", "Inicia sesión para continuar.", "Entre na sua conta para continuar.",
+                                "Sign in to continue.")
             except HandoffRequested as exc:
                 result = escalate(exc.reason, "general", "P2" if s.get("intent") in {"not_me", "card_emergency"} else "P3")
             except ServiceFailure:
                 if name in {"escalation", "security_language"}:
                     result = finish(s, "service_unavailable", "No se pudo verificar la operación. Contacta atención humana.",
-                                    "Não foi possível verificar a operação. Contate o atendimento humano.")
+                                    "Não foi possível verificar a operação. Contate o atendimento humano.",
+                                    "The operation could not be verified. Please contact a human agent.")
                 else:
                     result = escalate("tool_failure", "general", "P2" if s.get("intent") in {"not_me", "card_emergency"} or name == "fraud" else "P3")
             # Interrupt exceptions intentionally propagate to LangGraph.

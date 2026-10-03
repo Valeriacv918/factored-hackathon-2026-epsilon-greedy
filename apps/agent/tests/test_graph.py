@@ -19,7 +19,7 @@ def resume(graph, config, choice):
     return graph.invoke(Command(resume={"choice": choice}), config)
 
 
-@pytest.mark.parametrize("language", ["es", "pt"])
+@pytest.mark.parametrize("language", ["es", "pt", "en"])
 def test_normal_fraud_intake(language):
     services = FakeServices(language=language)
     graph, config, state = start(services)
@@ -47,10 +47,19 @@ def test_unknown_language_asks_before_authentication():
     services = FakeServices(language=None)
     services.valid = False
     graph, config, state = start(services)
-    assert state["__interrupt__"][0].value["options"] == ["es", "pt"]
+    assert state["__interrupt__"][0].value["options"] == ["es", "pt", "en"]
     state = resume(graph, config, "pt")
     assert state["response"].startswith("Entre")
     assert "understand" not in services.calls
+
+
+def test_english_selected_language_replies_in_english():
+    services = FakeServices(language=None)
+    services.valid = False
+    graph, config, _ = start(services)
+    state = resume(graph, config, "en")
+    assert state["language"] == "en"
+    assert state["response"] == "Sign in to continue."
 
 
 def test_session_expires_during_confirmation():
@@ -73,7 +82,7 @@ def test_declined_block_escalates_without_blocking():
 
 
 @pytest.mark.parametrize("status", ["Pending", "Reversed", "Declined"])
-@pytest.mark.parametrize("language", ["es", "pt"])
+@pytest.mark.parametrize("language", ["es", "pt", "en"])
 def test_charge_explanation_is_based_only_on_status(status, language):
     services = FakeServices(intent="charge_error", status=status, language=language)
     graph, config, state = start(services)

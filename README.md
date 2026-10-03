@@ -1,6 +1,6 @@
 # factored-hackathon-2026-epsilon-greedy
 
-AI-first **transaction-dispute intake** agent for a LATAM bank (Spanish and Portuguese), built for the Factored AI & Data Hackathon 2026.
+AI-first **transaction-dispute intake** agent for a LATAM bank (Spanish, Portuguese and English), built for the Factored AI & Data Hackathon 2026.
 
 > The LLM understands and writes. Deterministic code decides, acts and verifies.
 

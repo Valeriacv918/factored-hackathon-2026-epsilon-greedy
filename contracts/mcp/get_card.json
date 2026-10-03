@@ -1,0 +1,66 @@
+{
+  "name": "get_card",
+  "description": "Get one of the customer's cards. Fails if the card does not belong to the customer.",
+  "input_schema": {
+    "properties": {
+      "customer_id": {
+        "description": "Authenticated customer (customer_id).",
+        "pattern": "^[A-Za-z0-9_-]{1,64}$",
+        "title": "Customer Id",
+        "type": "string"
+      },
+      "card_id": {
+        "description": "Card product_id.",
+        "pattern": "^[A-Za-z0-9_-]{1,64}$",
+        "title": "Card Id",
+        "type": "string"
+      }
+    },
+    "required": [
+      "customer_id",
+      "card_id"
+    ],
+    "title": "get_cardArguments",
+    "type": "object"
+  },
+  "output_schema": {
+    "properties": {
+      "id": {
+        "title": "Id",
+        "type": "string"
+      },
+      "customer_id": {
+        "title": "Customer Id",
+        "type": "string"
+      },
+      "last4": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Last4"
+      },
+      "status": {
+        "title": "Status",
+        "type": "string"
+      },
+      "type": {
+        "title": "Type",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id",
+      "customer_id",
+      "last4",
+      "status",
+      "type"
+    ],
+    "title": "Card",
+    "type": "object"
+  }
+}

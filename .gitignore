@@ -49,3 +49,4 @@ Thumbs.db
 
 # Local cloud audit exports
 gcp-audit-*/
+*.egg-info/

@@ -13,13 +13,14 @@ def run(s, services, policy):
             return escalate("no_blockable_card", "cards", "P2")
         card = cards[0]["id"] if len(cards) == 1 else ask(
             s, services, "select_card", [c["id"] for c in cards],
-            "Selecciona la tarjeta.", "Selecione o cartão.",
+            "Selecciona la tarjeta.", "Selecione o cartão.", "Select the card.",
             cards=[{"id": c["id"], "last4": c["last4"]} for c in cards])
         return go("lost_card", "block", card_id=card)
     if phase == "block":
         return block(s, services, "lost_card")
     answer = ask(s, services, "unrecognized_charge", ["yes", "no"],
-                 "¿Hay algún cargo que no reconoces?", "Há alguma transação que você não reconhece?")
+                 "¿Hay algún cargo que no reconoces?", "Há alguma transação que você não reconhece?",
+                 "Is there any charge you don't recognize?")
     if answer == "yes":
         return go("understanding", "clarify", intent="not_me", slots={})
     return escalate("card_replacement", "cards", "P3")

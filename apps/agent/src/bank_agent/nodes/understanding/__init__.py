@@ -1,7 +1,7 @@
 from langgraph.types import interrupt
 
 from bank_agent.clients.contracts import ServiceFailure
-from bank_agent.nodes.common import ask, escalate, finish, go, number, require_session, tool
+from bank_agent.nodes.common import ask, escalate, finish, go, number, require_session, say, tool
 
 INTENTS = {"not_me", "charge_error", "card_emergency", "other"}
 
@@ -24,7 +24,8 @@ def run(s, services, policy):
         if s.get("reason") == "clarify_intent":
             intent = ask(s, services, "intent", sorted(INTENTS),
                          "¿Cargo desconocido, error en un cargo o tarjeta perdida?",
-                         "Compra não reconhecida, erro na cobrança ou cartão perdido?")
+                         "Compra não reconhecida, erro na cobrança ou cartão perdido?",
+                         "Unrecognized charge, charge error or lost card?")
         if intent == "card_emergency":
             return go("lost_card", intent=intent)
         if intent == "other":
@@ -33,12 +34,15 @@ def run(s, services, policy):
     if phase == "out_of_scope":
         answer = ask(s, services, "out_of_scope", ["human", "close"],
                      "Atiendo disputas y emergencias de tarjetas. Puedes solicitar una persona.",
-                     "Atendo contestações e emergências de cartões. Você pode solicitar uma pessoa.")
-        return finish(s, "out_of_scope", "Solicitud fuera de alcance.", "Solicitação fora do escopo.")
+                     "Atendo contestações e emergências de cartões. Você pode solicitar uma pessoa.",
+                     "I handle disputes and card emergencies. You can ask for a person.")
+        return finish(s, "out_of_scope", "Solicitud fuera de alcance.", "Solicitação fora do escopo.",
+                      "Request out of scope.")
     if phase == "clarify":
         reply = interrupt({"kind": "transaction_details", "language": s["language"],
-                           "message": "Indica fecha, monto o comercio." if s["language"] == "es"
-                           else "Informe data, valor ou estabelecimento.", "fields": ["text"]})
+                           "message": say(s, "Indica fecha, monto o comercio.",
+                                          "Informe data, valor ou estabelecimento.",
+                                          "Tell me the date, amount or merchant."), "fields": ["text"]})
         require_session(s, services)
         if not isinstance(reply, dict) or set(reply) != {"text"} or not isinstance(reply["text"], str) or not reply["text"].strip():
             raise ValueError("Expected {'text': <nonempty clarification>}.")
@@ -63,7 +67,7 @@ def run(s, services, policy):
         return go("understanding", "clarify")
     if len(candidates) > 1:
         selected = ask(s, services, "select_transaction", [t["id"] for t in candidates],
-                       "Selecciona el cargo.", "Selecione a transação.",
+                       "Selecciona el cargo.", "Selecione a transação.", "Select the charge.",
                        transactions=[{k: t[k] for k in ("id", "amount", "currency", "date")} for t in candidates])
         tx = next(t for t in candidates if t["id"] == selected)
     else:

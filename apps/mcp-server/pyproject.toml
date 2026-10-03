@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bank-mcp"
+version = "0.1.0"
+description = "Read-only MCP tools over bank_curated for the dispute agent"
+requires-python = ">=3.12"
+dependencies = [
+    "google-cloud-bigquery>=3.46,<4",
+    "mcp[cli]>=2.2,<3",
+    "pydantic>=2.13,<3",
+    "pydantic-settings>=2.15,<3",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8,<10"]
+
+[project.scripts]
+bank-mcp = "bank_mcp:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

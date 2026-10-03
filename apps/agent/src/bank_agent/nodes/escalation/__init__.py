@@ -27,5 +27,6 @@ def run(s, services, policy):
         raise ServiceFailure("Notification mismatch")
     ticket = s["ticket_id"]
     return {**finish(s, "escalated", f"Caso enviado a atención humana. Ticket: {ticket}.",
-                     f"Caso encaminhado ao atendimento humano. Ticket: {ticket}."),
+                     f"Caso encaminhado ao atendimento humano. Ticket: {ticket}.",
+                     f"Case sent to a human agent. Ticket: {ticket}."),
             "handoff_at": services.now().isoformat()}

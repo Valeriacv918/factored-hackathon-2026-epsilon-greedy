@@ -1,6 +1,6 @@
 """Textos (prompts) del agente 1: validación de identidad."""
 
-LANG_NAMES = {"es": "español", "pt": "portugués de Brasil"}
+LANG_NAMES = {"es": "español", "pt": "portugués de Brasil", "en": "inglés"}
 
 BASE_PROMPT = """Eres el asistente de validación de identidad de un banco.
 Tu ÚNICA tarea es autenticar al cliente antes de atenderlo.
@@ -28,4 +28,5 @@ Reglas:
 ALREADY_DONE = {
     "es": "Su identidad ya fue verificada. Lo estoy comunicando con el especialista que atenderá su solicitud.",
     "pt": "Sua identidade já foi verificada. Estou transferindo você para o especialista que vai atender sua solicitação.",
+    "en": "Your identity has already been verified. I am transferring you to the specialist who will handle your request.",
 }

@@ -1,1 +1,3 @@
-"""Espacio inicial del paquete; aplicacion pendiente."""
+from bank_mcp.tools.server import main
+
+__all__ = ["main"]

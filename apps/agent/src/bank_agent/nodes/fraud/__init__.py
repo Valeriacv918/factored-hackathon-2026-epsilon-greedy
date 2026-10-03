@@ -29,7 +29,8 @@ def run(s, services, policy):
         return file_case(s, services, "fraud")
     if phase == "more":
         answer = ask(s, services, "more_charges", ["yes", "no"],
-                     "¿Hay otro cargo que no reconoces?", "Há outra transação que você não reconhece?")
+                     "¿Hay otro cargo que no reconoces?", "Há outra transação que você não reconhece?",
+                     "Is there another charge you don't recognize?")
         if answer == "yes":
             if len(s["denied_transactions"]) >= policy.max_charges:
                 return escalate("charge_limit", "fraud", "P1")
@@ -46,4 +47,5 @@ def run(s, services, policy):
         return escalate("DSP-013", "fraud", "P2")
     ids = ", ".join(s["case_ids"]) or "—"
     return finish(s, "fraud_intake_complete", f"Bloqueo verificado. Casos registrados o existentes: {ids}.",
-                  f"Bloqueio verificado. Casos registrados ou existentes: {ids}.")
+                  f"Bloqueio verificado. Casos registrados ou existentes: {ids}.",
+                  f"Block verified. Filed or existing cases: {ids}.")

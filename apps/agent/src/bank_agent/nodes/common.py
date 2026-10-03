@@ -25,12 +25,17 @@ def require_session(s, services):
     return customer
 
 
-def ask(s, services, kind, options, es, pt, **details):
+def say(s, es, pt, en):
+    """Pick the reply in the conversation language; Spanish until one is known."""
+    return {"es": es, "pt": pt, "en": en}.get(s.get("language"), es)
+
+
+def ask(s, services, kind, options, es, pt, en, **details):
     # No mutations before interrupt: LangGraph restarts this node on resume.
     if s.get("customer_id") and "human" not in options:
         options = [*options, "human"]
     reply = interrupt({"kind": kind, "language": s.get("language"),
-                       "message": pt if s.get("language") == "pt" else es,
+                       "message": say(s, es, pt, en),
                        "options": options, **details})
     if s.get("customer_id"):
         require_session(s, services)  # Check again after the human wait.
@@ -74,8 +79,8 @@ def number(value):
         return None
 
 
-def finish(s, outcome, es, pt):
-    return go("end", outcome=outcome, response=pt if s.get("language") == "pt" else es)
+def finish(s, outcome, es, pt, en):
+    return go("end", outcome=outcome, response=say(s, es, pt, en))
 
 
 def block(s, services, route):
@@ -87,7 +92,7 @@ def block(s, services, route):
     if result.get("status") != "Blocked":
         answer = ask(s, services, "confirm_block", ["yes", "no"],
                      "¿Confirmas el bloqueo de esta tarjeta?", "Confirma o bloqueio deste cartão?",
-                     card_id=card)
+                     "Do you confirm blocking this card?", card_id=card)
         if answer == "no":
             return escalate("block_declined", "fraud", "P1")
         result = verified_action(s, services, "block_card", "read_block", card, card_id=card)
@@ -102,9 +107,11 @@ def file_case(s, services, route):
     tx = s["transaction"]
     answer = ask(s, services, "confirm_dispute", ["yes", "no"],
                  "¿Confirmas registrar la disputa?", "Confirma o registro da contestação?",
+                 "Do you confirm filing the dispute?",
                  transaction={k: tx[k] for k in ("id", "amount", "currency", "date")})
     if answer == "no":
-        return go("fraud", "more") if route == "fraud" else finish(s, "cancelled", "No se registró una disputa.", "Nenhuma contestação foi registrada.")
+        return go("fraud", "more") if route == "fraud" else finish(s, "cancelled", "No se registró una disputa.", "Nenhuma contestação foi registrada.",
+                                                                   "No dispute was filed.")
     record = verified_action(s, services, "file_dispute", "read_dispute", tx["id"],
                              transaction_id=tx["id"])
     if record.get("transaction_id") != tx["id"] or record.get("customer_id") != s["customer_id"]:
@@ -115,4 +122,5 @@ def file_case(s, services, route):
     if route == "fraud":
         return go("fraud", "more", **updates)
     return {**finish(s, "dispute_filed", f"Disputa registrada: {record['id']}.",
-                     f"Contestação registrada: {record['id']}."), **updates}
+                     f"Contestação registrada: {record['id']}.",
+                     f"Dispute filed: {record['id']}."), **updates}

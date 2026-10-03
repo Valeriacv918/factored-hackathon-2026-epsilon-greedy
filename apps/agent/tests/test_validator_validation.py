@@ -141,6 +141,8 @@ def test_no_pii_in_llm_output_or_audit(env):
     ("Não reconheço uma compra que apareceu na minha fatura", "pt"),
     ("Quiero bloquear mi tarjeta porque me la robaron", "es"),
     ("Hola necesito ayuda con mi credito hipotecario", "es"),
+    ("Hello, I need help with my credit card please", "en"),
+    ("I do not recognize a purchase on my statement", "en"),
 ])
 def test_language_detection(text, lang):
     assert detect_language(text).language == lang
