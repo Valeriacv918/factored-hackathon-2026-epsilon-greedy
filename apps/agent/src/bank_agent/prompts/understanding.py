@@ -8,7 +8,7 @@ Return:
 - intent:
   - not_me: the customer does not recognize a charge or suspects fraud.
   - charge_error: the customer recognizes the purchase but the charge is wrong (amount, duplicate, not refunded).
-  - card_emergency: the card was lost or stolen, or must be blocked now.
+  - emergency: the card was lost or stolen, or must be blocked now.
   - other: anything else.
 - confidence: 0 to 1, how sure you are of the intent.
 - slots: only what the customer actually said about the transaction:

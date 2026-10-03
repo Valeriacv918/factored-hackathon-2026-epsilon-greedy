@@ -92,7 +92,7 @@ def test_graph_explains_reversed_charge_end_to_end():
 
 
 def test_graph_lost_card_reaches_confirmation_then_fails_safely_without_writes():
-    s = services("card_emergency")
+    s = services("emergency")
     graph, config, state = run(s, "Perdí mi tarjeta")
     assert state["__interrupt__"][0].value["kind"] == "confirm_block"
     state = graph.invoke(Command(resume={"choice": "yes"}), config)

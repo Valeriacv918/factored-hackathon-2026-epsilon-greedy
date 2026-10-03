@@ -42,7 +42,7 @@ class Slots(BaseModel):
 
 
 class Extraction(BaseModel):
-    intent: Literal["not_me", "charge_error", "card_emergency", "other"]
+    intent: Literal["not_me", "charge_error", "emergency", "other"]
     confidence: float = Field(ge=0, le=1)
     slots: Slots = Field(default_factory=Slots)
     wants_human: bool = False

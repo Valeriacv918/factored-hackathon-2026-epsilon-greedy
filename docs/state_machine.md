@@ -130,7 +130,7 @@ reported_at: datetime | None = None           # first message of the conversatio
 block_verified_at: datetime | None = None     # exposure-window metric
 ```
 
-`Extraction` gains `intent: Literal["unrecognized_charge", "card_emergency", "other"]`.
+`Extraction` gains `intent: Literal["unrecognized_charge", "emergency", "other"]`.
 
 ## Demo cases mapped to paths
 
