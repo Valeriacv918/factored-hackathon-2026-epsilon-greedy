@@ -56,6 +56,15 @@ Python 3.12+, entorno propio en `apps/agent/.venv`, independiente del entorno
 analítico raíz y del servidor MCP. `apps/agent/uv.lock` fija las versiones.
 Las pruebas necesitan el extra `live` (langchain, lingua); no usan red ni GCP.
 
+Pruebas de integración (`tests/integration/`, marcador `integration`): levantan el
+servidor MCP real en su propio entorno y consultan BigQuery con tus credenciales
+ADC, solo lectura. Se excluyen por defecto y en CI. Usan el cliente de la entrada
+`dev` de `DEV_SESSIONS` (entorno o `.env` raíz), el mismo de `run_disputes.py --session dev`:
+
+```bash
+uv run --project apps/agent pytest apps/agent -m integration
+```
+
 ## Integrar
 
 ```python

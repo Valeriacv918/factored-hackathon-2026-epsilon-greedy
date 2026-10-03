@@ -24,5 +24,6 @@ live = [
 where = ["src"]
 
 [tool.pytest.ini_options]
-pythonpath = ["src", "tests"]
 testpaths = ["tests"]
+markers = ["integration: live agent -> MCP -> BigQuery tests; need ADC and DEV_SESSIONS=dev=<customer_id>"]
+addopts = "-m 'not integration'"

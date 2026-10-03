@@ -2,6 +2,8 @@
 from copy import deepcopy
 from datetime import datetime, timezone
 
+import pytest
+
 from bank_agent.clients.contracts import ServiceFailure
 
 
@@ -67,3 +69,9 @@ class FakeServices:
             if name in self.timeout_after_write:
                 raise ServiceFailure("Committed but response lost")
         return deepcopy(self.records[key])
+
+
+@pytest.fixture
+def fake_services():
+    """Factory: call as fake_services(language="pt", intent=...)."""
+    return FakeServices

@@ -7,7 +7,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
 
 from bank_agent.clients.contracts import ServiceFailure, SessionExpired
-from bank_agent.clients.mcp_services import McpServices, scenario_clock
+from bank_agent.clients.mcp_services import McpServices, detect_language_lingua, scenario_clock
 from bank_agent.clients.sessions import StaticSessions
 from bank_agent.graphs.disputes import build_graph
 from bank_agent.graphs.state import initial_state
@@ -106,3 +106,10 @@ def test_server_failure_escalates_then_ends_safely():
     _, _, state = run(services(client=FakeMcpClient(fail=True)))
     assert state["outcome"] == "service_unavailable"
     assert state["reason"] == "tool_failure"
+
+
+@pytest.mark.parametrize("text,language", [("Hola, necesito ayuda con mi tarjeta de crédito", "es"),
+                                           ("Olá, preciso de ajuda com o meu cartão de crédito", "pt")])
+def test_real_language_detector_is_wired(text, language):
+    # The graph tests inject a fake detector; this one imports the real lingua path.
+    assert detect_language_lingua(text) == language

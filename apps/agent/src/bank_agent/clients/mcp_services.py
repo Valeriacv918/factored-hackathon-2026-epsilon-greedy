@@ -40,7 +40,7 @@ def scenario_clock(start: dt.datetime) -> Callable[[], dt.datetime]:
 
 
 def detect_language_lingua(text: str) -> str | None:
-    from bank_agent.validator_agent.language import detect_language
+    from bank_agent.nodes.validator_agent.language import detect_language
     result = detect_language(text)
     return None if result.ambiguous else result.language
 

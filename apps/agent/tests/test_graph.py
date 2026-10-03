@@ -5,7 +5,6 @@ from langgraph.types import Command
 from bank_agent.graphs.disputes import build_graph
 from bank_agent.graphs.policy import Policy, decide
 from bank_agent.graphs.state import initial_state
-from fakes import FakeServices
 
 
 def start(services, **kwargs):
@@ -20,8 +19,8 @@ def resume(graph, config, choice):
 
 
 @pytest.mark.parametrize("language", ["es", "pt"])
-def test_normal_fraud_intake(language):
-    services = FakeServices(language=language)
+def test_normal_fraud_intake(fake_services, language):
+    services = fake_services(language=language)
     graph, config, state = start(services)
     assert state["__interrupt__"][0].value["kind"] == "confirm_block"
     assert "block_card" not in services.calls
@@ -35,16 +34,16 @@ def test_normal_fraud_intake(language):
     assert services.calls.index("validate_session") < services.calls.index("understand")
 
 
-def test_invalid_session_never_understands_or_reads_data():
-    services = FakeServices()
+def test_invalid_session_never_understands_or_reads_data(fake_services):
+    services = fake_services()
     services.valid = False
     _, _, state = start(services)
     assert state["outcome"] == "authentication_required"
     assert "understand" not in services.calls
 
 
-def test_unknown_language_asks_before_authentication():
-    services = FakeServices(language=None)
+def test_unknown_language_asks_before_authentication(fake_services):
+    services = fake_services(language=None)
     services.valid = False
     graph, config, state = start(services)
     assert state["__interrupt__"][0].value["options"] == ["es", "pt"]
@@ -53,16 +52,16 @@ def test_unknown_language_asks_before_authentication():
     assert "understand" not in services.calls
 
 
-def test_unsupported_language_asks_es_or_pt():
-    services = FakeServices(language="en")
+def test_unsupported_language_asks_es_or_pt(fake_services):
+    services = fake_services(language="en")
     graph, config, state = start(services)
     assert state["__interrupt__"][0].value["options"] == ["es", "pt"]
     with pytest.raises(ValueError):
         resume(graph, config, "en")
 
 
-def test_session_expires_during_confirmation():
-    services = FakeServices()
+def test_session_expires_during_confirmation(fake_services):
+    services = fake_services()
     graph, config, _ = start(services)
     services.valid = False
     state = resume(graph, config, "yes")
@@ -70,8 +69,8 @@ def test_session_expires_during_confirmation():
     assert "block_card" not in services.calls
 
 
-def test_declined_block_escalates_without_blocking():
-    services = FakeServices()
+def test_declined_block_escalates_without_blocking(fake_services):
+    services = fake_services()
     graph, config, _ = start(services)
     state = resume(graph, config, "no")
     assert state["outcome"] == "escalated"
@@ -82,8 +81,8 @@ def test_declined_block_escalates_without_blocking():
 
 @pytest.mark.parametrize("status", ["Pending", "Reversed", "Declined"])
 @pytest.mark.parametrize("language", ["es", "pt"])
-def test_charge_explanation_is_based_only_on_status(status, language):
-    services = FakeServices(intent="charge_error", status=status, language=language)
+def test_charge_explanation_is_based_only_on_status(fake_services, status, language):
+    services = fake_services(intent="charge_error", status=status, language=language)
     graph, config, state = start(services)
     assert state["__interrupt__"][0].value["kind"] == "explanation"
     state = resume(graph, config, "understood")
@@ -91,8 +90,8 @@ def test_charge_explanation_is_based_only_on_status(status, language):
     assert "file_dispute" not in services.calls
 
 
-def test_ambiguous_transaction_buttons():
-    services = FakeServices(intent="charge_error")
+def test_ambiguous_transaction_buttons(fake_services):
+    services = fake_services(intent="charge_error")
     services.transactions.append({**services.transactions[0], "id": "tx-2"})
     graph, config, state = start(services)
     assert state["__interrupt__"][0].value["kind"] == "select_transaction"
@@ -102,8 +101,8 @@ def test_ambiguous_transaction_buttons():
     assert state["transaction"]["id"] == "tx-2"
 
 
-def test_unowned_transaction_never_disclosed():
-    services = FakeServices()
+def test_unowned_transaction_never_disclosed(fake_services):
+    services = fake_services()
     services.transactions[0]["customer_id"] = "someone-else"
     _, _, state = start(services)
     assert state["outcome"] == "escalated"
@@ -111,8 +110,8 @@ def test_unowned_transaction_never_disclosed():
     assert "block_card" not in services.calls
 
 
-def test_timeout_after_commit_does_not_duplicate_dispute():
-    services = FakeServices(intent="charge_error")
+def test_timeout_after_commit_does_not_duplicate_dispute(fake_services):
+    services = fake_services(intent="charge_error")
     services.timeout_after_write.add("file_dispute")
     graph, config, _ = start(services)
     state = resume(graph, config, "yes")
@@ -121,8 +120,8 @@ def test_timeout_after_commit_does_not_duplicate_dispute():
     assert services.calls.count("file_dispute") == 2
 
 
-def test_failed_ticket_does_not_report_success_or_loop():
-    services = FakeServices()
+def test_failed_ticket_does_not_report_success_or_loop(fake_services):
+    services = fake_services()
     services.fail.add("create_handoff")
     graph, config, _ = start(services)
     state = resume(graph, config, "no")
@@ -131,8 +130,8 @@ def test_failed_ticket_does_not_report_success_or_loop():
     assert services.calls.count("create_handoff") == 2
 
 
-def test_failed_verification_never_reports_a_case():
-    services = FakeServices(intent="charge_error")
+def test_failed_verification_never_reports_a_case(fake_services):
+    services = fake_services(intent="charge_error")
     services.fail.add("read_dispute")
     graph, config, _ = start(services)
     state = resume(graph, config, "yes")
@@ -140,8 +139,8 @@ def test_failed_verification_never_reports_a_case():
     assert state["case_ids"] == []
 
 
-def test_high_fraud_score_reaches_p1():
-    services = FakeServices(score="85")
+def test_high_fraud_score_reaches_p1(fake_services):
+    services = fake_services(score="85")
     graph, config, _ = start(services)
     resume(graph, config, "yes")
     resume(graph, config, "yes")
@@ -149,36 +148,36 @@ def test_high_fraud_score_reaches_p1():
     assert state["reason"] == "DSP-013" and state["priority"] == "P1"
 
 
-def test_lost_card_to_replacement():
-    services = FakeServices(intent="card_emergency")
+def test_lost_card_to_replacement(fake_services):
+    services = fake_services(intent="card_emergency")
     graph, config, _ = start(services)
     resume(graph, config, "yes")
     state = resume(graph, config, "no")
     assert state["queue"] == "cards" and state["reason"] == "card_replacement"
 
 
-def test_free_text_cannot_confirm_a_mutation():
-    services = FakeServices()
+def test_free_text_cannot_confirm_a_mutation(fake_services):
+    services = fake_services()
     graph, config, _ = start(services)
     with pytest.raises(ValueError):
         graph.invoke(Command(resume="yes"), config)
     assert "block_card" not in services.calls
 
 
-def test_human_can_be_requested_at_button_pause():
-    services = FakeServices()
+def test_human_can_be_requested_at_button_pause(fake_services):
+    services = fake_services()
     graph, config, _ = start(services)
     state = resume(graph, config, "human")
     assert state["outcome"] == "escalated" and state["reason"] == "requested_human"
 
 
-def test_turn_limit_escalates():
-    _, _, state = start(FakeServices(), policy=Policy(max_turns=1))
+def test_turn_limit_escalates(fake_services):
+    _, _, state = start(fake_services(), policy=Policy(max_turns=1))
     assert state["reason"] == "turn_limit"
 
 
-def test_policy_boundary_and_missing_amount():
-    services = FakeServices()
+def test_policy_boundary_and_missing_amount(fake_services):
+    services = fake_services()
     tx = services.transactions[0]
     context = {"recent_dispute_count": 0}
     assert decide({**tx, "amount_usd": "500"}, context, services.now(), Policy())[0] == "file"
@@ -186,8 +185,8 @@ def test_policy_boundary_and_missing_amount():
     assert decide({**tx, "amount_usd": None}, context, services.now(), Policy())[0] == "escalate"
 
 
-def test_two_charges_on_different_cards_each_require_block():
-    services = FakeServices()
+def test_two_charges_on_different_cards_each_require_block(fake_services):
+    services = fake_services()
     graph, config, _ = start(services, policy=Policy(max_turns=20))
     resume(graph, config, "yes")
     resume(graph, config, "yes")
@@ -206,8 +205,8 @@ def test_two_charges_on_different_cards_each_require_block():
     assert len(state["case_ids"]) == 2
 
 
-def test_human_choice_cannot_bypass_language_and_security():
-    services = FakeServices(language=None)
+def test_human_choice_cannot_bypass_language_and_security(fake_services):
+    services = fake_services(language=None)
     graph, config, _ = start(services)
     with pytest.raises(ValueError):
         resume(graph, config, "human")
@@ -215,8 +214,8 @@ def test_human_choice_cannot_bypass_language_and_security():
     assert "create_handoff" not in services.calls
 
 
-def test_no_matches_exhausts_two_clarifications():
-    services = FakeServices()
+def test_no_matches_exhausts_two_clarifications(fake_services):
+    services = fake_services()
     services.transactions = []
     graph, config, _ = start(services)
     for _ in range(2):
@@ -225,8 +224,8 @@ def test_no_matches_exhausts_two_clarifications():
     assert state["reason"] == "transaction_unresolved"
 
 
-def test_existing_case_never_creates_a_duplicate():
-    services = FakeServices(intent="charge_error")
+def test_existing_case_never_creates_a_duplicate(fake_services):
+    services = fake_services(intent="charge_error")
     services.existing = "existing-case"
     _, _, state = start(services)
     assert state["outcome"] == "existing_case"
@@ -234,8 +233,8 @@ def test_existing_case_never_creates_a_duplicate():
     assert "file_dispute" not in services.calls
 
 
-def test_fraud_without_card_escalates():
-    services = FakeServices()
+def test_fraud_without_card_escalates(fake_services):
+    services = fake_services()
     services.transactions[0]["card_id"] = None
     _, _, state = start(services)
     assert state["reason"] == "no_blockable_card"
