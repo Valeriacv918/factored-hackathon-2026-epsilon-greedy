@@ -7,14 +7,28 @@ name = "bank-agent"
 version = "0.1.0"
 description = "LangGraph transaction dispute workflow"
 requires-python = ">=3.12"
-dependencies = ["langgraph>=1.0,<2"]
+dependencies = [
+    "langchain-groq>=1.1.3",
+    "langgraph>=1.0,<2",
+    "lingua-language-detector>=2.2.0",
+    "python-dotenv>=1.2.4",
+]
 
 [project.optional-dependencies]
 test = ["pytest>=8,<10"]
+# Real adapters: MCP client, LLM extraction, language detection (clients/mcp_services.py).
+live = [
+    "mcp>=2.2,<3",
+    "langchain>=1.4,<2",
+    "langchain-groq>=1.1,<2",
+    "lingua-language-detector>=2.2,<3",
+    "python-dotenv>=1.2,<2",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
 testpaths = ["tests"]
+markers = ["integration: live agent -> MCP -> BigQuery tests; need ADC and DEV_SESSIONS=dev=<customer_id>"]
+addopts = "-m 'not integration'"

@@ -7,16 +7,17 @@ AI-first **transaction-dispute intake** agent for a LATAM bank (Spanish and Port
 ## Status
 
 This repository combines the existing analysis notebook with the GCP data
-pipelines and starter folders for the future LangGraph agent and MCP server.
-The agent now contains an executable six-component LangGraph workflow with local
-synthetic-service tests. Real model/MCP adapters, the MCP endpoint and the
-end-to-end deployed application remain pending. See [agent setup](apps/agent/README.md).
+pipelines, a LangGraph agent and an MCP server.
+The agent runs an executable six-component LangGraph workflow (Spanish and
+Portuguese) and talks to a read-only MCP server over BigQuery. MCP write tools
+and the end-to-end deployed application remain pending. See
+[agent setup](apps/agent/README.md) and [MCP server](apps/mcp-server/README.md).
 
 ## Repository structure
 
 ```text
 apps/
-  agent/                 # LangGraph workflow, six node components, service contracts, tests
+  agent/                 # LangGraph workflow, nodes, service contracts, tests (+ tests/integration: live agent -> MCP)
   mcp-server/            # MCP: tools, services, repositories, sql, config, tests
 data/
   ingestion/            # Existing Cloud Run ingestion engine and tests
@@ -27,7 +28,6 @@ contracts/mcp/          # Future tool input/output schemas
 config/environments/    # Future non-secret application configuration
 infra/                  # cloud-run, workflows, iam placeholders
 scripts/                # deploy, run, verify
-tests/integration/     # Future integration tests
 evals/                 # Synthetic cases, runners and local result conventions
 docs/                  # Architecture, operations, quality and existing policies
 profiling.ipynb         # Existing local analysis notebook (preserved)
@@ -46,10 +46,29 @@ cd factored-hackathon-2026-epsilon-greedy
 uv sync --locked
 ```
 
-The root Python environment remains the analysis environment. The agent has its
-own pyproject.toml and pinned requirements.lock.txt; MCP packaging remains pending.
-`.env.example` describes proposed app settings;
+The root Python environment is only the analysis environment (duckdb, pandas,
+tabulate for the notebook). Each app is its own uv project with its own `.venv`
+and `uv.lock`: see [apps/agent](apps/agent/README.md) and
+[apps/mcp-server](apps/mcp-server/README.md). CI runs each app's tests in its own
+environment (`.github/workflows/python-tests.yml`).
+`.env.example` describes app settings;
 the existing data scripts do not automatically read it.
+
+## Testing
+
+Tests run per app, each in its own environment; there is no repository-wide `pytest`.
+
+| Layer | Where | Runs in CI | How |
+|---|---|---|---|
+| Agent unit tests | `apps/agent/tests/` | yes | `uv run --project apps/agent pytest apps/agent` |
+| MCP server unit tests | `apps/mcp-server/tests/` | yes | `uv run --project apps/mcp-server pytest apps/mcp-server` |
+| Live integration (agent → MCP → BigQuery) | `apps/agent/tests/integration/` | no (opt-in) | `uv run --project apps/agent pytest apps/agent -m integration` |
+| LLM quality evaluations | `evals/` | no | metrics, not pass/fail |
+| Data pipeline checks | `data/ingestion`, `data/dataform/tests` | Dataform only | `python scripts/verify/check_local.py` (see below) |
+
+Unit tests need no network, GCP or model. Integration tests need ADC and
+`DEV_SESSIONS=dev=<customer_id>`. Layout and conventions:
+[apps/agent/tests](apps/agent/tests/README.md), [apps/mcp-server/tests](apps/mcp-server/tests/README.md).
 
 ## Data and source files
 

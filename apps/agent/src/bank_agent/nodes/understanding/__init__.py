@@ -1,7 +1,7 @@
 from langgraph.types import interrupt
 
 from bank_agent.clients.contracts import ServiceFailure
-from bank_agent.nodes.common import ask, escalate, finish, go, number, require_session, tool
+from bank_agent.nodes.common import ask, escalate, finish, go, number, require_session, say, tool
 
 INTENTS = {"not_me", "charge_error", "emergency", "other"}
 
@@ -37,8 +37,8 @@ def run(s, services, policy):
         return finish(s, "out_of_scope", "Solicitud fuera de alcance.", "Solicitação fora do escopo.")
     if phase == "clarify":
         reply = interrupt({"kind": "transaction_details", "language": s["language"],
-                           "message": "Indica fecha, monto o comercio." if s["language"] == "es"
-                           else "Informe data, valor ou estabelecimento.", "fields": ["text"]})
+                           "message": say(s, "Indica fecha, monto o comercio.",
+                                          "Informe data, valor ou estabelecimento."), "fields": ["text"]})
         require_session(s, services)
         if not isinstance(reply, dict) or set(reply) != {"text"} or not isinstance(reply["text"], str) or not reply["text"].strip():
             raise ValueError("Expected {'text': <nonempty clarification>}.")

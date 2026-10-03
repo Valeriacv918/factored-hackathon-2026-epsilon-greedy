@@ -25,12 +25,17 @@ def require_session(s, services):
     return customer
 
 
+def say(s, es, pt):
+    """Pick the reply in the conversation language; Spanish until one is known."""
+    return pt if s.get("language") == "pt" else es
+
+
 def ask(s, services, kind, options, es, pt, **details):
     # No mutations before interrupt: LangGraph restarts this node on resume.
     if s.get("customer_id") and "human" not in options:
         options = [*options, "human"]
     reply = interrupt({"kind": kind, "language": s.get("language"),
-                       "message": pt if s.get("language") == "pt" else es,
+                       "message": say(s, es, pt),
                        "options": options, **details})
     if s.get("customer_id"):
         require_session(s, services)  # Check again after the human wait.
@@ -75,7 +80,7 @@ def number(value):
 
 
 def finish(s, outcome, es, pt):
-    return go("end", outcome=outcome, response=pt if s.get("language") == "pt" else es)
+    return go("end", outcome=outcome, response=say(s, es, pt))
 
 
 def block(s, services, route):
