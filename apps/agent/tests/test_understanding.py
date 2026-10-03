@@ -37,8 +37,8 @@ def test_extraction_returns_graph_shape_and_prompt_has_scenario_date():
 
 
 def test_dict_output_is_validated():
-    out = LlmUnderstanding(StubModel({"intent": "card_emergency", "confidence": 1}), lambda: NOW).understand("x", "pt")
-    assert out["intent"] == "card_emergency" and out["slots"] == {}
+    out = LlmUnderstanding(StubModel({"intent": "emergency", "confidence": 1}), lambda: NOW).understand("x", "pt")
+    assert out["intent"] == "emergency" and out["slots"] == {}
 
 
 @pytest.mark.parametrize("out", [{"intent": "transfer_money", "confidence": 0.9},

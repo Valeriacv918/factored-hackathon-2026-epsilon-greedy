@@ -19,7 +19,7 @@ deja de ser honesta.
 | `id` | `es-001`, `pt-045`... | Identificador único |
 | `lang` | `es` / `pt` | Idioma del mensaje |
 | `text` | texto | El mensaje tal como lo escribiría un cliente |
-| `intent` | `card_emergency` / `not_me` / `charge_error` / `other` | Intención correcta |
+| `intent` | `emergency` / `not_me` / `charge_error` / `other` | Intención correcta |
 | `wants_human` | `1` / `0` | ¿Pide hablar con una persona? |
 | `ambiguous` | `1` / `0` | `1` = ni un humano podría decidir sin preguntar → lo correcto es mostrar botones |
 | `category` | ver abajo | Qué hace difícil al mensaje |
@@ -28,10 +28,10 @@ deja de ser honesta.
 
 ## Reglas de etiquetado
 
-1. **`card_emergency`**: el cliente **no tiene** su tarjeta o cree que está comprometida:
+1. **`emergency`**: el cliente **no tiene** su tarjeta o cree que está comprometida:
    perdida, robada, clonada, retenida en un cajero, le robaron la billetera.
    Pedir "bloquear la tarjeta" también cuenta.
-   - Si además menciona compras raras → sigue siendo `card_emergency` (tiene prioridad).
+   - Si además menciona compras raras → sigue siendo `emergency` (tiene prioridad).
 2. **`not_me`**: hay un cargo que el cliente **no hizo ni autorizó**.
    - "Mi hijo usó mi tarjeta sin permiso" → `not_me` (no lo autorizó).
 3. **`charge_error`**: el cliente **sí hizo** la compra, pero el cobro está mal:

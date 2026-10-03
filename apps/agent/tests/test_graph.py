@@ -149,7 +149,7 @@ def test_high_fraud_score_reaches_p1(fake_services):
 
 
 def test_lost_card_to_replacement(fake_services):
-    services = fake_services(intent="card_emergency")
+    services = fake_services(intent="emergency")
     graph, config, _ = start(services)
     resume(graph, config, "yes")
     state = resume(graph, config, "no")
