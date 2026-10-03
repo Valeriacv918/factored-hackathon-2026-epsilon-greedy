@@ -1,6 +1,6 @@
 # Pruebas del grafo
 
-Desde apps/agent: .venv/Scripts/python.exe -m pytest -q
+Desde apps/agent: `uv run pytest -q` (o desde la raíz: `uv run --project apps/agent pytest apps/agent -q`)
 
 Servicios sintéticos en fakes.py; sin red, GCP ni modelos. Cubren ES/PT,
 confirmaciones, aislamiento de clientes, sesiones, políticas, reintentos,

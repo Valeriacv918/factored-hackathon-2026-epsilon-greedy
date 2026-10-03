@@ -1,7 +1,7 @@
 """Write each tool's input/output JSON Schema to contracts/mcp/<tool>.json.
 
 Run from apps/mcp-server after changing a tool signature:
-    .venv/Scripts/python.exe scripts/export_contracts.py
+    uv run scripts/export_contracts.py
 tests/test_contracts.py fails while the files are out of date.
 """
 import asyncio

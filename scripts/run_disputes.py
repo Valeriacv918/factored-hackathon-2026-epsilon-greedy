@@ -4,9 +4,9 @@ Reads the repository .env (SCENARIO_NOW, DEV_SESSIONS, MCP_SERVER_*, LLM_MODEL,
 GROQ_API_KEY). Only the read tools exist yet: block, dispute and handoff steps
 fail safely and end in "service unavailable".
 
-Use (from the repository root, with the agent venv):
-  apps/agent/.venv/Scripts/python.exe scripts/run_disputes.py --session dev
-  apps/agent/.venv/Scripts/python.exe scripts/run_disputes.py --session dev --debug
+Use (from the repository root, in the agent's uv env):
+  uv run --project apps/agent scripts/run_disputes.py --session dev
+  uv run --project apps/agent scripts/run_disputes.py --session dev --debug
 
 Inside: answer buttons by number or value, /new restarts, /quit exits.
 """

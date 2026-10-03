@@ -46,9 +46,12 @@ cd factored-hackathon-2026-epsilon-greedy
 uv sync --locked
 ```
 
-The root Python environment remains the analysis environment. The agent has its
-own pyproject.toml and pinned requirements.lock.txt; MCP packaging remains pending.
-`.env.example` describes proposed app settings;
+The root Python environment is only the analysis environment (duckdb, pandas,
+tabulate for the notebook). Each app is its own uv project with its own `.venv`
+and `uv.lock`: see [apps/agent](apps/agent/README.md) and
+[apps/mcp-server](apps/mcp-server/README.md). CI runs each app's tests in its own
+environment (`.github/workflows/python-tests.yml`).
+`.env.example` describes app settings;
 the existing data scripts do not automatically read it.
 
 ## Data and source files

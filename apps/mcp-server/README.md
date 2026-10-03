@@ -16,15 +16,17 @@ search window (the demo data ends 2026-06-18). Amounts are decimal strings;
 missing `amount_usd`/`fraud_score` are returned as null, never imputed.
 Column renaming lives only in `services/mapping.py`. JSON Schemas: `../../contracts/mcp`.
 
-## Run (PowerShell, from apps/mcp-server)
+## Run (from the repo root, with uv)
 
-```powershell
-python -m venv .venv
-.venv/Scripts/python.exe -m pip install -e ".[test]"
-.venv/Scripts/python.exe -m pytest -q             # no GCP needed
-gcloud auth application-default login             # ADC for live queries
-.venv/Scripts/python.exe -m bank_mcp              # stdio; --http for streamable HTTP
+```bash
+uv sync --project apps/mcp-server --extra test
+uv run --project apps/mcp-server pytest apps/mcp-server -q   # no GCP needed
+gcloud auth application-default login                         # ADC for live queries
+uv run --project apps/mcp-server bank-mcp                     # stdio; --http for streamable HTTP
 ```
+
+Own env in `apps/mcp-server/.venv`, pinned by `apps/mcp-server/uv.lock`. The agent
+starts this server through `MCP_SERVER_COMMAND` (see `.env.example`).
 
 Config via env or `.env` (repo root or this folder): `BQ_PROJECT`/`GCP_PROJECT_ID`,
 `BQ_DATASET`/`BIGQUERY_CURATED_DATASET`, `BQ_LOCATION`/`GCP_REGION`. Defaults:

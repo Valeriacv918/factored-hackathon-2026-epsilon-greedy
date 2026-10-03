@@ -13,7 +13,7 @@ SERVER = str(Path(__file__).with_name("mcp_echo_server.py"))
 
 @pytest.fixture(scope="module")
 def client():
-    with McpToolClient(command=sys.executable, args=[SERVER], timeout_s=1.5) as c:
+    with McpToolClient(command=sys.executable, args=[SERVER], timeout_s=5) as c:
         yield c
 
 

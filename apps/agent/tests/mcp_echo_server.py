@@ -24,7 +24,7 @@ def boom() -> Echo:
 
 @mcp.tool()
 def slow() -> Echo:
-    time.sleep(3)
+    time.sleep(10)
     return Echo(text="late")
 
 
