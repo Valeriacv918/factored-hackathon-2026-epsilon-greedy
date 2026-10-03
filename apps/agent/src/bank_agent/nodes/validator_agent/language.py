@@ -13,7 +13,7 @@ from typing import Optional
 
 from lingua import Language, LanguageDetectorBuilder
 
-from ..config.settings import settings
+from ...config.settings import settings
 
 _LANG_MAP = {Language.SPANISH: "es", Language.PORTUGUESE: "pt"}
 

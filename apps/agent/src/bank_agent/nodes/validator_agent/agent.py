@@ -18,7 +18,7 @@ from langchain.agents.middleware import ModelRequest, dynamic_prompt
 from langchain_core.tools import tool
 from langgraph.checkpoint.memory import InMemorySaver
 
-from ..config.settings import settings
+from ...config.settings import settings
 from .language import detect_language
 from .validator import IdentityValidator, Status
 from bank_agent.prompts.validation import ALREADY_DONE, BASE_PROMPT, LANG_NAMES
