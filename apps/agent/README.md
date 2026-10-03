@@ -48,13 +48,13 @@ en la misma fase. Los adaptadores deben garantizar idempotencia ante reejecució
 ## Pruebas (desde la raíz del repositorio, con uv)
 
 ```bash
-uv sync --project apps/agent --all-extras
+uv sync --project apps/agent
 uv run --project apps/agent pytest apps/agent -q
 ```
 
 Python 3.12+, entorno propio en `apps/agent/.venv`, independiente del entorno
 analítico raíz y del servidor MCP. `apps/agent/uv.lock` fija las versiones.
-Las pruebas necesitan el extra `live` (langchain, lingua); no usan red ni GCP.
+Las pruebas no usan red ni GCP; pytest viene del grupo `dev`, que `uv sync` instala por defecto.
 
 Pruebas de integración (`tests/integration/`, marcador `integration`): levantan el
 servidor MCP real en su propio entorno y consultan BigQuery con tus credenciales

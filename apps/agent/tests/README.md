@@ -4,7 +4,7 @@ Se ejecutan en el entorno propio del agente (`apps/agent/.venv`), nunca en el
 entorno raíz. Desde la raíz del repositorio:
 
 ```bash
-uv sync --project apps/agent --all-extras                    # una vez
+uv sync --project apps/agent                                 # una vez
 uv run --project apps/agent pytest apps/agent                # unitarias (por defecto, y en CI)
 uv run --project apps/agent pytest apps/agent -m integration # integración en vivo (opcional)
 ```
@@ -25,8 +25,7 @@ Desde `apps/agent` basta `uv run pytest` (o `uv run pytest -m integration`).
 | `test_validator_agent_flow.py` | Agente validador completo con LLM simulado |
 | `integration/test_live_mcp.py` | En vivo: servidor MCP real y BigQuery (ver abajo) |
 
-**Unitarias:** sin red, GCP ni modelos. Necesitan el extra `live` (langchain,
-lingua, mcp), que `--all-extras` instala.
+**Unitarias:** sin red, GCP ni modelos.
 
 **Integración** (`integration/`, marcador `integration`): levantan el servidor MCP
 real con `uv run --project apps/mcp-server bank-mcp`, en su propio entorno, y
