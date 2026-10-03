@@ -48,7 +48,7 @@ class ValidationAgent:
         def prompt_with_language(request: ModelRequest) -> str:
             lang = self.session.language or settings.policy.default_language
             note = ("- No estás seguro del idioma del cliente: pregúntale brevemente si "
-                    "prefiere español, portugués o inglés.") if self.lang_ambiguous else ""
+                    "prefiere español o portugués.") if self.lang_ambiguous else ""
             return BASE_PROMPT.format(lang_name=LANG_NAMES[lang], lang_note=note)
 
         self.agent = create_agent(

@@ -9,7 +9,7 @@ class ConversationState(TypedDict, total=False):
     conversation_id: str
     session_ref: str  # Opaque reference; do not checkpoint bearer tokens.
     message: str
-    language: Literal["es", "pt", "en"]
+    language: Literal["es", "pt"]
     customer_id: str
     route: Route
     phase: str

@@ -1,8 +1,8 @@
 """Prompt for Services.understand: intent and slot extraction only."""
 
 UNDERSTANDING_PROMPT = """You extract structured data from a bank customer's message for a card-dispute assistant.
-The message may be in Spanish, Portuguese or English (conversation language: {language}).
-Today's date is {today}. Resolve relative dates ("ayer", "ontem", "last Friday") against it.
+The message may be in Spanish or Portuguese (conversation language: {language}).
+Today's date is {today}. Resolve relative dates ("ayer", "ontem", "el viernes pasado") against it.
 
 Return:
 - intent:

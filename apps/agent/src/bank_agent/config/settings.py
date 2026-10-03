@@ -27,7 +27,7 @@ class ValidationPolicy:
     max_attempts: int = 3                 # intentos fallidos antes de bloquear
     lockout_minutes: int = 15             # duración del bloqueo
     session_ttl_minutes: int = 15         # vida de la sesión autenticada
-    supported_languages: tuple = ("es", "pt", "en")
+    supported_languages: tuple = ("es", "pt")
     default_language: str = "es"
     min_lang_confidence: float = 0.60     # umbral de lingua
     min_chars_for_detection: int = 12     # textos más cortos no cambian el idioma

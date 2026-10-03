@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field, ValidationError, field_validator
 from bank_agent.clients.contracts import ServiceFailure
 from bank_agent.prompts.understanding import UNDERSTANDING_PROMPT
 
-LANGUAGE_NAMES = {"es": "Spanish", "pt": "Portuguese", "en": "English"}
+LANGUAGE_NAMES = {"es": "Spanish", "pt": "Portuguese"}
 
 
 class Slots(BaseModel):

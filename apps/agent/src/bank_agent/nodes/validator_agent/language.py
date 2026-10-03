@@ -1,7 +1,7 @@
 """Detección de idioma con lingua (determinística, sin LLM).
 
 Decisiones:
-- Solo comparamos entre los idiomas soportados (es, pt, en): reduce errores,
+- Solo comparamos entre los idiomas soportados (es, pt): reduce errores,
   sobre todo español vs portugués, que es la confusión más común.
 - Textos cortos ("sí", "ok", "1234") no son confiables: no cambian el idioma
   que ya tenía la conversación ("idioma pegajoso").
@@ -15,7 +15,7 @@ from lingua import Language, LanguageDetectorBuilder
 
 from ...config.settings import settings
 
-_LANG_MAP = {Language.SPANISH: "es", Language.PORTUGUESE: "pt", Language.ENGLISH: "en"}
+_LANG_MAP = {Language.SPANISH: "es", Language.PORTUGUESE: "pt"}
 
 _detector = (
     LanguageDetectorBuilder.from_languages(*_LANG_MAP.keys())

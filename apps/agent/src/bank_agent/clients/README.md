@@ -29,7 +29,7 @@ Importes como strings decimales, evitando float.
 `understand`: intent (not_me/charge_error/card_emergency/other), confidence,
 slots (objeto), wants_human opcional. El modelo nunca devuelve rutas ejecutables
 ni una identidad autorizada. El adaptador valida el esquema y rechaza salidas
-inválidas. `detect_language` devuelve es/pt/en o None si no hay confianza suficiente.
+inválidas. `detect_language` devuelve es/pt o None si no hay confianza suficiente.
 
 Buscar exclusivamente en productos autorizados y devolver has_more cuando la
 lista es parcial. Implementar la tolerancia de monto y filtros de fechas/comercio

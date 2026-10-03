@@ -26,8 +26,8 @@ immediately when it may be fraud** (semi-autonomous: the agent proposes, the cus
 ```mermaid
 flowchart TD
     MSG([customer message]) --> LANG{"DETECT_LANGUAGE<br/>code, no LLM"}
-    LANG -- "es / pt / en" --> VS{VALIDATE_SESSION}
-    LANG -- "unsupported or unclear" --> CL["CLARIFY_LANGUAGE<br/>buttons: Español · Português · English"] --> VS
+    LANG -- "es / pt" --> VS{VALIDATE_SESSION}
+    LANG -- "unsupported or unclear" --> CL["CLARIFY_LANGUAGE<br/>buttons: Español · Português"] --> VS
     VS -- invalid / expired --> ENDA([END: sign in again])
     VS -- ok --> UND["UNDERSTAND<br/>LLM: slots · classifier: intent"]
     UND --> TRI{TRIAGE}
@@ -45,7 +45,7 @@ flowchart TD
 
 **DETECT_LANGUAGE** runs on the first customer message, before anything else, so that every reply —
 including "please sign in again" — is in the customer's language. It is code (a language-detection
-library), not the LLM. Supported: Spanish (`es`), Portuguese (`pt`) and English (`en`). If the language is unsupported
+library), not the LLM. Supported: Spanish (`es`) and Portuguese (`pt`). If the language is unsupported
 or the detector is not confident, the customer picks it with buttons. The language is stored in
 `ConversationState.language` and kept for the whole conversation.
 

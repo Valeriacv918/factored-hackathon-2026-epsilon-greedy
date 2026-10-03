@@ -11,7 +11,7 @@ src/bank_agent/
   graphs/state.py             Estado compartido e inicialización
   graphs/disputes.py          Grafo y controles comunes
   graphs/policy.py            Política de demostración configurable
-  nodes/security_language/   1. Seguridad e idioma ES/PT/EN
+  nodes/security_language/   1. Seguridad e idioma ES/PT
   nodes/understanding/       2. Comprensión, aclaración y búsqueda
   nodes/lost_card/           3. Tarjeta perdida o robada
   nodes/fraud/               4. Señal de fraude
@@ -106,7 +106,7 @@ por el validador cuando `normalize_id` conserve los guiones de los IDs reales.
 
 ## Decisiones y límites
 
-- ES/PT/EN: detección y extracción inyectadas mediante `Services`.
+- ES/PT: detección y extracción inyectadas mediante `Services`.
 - Política demo v4: 90 días, USD 500, score 30. No son políticas bancarias reales.
   Fecha de referencia: `services.now()`. Para históricos, inyectar un reloj de
   simulación explícito. Fechas futuras o sin zona escalan.
