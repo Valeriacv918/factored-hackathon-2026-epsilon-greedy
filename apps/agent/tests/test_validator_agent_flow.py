@@ -2,10 +2,10 @@
 from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
 from langchain_core.messages import AIMessage
 
-from bank_agent.clients.demo_data import DEMO_CUSTOMERS as CUSTOMERS
-from bank_agent.validator_agent.agent import ValidationAgent
-from bank_agent.clients.repository import InMemoryCustomerRepository
-from bank_agent.validator_agent.validator import IdentityValidator
+from src.bank_agent.clients.demo_data import DEMO_CUSTOMERS as CUSTOMERS
+from src.bank_agent.nodes.validator_agent.agent import ValidationAgent
+from src.bank_agent.clients.repository import InMemoryCustomerRepository
+from src.bank_agent.nodes.validator_agent.validator import IdentityValidator
 
 
 class FakeLLM(GenericFakeChatModel):
