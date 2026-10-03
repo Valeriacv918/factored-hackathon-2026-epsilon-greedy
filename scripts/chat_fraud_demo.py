@@ -97,47 +97,55 @@ def print_escalation(result):
 
 
 def run_fraud_agent(fraud: FraudAgent, session_id: str, transaction_id: str, debug: bool):
-    r = fraud.evaluate_transaction(session_id, transaction_id)
+    try:
+        r = fraud.evaluate_transaction(session_id, transaction_id)
+    except Exception as e:
+        print(f"[error] {type(e).__name__}: {e}\n")
+        return
 
     while True:
         if debug:
             print(f"  [fraud next_step={r.next_step}]")
 
-        if r.next_step == "confirm_block":
-            kind = r.product["kind"]
-            label = "bloquear la tarjeta" if kind == "card" else "suspender las transacciones de la cuenta"
-            confirmed = yes_no(f"Agente 3: ¿Confirmás {label} {r.product['product_number']}?")
-            r = fraud.confirm_block(session_id, confirmed)
+        try:
+            if r.next_step == "confirm_block":
+                kind = r.product["kind"]
+                label = "bloquear la tarjeta" if kind == "card" else "suspender las transacciones de la cuenta"
+                confirmed = yes_no(f"Agente 3: ¿Confirmás {label} {r.product['product_number']}?")
+                r = fraud.confirm_block(session_id, confirmed)
 
-        elif r.next_step == "confirm_dispute":
-            tx = r.transaction
-            print(f"Agente 3: cargo de {tx['merchant_name']} por {tx['amount_usd']} {tx['currency']} "
-                  f"({tx['transaction_date']}, estado {tx['transaction_status']}).")
-            confirmed = yes_no("¿Querés que presentemos una disputa por este cargo?")
-            r = fraud.confirm_dispute(session_id, confirmed)
+            elif r.next_step == "confirm_dispute":
+                tx = r.transaction
+                print(f"Agente 3: cargo de {tx['merchant_name']} por {tx['amount_usd']} {tx['currency']} "
+                      f"({tx['transaction_date']}, estado {tx['transaction_status']}).")
+                confirmed = yes_no("¿Querés que presentemos una disputa por este cargo?")
+                r = fraud.confirm_dispute(session_id, confirmed)
 
-        elif r.next_step == "ask_more_charges":
-            if r.case_id:
-                rule_note = f" (regla {r.rule_id})" if r.rule_id else ""
-                print(f"Agente 3: caso {r.case_id}{rule_note}.")
-            more = yes_no("¿Hay otro cargo que no reconocés?")
-            if more:
-                tx_id = input("  ID de transacción (TX-100 / TX-200 / TX-300): ").strip()
-                r = fraud.ask_more_charges(session_id, True, transaction_id=tx_id)
+            elif r.next_step == "ask_more_charges":
+                if r.case_id:
+                    rule_note = f" (regla {r.rule_id})" if r.rule_id else ""
+                    print(f"Agente 3: caso {r.case_id}{rule_note}.")
+                more = yes_no("¿Hay otro cargo que no reconocés?")
+                if more:
+                    tx_id = input("  ID de transacción (TX-100 / TX-200 / TX-300): ").strip()
+                    r = fraud.ask_more_charges(session_id, True, transaction_id=tx_id)
+                else:
+                    r = fraud.ask_more_charges(session_id, False)
+
+            elif r.next_step == "escalate":
+                print_escalation(r)
+                return
+
+            elif r.next_step == "done":
+                print("Agente 3: listo, caso cerrado sin necesidad de un humano.\n")
+                return
+
             else:
-                r = fraud.ask_more_charges(session_id, False)
-
-        elif r.next_step == "escalate":
-            print_escalation(r)
-            return
-
-        elif r.next_step == "done":
-            print("Agente 3: listo, caso cerrado sin necesidad de un humano.\n")
-            return
-
-        else:
-            print(f"[fraud_agent next_step desconocido: {r.next_step}]")
-            return
+                print(f"[fraud_agent next_step desconocido: {r.next_step}]")
+                return
+        except Exception as e:
+            print(f"[error] {type(e).__name__}: {e}\n")
+            continue
 
 
 def main():
