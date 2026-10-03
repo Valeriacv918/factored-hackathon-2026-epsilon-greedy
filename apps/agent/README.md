@@ -45,17 +45,25 @@ Cada componente es un nodo con fases internas. Cada transición de fase crea un
 checkpoint; una espera usa `interrupt()`. No hay escrituras antes de una espera
 en la misma fase. Los adaptadores deben garantizar idempotencia ante reejecución.
 
-## Pruebas (PowerShell, desde apps/agent)
+## Pruebas (desde la raíz del repositorio, con uv)
 
-```powershell
-python -m venv .venv
-.venv/Scripts/python.exe -m pip install -r requirements.lock.txt
-.venv/Scripts/python.exe -m pytest -q
+```bash
+uv sync --project apps/agent --all-extras
+uv run --project apps/agent pytest apps/agent -q
 ```
 
-Python 3.12+ (probado con 3.12), independiente del entorno analítico raíz.
-`requirements.lock.txt` fija versiones del entorno probado, sin hashes.
-Para instalar el paquete: `pip install -e .`.
+Python 3.12+, entorno propio en `apps/agent/.venv`, independiente del entorno
+analítico raíz y del servidor MCP. `apps/agent/uv.lock` fija las versiones.
+Las pruebas necesitan el extra `live` (langchain, lingua); no usan red ni GCP.
+
+Pruebas de integración (`tests/integration/`, marcador `integration`): levantan el
+servidor MCP real en su propio entorno y consultan BigQuery con tus credenciales
+ADC, solo lectura. Se excluyen por defecto y en CI. Usan el cliente de la entrada
+`dev` de `DEV_SESSIONS` (entorno o `.env` raíz), el mismo de `run_disputes.py --session dev`:
+
+```bash
+uv run --project apps/agent pytest apps/agent -m integration
+```
 
 ## Integrar
 
@@ -79,6 +87,31 @@ usuario autenticado. Nunca aceptar estado arbitrario del navegador ni exponer
 `graph.invoke` directamente. No guardar tokens en checkpoints. La sesión se
 revalida antes de nodos protegidos, al recibir confirmaciones y antes de herramientas.
 Usar un checkpointer persistente y protegido al desplegar; `InMemorySaver` es local.
+
+## Ejecutar contra el servidor MCP (datos reales)
+
+`clients/mcp_services.py:McpServices` implementa `Services` sobre `apps/mcp-server`
+(solo lectura: `find_transactions`, `list_cards`, `get_card`), un LLM para
+`understand` y lingua para el idioma. Bloqueos, disputas, `dispute_context` y
+derivaciones aún no existen: fallan con `ServiceFailure` y el grafo termina de forma
+segura (escalación o "servicio no disponible"), nunca anunciando un éxito.
+`customer_id` sale siempre de la sesión; `reference_date` del reloj de escenario.
+
+```bash
+# .env en la raíz: SCENARIO_NOW, DEV_SESSIONS (solo desarrollo), LLM_MODEL, GROQ_API_KEY.
+# El agente lanza el servidor con MCP_SERVER_COMMAND (uv run --project apps/mcp-server bank-mcp).
+# Desde la raíz:
+uv run --project apps/agent scripts/run_disputes.py --session dev --debug
+```
+
+Chat del validador de identidad (`scripts/chat_validator.py`): datos sintéticos con
+`uv run --project apps/agent scripts/chat_validator.py`. Con `--bq` consulta
+BigQuery directamente, sin pasar por MCP (límite conocido); la dependencia se
+añade solo para esa ejecución:
+`uv run --project apps/agent --with google-cloud-bigquery scripts/chat_validator.py --bq`.
+
+`DEV_SESSIONS` asocia referencias fijas a clientes reales sin login; se reemplazará
+por el validador cuando `normalize_id` conserve los guiones de los IDs reales.
 
 ## Decisiones y límites
 

@@ -1,24 +1,10 @@
 [project]
 name = "repo"
 version = "0.1.0"
+description = "Analysis environment (notebooks). Apps live in apps/*, each with its own uv project."
 requires-python = ">=3.13"
 dependencies = [
     "duckdb>=1.5.6",
     "pandas>=3.0.6",
     "tabulate>=0.10.0",
-    "langchain>=1.4",
-    "langgraph>=1.0",
-    "langchain-groq>=0.3",
-    "lingua-language-detector>=2.0",
-    "google-cloud-bigquery>=3.20",
-    "python-dotenv>=1.0",
 ]
-
-[dependency-groups]
-dev = [
-    "pytest>=9.1.1",
-]
-
-[tool.pytest.ini_options]
-pythonpath = ["apps/agent/src"]
-testpaths = ["apps/agent/tests"]

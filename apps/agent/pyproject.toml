@@ -11,10 +11,19 @@ dependencies = ["langgraph>=1.0,<2"]
 
 [project.optional-dependencies]
 test = ["pytest>=8,<10"]
+# Real adapters: MCP client, LLM extraction, language detection (clients/mcp_services.py).
+live = [
+    "mcp>=2.2,<3",
+    "langchain>=1.4,<2",
+    "langchain-groq>=1.1,<2",
+    "lingua-language-detector>=2.2,<3",
+    "python-dotenv>=1.2,<2",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
 testpaths = ["tests"]
+markers = ["integration: live agent -> MCP -> BigQuery tests; need ADC and DEV_SESSIONS=dev=<customer_id>"]
+addopts = "-m 'not integration'"
