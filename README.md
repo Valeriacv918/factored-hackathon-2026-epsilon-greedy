@@ -8,14 +8,15 @@ AI-first **transaction-dispute intake** agent for a LATAM bank (Spanish and Port
 
 This repository combines the existing analysis notebook with the GCP data
 pipelines and starter folders for the future LangGraph agent and MCP server.
-The application folders are scaffolding: no agent, MCP endpoint, or end-to-end
-orchestrator has been implemented yet.
+The agent now contains an executable six-component LangGraph workflow with local
+synthetic-service tests. Real model/MCP adapters, the MCP endpoint and the
+end-to-end deployed application remain pending. See [agent setup](apps/agent/README.md).
 
 ## Repository structure
 
 ```text
 apps/
-  agent/                 # LangGraph: graphs, nodes, prompts, clients, config, tests
+  agent/                 # LangGraph workflow, six node components, service contracts, tests
   mcp-server/            # MCP: tools, services, repositories, sql, config, tests
 data/
   ingestion/            # Existing Cloud Run ingestion engine and tests
@@ -45,9 +46,9 @@ cd factored-hackathon-2026-epsilon-greedy
 uv sync --locked
 ```
 
-The root Python environment remains the analysis environment. App-specific
-pyproject.toml files, lockfiles and entry points will be added when the agent
-and MCP server are implemented. `.env.example` describes proposed app settings;
+The root Python environment remains the analysis environment. The agent has its
+own pyproject.toml and pinned requirements.lock.txt; MCP packaging remains pending.
+`.env.example` describes proposed app settings;
 the existing data scripts do not automatically read it.
 
 ## Data and source files

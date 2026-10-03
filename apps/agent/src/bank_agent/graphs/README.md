@@ -1,5 +1,9 @@
-# graphs
+# Grafo de disputas
 
-Definiciones de grafos, estado y transiciones de LangGraph.
+`disputes.build_graph(services, checkpointer=..., policy=...)` compila seis nodos.
+`state.initial_state` crea una conversación desde la capa autenticada.
+`policy.Policy` contiene reglas de demostración configurables.
 
-Estado: estructura inicial; implementacion pendiente.
+route lo escribe el código; phase identifica el paso interno. Seis componentes
+no implican seis llamadas al modelo. Ver apps/agent/README.md para integración,
+diagrama y límites actuales.
