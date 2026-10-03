@@ -3,7 +3,7 @@
 Pruebas unitarias del servidor MCP, sin GCP ni red. Desde la raíz:
 
 ```bash
-uv sync --project apps/mcp-server --extra test
+uv sync --project apps/mcp-server
 uv run --project apps/mcp-server pytest apps/mcp-server
 ```
 
