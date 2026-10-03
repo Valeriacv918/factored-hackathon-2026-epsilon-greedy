@@ -80,6 +80,25 @@ usuario autenticado. Nunca aceptar estado arbitrario del navegador ni exponer
 revalida antes de nodos protegidos, al recibir confirmaciones y antes de herramientas.
 Usar un checkpointer persistente y protegido al desplegar; `InMemorySaver` es local.
 
+## Ejecutar contra el servidor MCP (datos reales)
+
+`clients/mcp_services.py:McpServices` implementa `Services` sobre `apps/mcp-server`
+(solo lectura: `find_transactions`, `list_cards`, `get_card`), un LLM para
+`understand` y lingua para el idioma. Bloqueos, disputas, `dispute_context` y
+derivaciones aún no existen: fallan con `ServiceFailure` y el grafo termina de forma
+segura (escalación o "servicio no disponible"), nunca anunciando un éxito.
+`customer_id` sale siempre de la sesión; `reference_date` del reloj de escenario.
+
+```powershell
+.venv/Scripts/python.exe -m pip install -e ".[live,test]"   # desde apps/agent
+# .env en la raíz: SCENARIO_NOW, DEV_SESSIONS (solo desarrollo), LLM_MODEL, GROQ_API_KEY
+# y el venv de apps/mcp-server instalado (ver su README). Desde la raíz:
+apps/agent/.venv/Scripts/python.exe scripts/run_disputes.py --session dev --debug
+```
+
+`DEV_SESSIONS` asocia referencias fijas a clientes reales sin login; se reemplazará
+por el validador cuando `normalize_id` conserve los guiones de los IDs reales.
+
 ## Decisiones y límites
 
 - ES/PT/EN: detección y extracción inyectadas mediante `Services`.

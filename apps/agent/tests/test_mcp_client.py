@@ -1,0 +1,50 @@
+import sys
+from pathlib import Path
+
+import pytest
+
+pytest.importorskip("mcp")
+
+from bank_agent.clients.contracts import ServiceFailure  # noqa: E402
+from bank_agent.clients.mcp_client import McpToolClient  # noqa: E402
+
+SERVER = str(Path(__file__).with_name("mcp_echo_server.py"))
+
+
+@pytest.fixture(scope="module")
+def client():
+    with McpToolClient(command=sys.executable, args=[SERVER], timeout_s=1.5) as c:
+        yield c
+
+
+def test_structured_call_reuses_one_session(client):
+    assert client.call("echo", {"text": "hola"}) == {"text": "hola"}
+    session = client._session
+    assert client.call("echo", {"text": "olá"}) == {"text": "olá"}
+    assert client._session is session
+
+
+def test_tool_error_is_service_failure_without_detail(client):
+    with pytest.raises(ServiceFailure) as exc:
+        client.call("boom", {})
+    assert "secret" not in str(exc.value)
+
+
+def test_timeout_is_service_failure_and_session_survives(client):
+    with pytest.raises(ServiceFailure):
+        client.call("slow", {})
+    assert client.call("echo", {"text": "still alive"}) == {"text": "still alive"}
+
+
+def test_unreachable_server_is_service_failure():
+    c = McpToolClient(command=sys.executable, args=["-c", "import sys; sys.exit(1)"], timeout_s=5)
+    with pytest.raises(ServiceFailure):
+        c.call("echo", {"text": "x"})
+    c.close()
+
+
+def test_requires_exactly_one_transport():
+    with pytest.raises(ValueError):
+        McpToolClient()
+    with pytest.raises(ValueError):
+        McpToolClient(url="http://x", command="y")
