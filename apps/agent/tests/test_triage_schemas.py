@@ -2,7 +2,7 @@
 import pytest
 from pydantic import ValidationError
 
-from src.bank_agent.nodes.triage_agent.schemas import Intent, Route, Slots, TriageDecision, Understanding
+from bank_agent.nodes.triage_agent.schemas import Intent, Route, Slots, TriageDecision, Understanding
 
 def test_understanding_minimal():
     u = Understanding(intent=Intent.NOT_ME, confidence=0.9, wants_human=False)

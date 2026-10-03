@@ -26,7 +26,7 @@ opcional, `amount`, `amount_usd` opcional, `currency`, `date` ISO con zona.
 Tarjeta: `id`, `customer_id`, `last4`, `status`.
 Importes como strings decimales, evitando float.
 
-`understand`: intent (not_me/charge_error/card_emergency/other), confidence,
+`understand`: intent (not_me/charge_error/emergency/other), confidence,
 slots (objeto), wants_human opcional. El modelo nunca devuelve rutas ejecutables
 ni una identidad autorizada. El adaptador valida el esquema y rechaza salidas
 inválidas. `detect_language` devuelve es/pt o None si no hay confianza suficiente.

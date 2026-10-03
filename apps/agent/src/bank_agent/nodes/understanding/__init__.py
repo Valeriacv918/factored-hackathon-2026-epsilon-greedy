@@ -3,7 +3,7 @@ from langgraph.types import interrupt
 from bank_agent.clients.contracts import ServiceFailure
 from bank_agent.nodes.common import ask, escalate, finish, go, number, require_session, tool
 
-INTENTS = {"not_me", "charge_error", "card_emergency", "other"}
+INTENTS = {"not_me", "charge_error", "emergency", "other"}
 
 
 def run(s, services, policy):
@@ -25,7 +25,7 @@ def run(s, services, policy):
             intent = ask(s, services, "intent", sorted(INTENTS),
                          "¿Cargo desconocido, error en un cargo o tarjeta perdida?",
                          "Compra não reconhecida, erro na cobrança ou cartão perdido?")
-        if intent == "card_emergency":
+        if intent == "emergency":
             return go("lost_card", intent=intent)
         if intent == "other":
             return go("understanding", "out_of_scope", intent=intent)
@@ -45,8 +45,8 @@ def run(s, services, policy):
         parsed = services.understand(reply["text"], s["language"])
         if parsed.get("wants_human") is True:
             return escalate("requested_human")
-        if parsed.get("intent") == "card_emergency":
-            return go("lost_card", intent="card_emergency")
+        if parsed.get("intent") == "emergency":
+            return go("lost_card", intent="emergency")
         if not isinstance(parsed.get("slots", {}), dict):
             raise ServiceFailure("Invalid clarification schema")
         return go("understanding", "find", slots={**s.get("slots", {}), **parsed.get("slots", {})},

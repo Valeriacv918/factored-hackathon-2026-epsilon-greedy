@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 
 class Intent(str, Enum):
     """Las 4 intenciones que distingue el Triage."""
-    CARD_EMERGENCY = "card_emergency"   # tarjeta perdida, robada, clonada, retenida
+    EMERGENCY = "emergency"            # tarjeta perdida, robada, clonada, retenida
     NOT_ME = "not_me"                   # "yo no hice esta compra"
     CHARGE_ERROR = "charge_error"       # "sí la hice, pero el cobro está mal"
     OTHER = "other"                     # todo lo demás
@@ -39,7 +39,7 @@ class Understanding(BaseModel):
 class Route(str, Enum):
     """A dónde sigue la conversación después del Triage."""
     ESCALATION = "ESCALATION"               # pidió humano
-    CARD_EMERGENCY = "CARD_EMERGENCY"       # bloquear tarjeta
+    EMERGENCY = "EMERGENCY"                 # bloquear tarjeta
     FIND_TRANSACTION = "FIND_TRANSACTION"   # not_me o charge_error: buscar el cargo
     OUT_OF_SCOPE = "OUT_OF_SCOPE"           # no es algo que atendamos
     CLARIFY_INTENT = "CLARIFY_INTENT"       # no estamos seguros: mostrar botones

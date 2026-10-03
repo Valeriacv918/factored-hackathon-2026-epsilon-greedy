@@ -34,7 +34,7 @@ flowchart TD
     TRI -- low confidence --> CI["CLARIFY_INTENT<br/>buttons"] --> TRI
     TRI -- other --> OOS([OUT_OF_SCOPE])
     TRI -- wants human --> ESC[[ESCALATION]]
-    TRI -- card_emergency --> EMG[[CARD EMERGENCY]]
+    TRI -- emergency --> EMG[[CARD EMERGENCY]]
     TRI -- "not_me / charge_error" --> FIND["FIND_TRANSACTION<br/>only the session customer's products"]
     FIND -- "0 · several · product not owned<br/>DSP-002 · 001 · 007" --> CT["CLARIFY_TRANSACTION<br/>max 2 attempts"] --> FIND
     CT -- attempts exhausted --> ESC
@@ -53,7 +53,7 @@ or the detector is not confident, the customer picks it with buttons. The langua
 
 ```mermaid
 flowchart TD
-    IN([from TRIAGE: card_emergency]) --> SEL["SELECT_CARD<br/>1 active card: auto · several: buttons"]
+    IN([from TRIAGE: emergency]) --> SEL["SELECT_CARD<br/>1 active card: auto · several: buttons"]
     SEL --> AB{already blocked?}
     AB -- no --> CB{"CONFIRM_BLOCK<br/>buttons"}
     CB -- yes --> BV["BLOCK_AND_VERIFY<br/>read status back · block_verified_at"]
@@ -128,7 +128,7 @@ flowchart TD
 |---|---|---|---|
 | VALIDATE_SESSION | Code | Token exists and is not expired; log `reported_at` on the first message | – |
 | UNDERSTAND | LLM + classifier | LLM extracts slots (merchant, amount, date range, product mentioned, wants_human, language). Classifier returns intent + confidence | ✅ |
-| TRIAGE | Code | Routes by: wants human → card_emergency → not_me / charge_error → other. Low confidence → buttons | – |
+| TRIAGE | Code | Routes by: wants human → emergency → not_me / charge_error → other. Low confidence → buttons | – |
 | CLARIFY_INTENT | UI | Buttons: "I didn't make it" / "I made it, but it's wrong" / "I lost my card" | – |
 | OUT_OF_SCOPE | Template | Says what the assistant can do; offers a human | – |
 | FIND_TRANSACTION | Code | Matches merchant, amount (±10%) and date window among the customer's own products | – |
@@ -170,7 +170,7 @@ cost per case low and every decision auditable.
 | DSP-001 | Several matching transactions | Clarify (up to 3 buttons) |
 | DSP-002 | No matching transaction | Clarify (date or amount) |
 | DSP-007 | Customer names a product they do not own | Clarify without disclosing anything |
-| DSP-010 | `not_me`, `card_emergency` or `fraud_score > 30` | Fraud path |
+| DSP-010 | `not_me`, `emergency` or `fraud_score > 30` | Fraud path |
 | DSP-004 | Open dispute already exists | Tell existing case ID; no new case |
 | DSP-005 | Older than 90 days (policy decision) | Charge error: deny with reason · Fraud: escalate |
 | DSP-011 | ≥ 2 disputes in the last 90 days (own history) | Escalate |
@@ -202,7 +202,7 @@ the block is offered **even when the status explains the charge**.
 
 ## Global rules (override the diagrams, in any state)
 
-1. Fraud words at any point ("me robaron la tarjeta", "roubaram meu cartão") → `card_emergency`.
+1. Fraud words at any point ("me robaron la tarjeta", "roubaram meu cartão") → `emergency`.
 2. Customer asks for a human → ESCALATION with everything gathered so far.
 3. Tool failure or timeout → retry once, then safe fallback + ESCALATION. Never report an unverified action.
 4. Turn limit (~8 customer turns) → ESCALATION.
@@ -224,7 +224,7 @@ the block is offered **even when the status explains the charge**.
 class Intent(str, Enum):
     NOT_ME = "not_me"                  # "I didn't make this purchase"
     CHARGE_ERROR = "charge_error"      # "I made it, but the charge is wrong"
-    CARD_EMERGENCY = "card_emergency"  # lost / stolen card
+    EMERGENCY = "emergency"  # lost / stolen card
     OTHER = "other"
 
 class AgentState(str, Enum):
@@ -238,7 +238,7 @@ class AgentState(str, Enum):
 # ConversationState — new / changed fields
 intent: Intent | None = None
 intent_confidence: float | None = None
-path: Literal["fraud", "charge_error", "card_emergency"] | None = None
+path: Literal["fraud", "charge_error", "emergency"] | None = None
 explanation_rule: str | None = None             # EXP-xxx
 denied_transaction_ids: list[str] = []          # for DSP-013 and ASK_MORE_CHARGES (max 3)
 block_declined: bool = False                    # → P1

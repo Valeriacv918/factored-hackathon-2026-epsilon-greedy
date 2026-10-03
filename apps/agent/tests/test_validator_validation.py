@@ -3,9 +3,9 @@ from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
-from src.bank_agent.nodes.validator_agent.language import detect_language
-from src.bank_agent.clients.repository import (CustomerRecord, InMemoryCustomerRepository, Product)
-from src.bank_agent.nodes.validator_agent.validator import IdentityValidator, Status, parse_dob
+from bank_agent.nodes.validator_agent.language import detect_language
+from bank_agent.clients.repository import (CustomerRecord, InMemoryCustomerRepository, Product)
+from bank_agent.nodes.validator_agent.validator import IdentityValidator, Status, parse_dob
 
 CUSTOMERS = {
     "1020304050": CustomerRecord("1020304050", date(1990, 4, 3), (
