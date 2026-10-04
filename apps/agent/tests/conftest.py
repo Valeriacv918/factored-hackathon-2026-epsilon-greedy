@@ -21,6 +21,7 @@ class FakeServices:
         self.narrative_facts = None
         self.existing = None
         self.cards = [{"id": "card-1", "customer_id": "customer-1", "last4": "1234", "status": "Active"}]
+        self.accounts = [{"id": "account-1", "customer_id": "customer-1", "last4": "9876", "status": "Active"}]
         self.transactions = [{"id": "tx-1", "customer_id": "customer-1", "card_id": "card-1",
                               "status": status, "fraud_score": score, "amount": "40.00",
                               "amount_usd": "40.00", "currency": "USD", "date": "2026-09-30T12:00:00+00:00"}]
@@ -52,6 +53,10 @@ class FakeServices:
             return {"cards": deepcopy(self.cards)}
         if name == "get_card":
             return deepcopy(next(c for c in self.cards if c["id"] == arguments["card_id"]))
+        if name == "list_accounts":
+            return {"accounts": deepcopy(self.accounts)}
+        if name == "get_account":
+            return deepcopy(next(a for a in self.accounts if a["id"] == arguments["account_id"]))
         if name == "dispute_context":
             return {"existing_case_id": self.existing, "recent_dispute_count": 0}
         if name.startswith("read_"):
@@ -63,6 +68,10 @@ class FakeServices:
                 card = next(c for c in self.cards if c["id"] == arguments["card_id"])
                 card["status"] = "Blocked"
                 record.update(card_id=card["id"], status="Blocked")
+            elif name == "suspend_account_transactions":
+                account = next(a for a in self.accounts if a["id"] == arguments["account_id"])
+                account["status"] = "TransactionsSuspended"
+                record.update(account_id=account["id"], status="TransactionsSuspended")
             elif name == "file_dispute":
                 record["transaction_id"] = arguments["transaction_id"]
             elif name == "notify_employee":

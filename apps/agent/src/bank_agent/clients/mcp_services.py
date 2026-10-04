@@ -26,6 +26,8 @@ READ_TOOLS = {
     "find_transactions": ("slots", "limit", "window_days"),
     "list_cards": (),
     "get_card": ("card_id",),
+    "list_accounts": (),
+    "get_account": ("account_id",),
 }
 
 
