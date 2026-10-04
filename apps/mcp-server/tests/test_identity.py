@@ -1,39 +1,40 @@
 import datetime as dt
+from types import SimpleNamespace
 import pytest
 from mcp.server.mcpserver.exceptions import ToolError
 from bank_mcp.tools import server
+from bank_mcp.services import session
 
 class Gateway:
-    def __init__(self, rows):
-        self.rows=rows;self.calls=[]
-    def table(self,name):
-        return "`hackaton-509923.bank_curated."+name+"`"
+    def __init__(self,rows): self.rows=rows; self.calls=[]
+    def table(self,name): return name
     def query(self,sql,params,tool):
-        self.calls.append((sql,{p.name:p.value for p in params},tool))
-        return self.rows
+        self.calls.append((sql,params,tool)); return self.rows
 
-def test_identity_query_binds_all_factors_and_ownership(monkeypatch):
-    gw=Gateway([{"customer_id":"CLI-ONE","products":[{"product_number":"12345678",
-                 "product_type":"Tarjeta Crédito","status":"Active"}]}])
+@pytest.fixture(autouse=True)
+def setup(monkeypatch):
+    monkeypatch.setattr(server,"_throttle",session.LoginThrottle(3,dt.timedelta(minutes=15)))
+    monkeypatch.setattr(server,"_signing_key",lambda:b"k"*32)
+    monkeypatch.setattr(server,"get_settings",lambda:SimpleNamespace(session_ttl_minutes=15))
+
+def test_document_parameters_and_signed_session(monkeypatch):
+    gw=Gateway([{"customer_id":"CLI-ONE","product_numbers":["12345678"]}])
     monkeypatch.setattr(server,"_gw",lambda:gw)
-    result=server.verify_identity("CLI-ONE",dt.date(1990,4,3),"12345678")
-    sql,params,tool=gw.calls[0]
-    assert result.verified and result.customer_id=="CLI-ONE"
-    assert params=={"customer_id":"CLI-ONE","date_of_birth":dt.date(1990,4,3),"product_number":"12345678"}
-    assert "owned.customer_id=c.customer_id" in sql
-    assert "c.date_of_birth=@date_of_birth" in sql
-    assert "p.customer_id=c.customer_id" in sql
-    assert "CLI-ONE" not in sql
-    assert "date_of_birth" not in result.model_dump()
-    assert tool=="verify_identity"
+    r=server.verify_identity("1.020.304.050",dt.date(1990,4,3),"12345678")
+    assert r.status=="verified"
+    assert session.verify(r.session_token,b"k"*32)=="CLI-ONE"
+    sql,params,_=gw.calls[0]
+    assert params[0].name=="document_number" and params[0].value=="1020304050"
+    assert "@document_number" in sql and "c.customer_id=@" not in sql
+    assert "date_of_birth" not in r.model_dump()
 
-def test_identity_mismatch_is_generic(monkeypatch):
+def test_mismatch_and_lockout(monkeypatch):
     monkeypatch.setattr(server,"_gw",lambda:Gateway([]))
-    result=server.verify_identity("CLI-ONE",dt.date(1990,4,3),"12345678")
-    assert result.model_dump()=={"verified":False,"customer_id":None,"products":[]}
+    results=[server.verify_identity("1020304050",dt.date(1990,4,3),"12345678") for _ in range(3)]
+    assert [r.status for r in results]==["failed","failed","locked"]
+    assert all(r.customer_id is None and r.session_token is None for r in results)
 
-def test_oversized_identity_is_rejected_not_truncated(monkeypatch):
-    row={"customer_id":"CLI-ONE","products":[{"product_number":"12345678"}]*201}
-    monkeypatch.setattr(server,"_gw",lambda:Gateway([row]))
+def test_ambiguous_identity_fails_closed(monkeypatch):
+    monkeypatch.setattr(server,"_gw",lambda:Gateway([{},{}]))
     with pytest.raises(ToolError):
-        server.verify_identity("CLI-ONE",dt.date(1990,4,3),"12345678")
+        server.verify_identity("1020304050",dt.date(1990,4,3),"12345678")

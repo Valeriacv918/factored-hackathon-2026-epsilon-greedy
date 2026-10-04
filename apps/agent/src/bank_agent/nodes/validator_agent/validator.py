@@ -106,7 +106,7 @@ def normalize_document(raw: Optional[str]) -> Optional[str]:
         return None
     canonical = str(raw).strip().upper()
     if re.fullmatch(r"CLI-[A-Z0-9]{1,16}", canonical):
-        return canonical
+        return None
     s = re.sub(r"[\s.\-]", "", str(raw)).upper()
     return s if re.fullmatch(r"[A-Z0-9]{4,20}", s) else None
 
@@ -216,9 +216,8 @@ class IdentityValidator:
 
         # 3) verificación en el servidor (misma respuesta para "no existe" y "no coincide")
         try:
-            verify = getattr(self.repo, "verify_customer", None)
-            record = verify(cid, dob, prod) if verify is not None else self.repo.get_customer(cid)
-        except RepositoryUnavailable:
+            result = self.identity.verify(doc, dob, prod)
+        except ServiceFailure:
             return self._res(s, Status.SERVICE_UNAVAILABLE, t0)
 
         if result.status == "locked":

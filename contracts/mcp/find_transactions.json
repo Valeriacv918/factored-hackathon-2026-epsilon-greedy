@@ -1,6 +1,6 @@
 {
   "name": "find_transactions",
-  "description": "Find the customer's transactions matching what they described, newest first.\n\n    Without dates, searches the policy window ending on reference_date. `amount`\n    matches within a small tolerance; `merchant` is a case-insensitive substring.\n    has_more=true means more matches exist than were returned: ask for more detail.\n    ",
+  "description": "Find the customer's transactions matching what they described, newest first.\n\n    Without dates, searches the last window_days ending on reference_date. The caller\n    owns that policy; the server only caps it at MAX_SPAN_DAYS. `amount`\n    matches within a small tolerance; `merchant` is a case-insensitive substring.\n    has_more=true means more matches exist than were returned: ask for more detail.\n    ",
   "input_schema": {
     "$defs": {
       "TransactionSlots": {
