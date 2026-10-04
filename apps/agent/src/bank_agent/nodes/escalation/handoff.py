@@ -32,6 +32,8 @@ PROMISES = [
 ]
 BLOCK_CLAIMS = [r"bloquead[ao]s?", r"bloqueo verificado", r"bloqueio verificado", r"se bloqueo",
                 r"foi bloquead", r"foram bloquead"]
+SUSPEND_CLAIMS = [r"suspendid[ao]s?", r"suspensa?s?", r"suspension verificada", r"suspensao verificada",
+                  r"se suspendio", r"foi suspens", r"foram suspens"]
 CASE_CLAIMS = [r"(disputa|caso|contestacao) (fue |foi )?(registrad|cread|abiert|abert)",
                r"se (registro|creo|abrio) (la |una |el |un )?(disputa|caso)",
                r"(registrou|abriu) (a |uma )?contestacao"]
@@ -71,6 +73,7 @@ def build_facts(s, policy) -> dict:
         "priority": s["priority"],
         "transactions": transactions,
         "blocked_cards": list(s.get("blocked_cards", [])),
+        "suspended_accounts": list(s.get("suspended_accounts", [])),
         "case_ids": list(s.get("case_ids", [])),
         "policy": {"fraud_score": str(policy.fraud_score), "high_amount_usd": str(policy.high_amount_usd),
                    "window_days": policy.window_days},
@@ -89,12 +92,15 @@ def template_narrative(facts: dict, language: str) -> str:
         f"{t['id']} ({' '.join(str(t[k]) for k in ('merchant', 'amount', 'currency', 'date', 'status') if k in t)})"
         for t in facts["transactions"]) or "—"
     blocked = ", ".join(facts["blocked_cards"]) or "—"
+    suspended = ", ".join(facts.get("suspended_accounts", []))
     cases = ", ".join(facts["case_ids"]) or "—"
     if pt:
+        suspended_clause = f" contas com transações suspensas: {suspended};" if suspended else ""
         return (f"Encaminhado para a fila {queue} com prioridade {facts['priority']}: {facts['reason_text']}. "
-                f"Cobranças: {txs}; cartões bloqueados: {blocked}; casos: {cases}.")
+                f"Cobranças: {txs}; cartões bloqueados: {blocked};{suspended_clause} casos: {cases}.")
+    suspended_clause = f" cuentas con transacciones suspendidas: {suspended};" if suspended else ""
     return (f"Escalado a la cola {queue} con prioridad {facts['priority']}: {facts['reason_text']}. "
-            f"Cargos: {txs}; tarjetas bloqueadas: {blocked}; casos: {cases}.")
+            f"Cargos: {txs}; tarjetas bloqueadas: {blocked};{suspended_clause} casos: {cases}.")
 
 
 def _claims(patterns, plain: str) -> bool:
@@ -118,15 +124,18 @@ def claim_check(text: str, facts: dict) -> list[str]:
         issues.append("too_many_sentences")
 
     txs = facts["transactions"]
+    suspended_accounts = facts.get("suspended_accounts", [])
     merchant_tokens = {w for t in txs for w in re.findall(r"[\w-]+", str(t.get("merchant", "")))}
     allowed_ids = ({t["id"] for t in txs} | set(facts["case_ids"]) | set(facts["blocked_cards"])
+                   | set(suspended_accounts)
                    | {facts["reason"], facts["priority"], facts.get("policy_rule"), facts.get("explanation_rule")}
                    | merchant_tokens) - {None}
     allowed_dates = {t["date"] for t in txs if "date" in t}
     allowed_numbers = {n for n in (
         [_decimal(t.get(k)) for t in txs for k in ("amount", "fraud_score")]
         + [_decimal(v) for v in facts["policy"].values()]
-        + [Decimal(len(txs)), Decimal(len(facts["case_ids"])), Decimal(len(facts["blocked_cards"]))]
+        + [Decimal(len(txs)), Decimal(len(facts["case_ids"])), Decimal(len(facts["blocked_cards"])),
+           Decimal(len(suspended_accounts))]
         + [_decimal(n) for w in merchant_tokens for n in NUMBER_RE.findall(w)]
     ) if n is not None}
 
@@ -148,6 +157,8 @@ def claim_check(text: str, facts: dict) -> list[str]:
         issues.append("promise")
     if not facts["blocked_cards"] and _claims(BLOCK_CLAIMS, plain):
         issues.append("unverified_block")
+    if not suspended_accounts and _claims(SUSPEND_CLAIMS, plain):
+        issues.append("unverified_suspension")
     if not facts["case_ids"] and _claims(CASE_CLAIMS, plain):
         issues.append("unverified_case")
     return issues

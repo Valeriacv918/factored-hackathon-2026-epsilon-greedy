@@ -239,3 +239,37 @@ def test_fraud_without_card_escalates(fake_services):
     _, _, state = start(services)
     assert state["reason"] == "no_blockable_card"
     assert state["outcome"] == "escalated"
+
+
+def test_fraud_on_account_suspends_transactions_not_the_card(fake_services):
+    """A disputed transaction may sit on a savings/checking account, not a card:
+    the account's capacity to transact is suspended, never the product itself."""
+    services = fake_services()
+    services.transactions[0]["card_id"] = None
+    services.transactions[0]["account_id"] = "account-1"
+    graph, config, state = start(services)
+    assert state["__interrupt__"][0].value["kind"] == "confirm_suspend"
+    assert state["__interrupt__"][0].value["account_id"] == "account-1"
+    assert "suspend_account_transactions" not in services.calls
+    assert "block_card" not in services.calls
+    state = resume(graph, config, "yes")
+    assert state["__interrupt__"][0].value["kind"] == "confirm_dispute"
+    assert "suspend_account_transactions" in services.calls
+    assert next(a for a in services.accounts if a["id"] == "account-1")["status"] == "TransactionsSuspended"
+    state = resume(graph, config, "yes")
+    state = resume(graph, config, "no")
+    assert state["outcome"] == "fraud_intake_complete"
+    assert state["suspended_accounts"] == ["account-1"]
+    assert state["blocked_cards"] == []
+    assert state["block_verified_at"]["account-1"]
+
+
+def test_declined_account_suspension_escalates_without_suspending(fake_services):
+    services = fake_services()
+    services.transactions[0]["card_id"] = None
+    services.transactions[0]["account_id"] = "account-1"
+    graph, config, _ = start(services)
+    state = resume(graph, config, "no")
+    assert state["outcome"] == "escalated"
+    assert (state["queue"], state["priority"]) == ("fraud", "P1")
+    assert "suspend_account_transactions" not in services.calls

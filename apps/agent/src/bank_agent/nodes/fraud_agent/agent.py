@@ -36,7 +36,7 @@ Fuera de alcance de este agente (lo resuelve el orquestador / otros agentes):
   no en el agente de fraude. Este agente solo produce un `EscalationRequest`
   con cola, prioridad y motivo verificado.
 
-Igual que `validator_agent/validator.py`: toda decision de a donde ir despues
+Igual que `validator_agent/validator.py` (en `nodes/validator_agent/`): toda decision de a donde ir despues
 la toma este codigo, nunca el texto del cliente ni un modelo.
 """
 from __future__ import annotations

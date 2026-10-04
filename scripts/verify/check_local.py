@@ -13,4 +13,6 @@ subprocess.run([sys.executable, "-m", "unittest", "discover", "-s",
                cwd=root, check=True)
 for test in sorted((root / "data/dataform/tests").glob("*.js")):
     subprocess.run([node, str(test)], cwd=root, check=True)
+subprocess.run([sys.executable, str(root / "scripts/verify/sandbox_contract.py"), "--check"],
+               cwd=root, check=True)
 print("Local checks passed. Cloud compilation/execution remains separate.")

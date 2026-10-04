@@ -1,0 +1,399 @@
+{
+  "version": "1.0.0",
+  "project": "hackaton-509923",
+  "dataset": "bank_sandbox",
+  "location": "us-central1",
+  "enforcement": {
+    "required": "BigQuery NOT NULL; empty strings are audited",
+    "keys_domains_references": "Writer validation plus post-write audit; NOT database-enforced",
+    "idempotency": "Scope also includes table/action. Concurrent deduplication belongs to writer."
+  },
+  "tables": {
+    "scenarios": {
+      "key": [
+        "scenario_id"
+      ],
+      "fields": [
+        {
+          "name": "scenario_id",
+          "type": "STRING",
+          "required": true
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "required": true
+        },
+        {
+          "name": "created_by",
+          "type": "STRING",
+          "required": true
+        },
+        {
+          "name": "scenario_clock",
+          "type": "TIMESTAMP",
+          "required": true
+        },
+        {
+          "name": "products_run_id",
+          "type": "STRING",
+          "required": true
+        },
+        {
+          "name": "transactions_run_id",
+          "type": "STRING",
+          "required": true
+        }
+      ],
+      "cluster": [
+        "scenario_id"
+      ]
+    },
+    "card_blocks": {
+      "key": [
+        "block_id"
+      ],
+      "fields": [
+        {
+          "name": "block_id",
+          "type": "STRING",
+          "required": true
+        },
+        {
+          "name": "scenario_id",
+          "type": "STRING",
+          "required": true
+        },
+        {
+          "name": "customer_id",
+          "type": "STRING",
+          "required": true
+        },
+        {
+          "name": "idempotency_key",
+          "type": "STRING",
+          "required": true
+        },
+        {
+          "name": "request_hash",
+          "type": "STRING",
+          "required": true,
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "required": true
+        },
+        {
+          "name": "actor_service",
+          "type": "STRING",
+          "required": true
+        },
+        {
+          "name": "correlation_id",
+          "type": "STRING",
+          "required": true
+        },
+        {
+          "name": "mode",
+          "type": "STRING",
+          "required": true,
+          "allowed": [
+            "SIMULATED"
+          ]
+        },
+        {
+          "name": "contract_version",
+          "type": "STRING",
+          "required": true,
+          "allowed": [
+            "1.0.0"
+          ]
+        },
+        {
+          "name": "card_id",
+          "type": "STRING",
+          "required": true
+        },
+        {
+          "name": "products_run_id",
+          "type": "STRING",
+          "required": true
+        },
+        {
+          "name": "status",
+          "type": "STRING",
+          "required": true,
+          "allowed": [
+            "Blocked"
+          ]
+        }
+      ],
+      "cluster": [
+        "scenario_id",
+        "customer_id"
+      ],
+      "idempotency_scope": [
+        "scenario_id",
+        "customer_id",
+        "idempotency_key"
+      ]
+    },
+    "disputes": {
+      "key": [
+        "case_id"
+      ],
+      "fields": [
+        {
+          "name": "case_id",
+          "type": "STRING",
+          "required": true
+        },
+        {
+          "name": "scenario_id",
+          "type": "STRING",
+          "required": true
+        },
+        {
+          "name": "customer_id",
+          "type": "STRING",
+          "required": true
+        },
+        {
+          "name": "idempotency_key",
+          "type": "STRING",
+          "required": true
+        },
+        {
+          "name": "request_hash",
+          "type": "STRING",
+          "required": true,
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "required": true
+        },
+        {
+          "name": "actor_service",
+          "type": "STRING",
+          "required": true
+        },
+        {
+          "name": "correlation_id",
+          "type": "STRING",
+          "required": true
+        },
+        {
+          "name": "mode",
+          "type": "STRING",
+          "required": true,
+          "allowed": [
+            "SIMULATED"
+          ]
+        },
+        {
+          "name": "contract_version",
+          "type": "STRING",
+          "required": true,
+          "allowed": [
+            "1.0.0"
+          ]
+        },
+        {
+          "name": "transaction_id",
+          "type": "STRING",
+          "required": true
+        },
+        {
+          "name": "transactions_run_id",
+          "type": "STRING",
+          "required": true
+        },
+        {
+          "name": "status",
+          "type": "STRING",
+          "required": true,
+          "allowed": [
+            "OPEN"
+          ]
+        }
+      ],
+      "cluster": [
+        "scenario_id",
+        "customer_id"
+      ],
+      "idempotency_scope": [
+        "scenario_id",
+        "customer_id",
+        "idempotency_key"
+      ]
+    },
+    "handoffs": {
+      "key": [
+        "ticket_id"
+      ],
+      "fields": [
+        {
+          "name": "ticket_id",
+          "type": "STRING",
+          "required": true
+        },
+        {
+          "name": "scenario_id",
+          "type": "STRING",
+          "required": true
+        },
+        {
+          "name": "customer_id",
+          "type": "STRING",
+          "required": true
+        },
+        {
+          "name": "idempotency_key",
+          "type": "STRING",
+          "required": true
+        },
+        {
+          "name": "request_hash",
+          "type": "STRING",
+          "required": true,
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "required": true
+        },
+        {
+          "name": "actor_service",
+          "type": "STRING",
+          "required": true
+        },
+        {
+          "name": "correlation_id",
+          "type": "STRING",
+          "required": true
+        },
+        {
+          "name": "mode",
+          "type": "STRING",
+          "required": true,
+          "allowed": [
+            "SIMULATED"
+          ]
+        },
+        {
+          "name": "contract_version",
+          "type": "STRING",
+          "required": true,
+          "allowed": [
+            "1.0.0"
+          ]
+        },
+        {
+          "name": "packet",
+          "type": "JSON",
+          "required": true
+        }
+      ],
+      "cluster": [
+        "scenario_id",
+        "customer_id"
+      ],
+      "idempotency_scope": [
+        "scenario_id",
+        "customer_id",
+        "idempotency_key"
+      ]
+    },
+    "notifications": {
+      "key": [
+        "delivery_id"
+      ],
+      "fields": [
+        {
+          "name": "delivery_id",
+          "type": "STRING",
+          "required": true
+        },
+        {
+          "name": "scenario_id",
+          "type": "STRING",
+          "required": true
+        },
+        {
+          "name": "customer_id",
+          "type": "STRING",
+          "required": true
+        },
+        {
+          "name": "idempotency_key",
+          "type": "STRING",
+          "required": true
+        },
+        {
+          "name": "request_hash",
+          "type": "STRING",
+          "required": true,
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "required": true
+        },
+        {
+          "name": "actor_service",
+          "type": "STRING",
+          "required": true
+        },
+        {
+          "name": "correlation_id",
+          "type": "STRING",
+          "required": true
+        },
+        {
+          "name": "mode",
+          "type": "STRING",
+          "required": true,
+          "allowed": [
+            "SIMULATED"
+          ]
+        },
+        {
+          "name": "contract_version",
+          "type": "STRING",
+          "required": true,
+          "allowed": [
+            "1.0.0"
+          ]
+        },
+        {
+          "name": "ticket_id",
+          "type": "STRING",
+          "required": true
+        },
+        {
+          "name": "status",
+          "type": "STRING",
+          "required": true,
+          "allowed": [
+            "SIMULATED"
+          ]
+        }
+      ],
+      "cluster": [
+        "scenario_id",
+        "customer_id"
+      ],
+      "idempotency_scope": [
+        "scenario_id",
+        "customer_id",
+        "idempotency_key"
+      ]
+    }
+  }
+}

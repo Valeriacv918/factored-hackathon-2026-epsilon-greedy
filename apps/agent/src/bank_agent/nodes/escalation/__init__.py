@@ -12,6 +12,7 @@ def run(s, services, policy):
             "customer_quote": s["message"], "language": s["language"],
             "transaction_ids": [t["id"] for t in s.get("risk_transactions", [])],
             "case_ids": s["case_ids"], "blocked_cards": s["blocked_cards"],
+            "suspended_accounts": s["suspended_accounts"],
             "not_done": [s["reason"]], "next_steps": ["human_review"],
             "policy_version": policy.version,
         }
