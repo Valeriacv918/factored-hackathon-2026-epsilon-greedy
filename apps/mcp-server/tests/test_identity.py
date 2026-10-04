@@ -29,6 +29,7 @@ class FakeGateway:
 def configured(monkeypatch):
     monkeypatch.setenv("SESSION_SIGNING_KEY", KEY)
     monkeypatch.setenv("IDENTITY_MAX_ATTEMPTS", "3")
+    monkeypatch.setenv("SANDBOX_SCENARIO_ID", "")   # curated-only behaviour, whatever .env says
     get_settings.cache_clear()
     monkeypatch.setattr(server, "_throttle", None)
     yield

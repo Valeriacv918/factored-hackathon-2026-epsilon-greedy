@@ -26,6 +26,8 @@ ni integración con un servicio MCP desplegado. IAM no aísla filas por cliente.
 
 ## Configuración para el responsable de MCP
 
+Implementación en el servidor MCP (bloqueos y disputas): [mcp-sandbox.md](mcp-sandbox.md).
+
 | Concepto | Valor |
 |---|---|
 | Proyecto / región | hackaton-509923 / us-central1 |

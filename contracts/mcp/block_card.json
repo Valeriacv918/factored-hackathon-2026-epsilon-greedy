@@ -1,0 +1,48 @@
+{
+  "name": "block_card",
+  "description": "Block one of the customer's cards. SIMULATED: recorded in the sandbox, curated never changes.\n\nOnly an Active credit or debit card can be blocked. A card already blocked in this\nscenario returns that block's receipt. A retry with the same idempotency_key returns\nthe original receipt; reusing the key for another card is an error. Confirm with read_block.\n",
+  "input_schema": {
+    "properties": {
+      "session_token": {
+        "description": "session_token from verify_identity.",
+        "maxLength": 512,
+        "minLength": 1,
+        "title": "Session Token",
+        "type": "string"
+      },
+      "card_id": {
+        "description": "Card product_id.",
+        "pattern": "^[A-Za-z0-9_-]{1,64}$",
+        "title": "Card Id",
+        "type": "string"
+      },
+      "idempotency_key": {
+        "description": "Caller-chosen key; a retry with the same key returns the same receipt.",
+        "pattern": "^[A-Za-z0-9_.:@/+=-]{1,200}$",
+        "title": "Idempotency Key",
+        "type": "string"
+      }
+    },
+    "required": [
+      "session_token",
+      "card_id",
+      "idempotency_key"
+    ],
+    "title": "block_cardArguments",
+    "type": "object"
+  },
+  "output_schema": {
+    "description": "What a write returns: only the id. The agent proves the effect with read_*.",
+    "properties": {
+      "id": {
+        "title": "Id",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "title": "ActionReceipt",
+    "type": "object"
+  }
+}
