@@ -19,6 +19,7 @@ dev = ["pytest>=8,<10"]
 
 [project.scripts]
 bank-mcp = "bank_mcp:main"
+bank-mcp-token = "bank_mcp.tools.server:mint_token"
 
 [tool.setuptools.packages.find]
 where = ["src"]

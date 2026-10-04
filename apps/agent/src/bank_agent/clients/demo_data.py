@@ -1,7 +1,7 @@
 """Clientes SINTÉTICOS para pruebas y demos. Nunca poner datos reales aquí."""
 from datetime import date
 
-from bank_agent.clients.repository import CustomerRecord, Product
+from bank_agent.clients.identity import CustomerRecord, Product
 
 DEMO_CUSTOMERS = {
     "1020304050": CustomerRecord("1020304050", date(1990, 4, 3), (

@@ -1,8 +1,10 @@
-"""Settings from environment variables / .env. Never credentials: auth is ADC."""
+"""Settings from environment variables / .env. BigQuery auth is ADC, never a key file.
+
+The one secret here is SESSION_SIGNING_KEY, which signs session tokens."""
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import AliasChoices, Field
+from pydantic import AliasChoices, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 APP_ROOT = Path(__file__).resolve().parents[3]   # apps/mcp-server
@@ -28,7 +30,14 @@ class Settings(BaseSettings):
 
     # find_transactions defaults (demo policy: 90-day window).
     window_days: int = Field(default=90, gt=0, le=366)
-    amount_tolerance_pct: float = Field(default=1.0, ge=0, le=50)
+    amount_tolerance_pct: float = Field(default=10.0, ge=0, le=50)
+
+    # Session tokens (services/session.py). The key signs every token: keep it secret,
+    # e.g. `python -c "import secrets; print(secrets.token_urlsafe(48))"`.
+    session_signing_key: SecretStr = Field(min_length=32)
+    session_ttl_minutes: int = Field(default=15, gt=0, le=24 * 60)
+    identity_max_attempts: int = Field(default=3, gt=0)
+    identity_lockout_minutes: int = Field(default=15, gt=0)
 
     @property
     def billing_project(self) -> str:

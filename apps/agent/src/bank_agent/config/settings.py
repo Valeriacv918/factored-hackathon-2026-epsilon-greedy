@@ -1,25 +1,10 @@
-"""Configuración del agente de validación.
+"""Configuración del agente: políticas y modelo.
 
-Todo lo que depende de TU base de datos está aquí. Ajusta los nombres
-de tablas/columnas con variables de entorno, sin tocar el código.
+El agente no tiene configuración de BigQuery: todos los datos llegan por el
+servidor MCP (apps/mcp-server), que tiene la suya.
 """
 import os
 from dataclasses import dataclass, field
-
-
-@dataclass(frozen=True)
-class BigQueryConfig:
-    project: str = os.getenv("GCP_PROJECT_ID", "mi-proyecto")
-    dataset: str = os.getenv("BQ_DATASET", "banco")
-    customers_table: str = os.getenv("BQ_CUSTOMERS_TABLE", "customers")
-    products_table: str = os.getenv("BQ_PRODUCTS_TABLE", "products")
-    # Columnas
-    col_customer_id: str = os.getenv("BQ_COL_CUSTOMER_ID", "customer_id")
-    col_dob: str = os.getenv("BQ_COL_DOB", "date_of_birth")
-    col_product_number: str = os.getenv("BQ_COL_PRODUCT_NUMBER", "product_number")
-    col_product_type: str = os.getenv("BQ_COL_PRODUCT_TYPE", "product_type")
-    col_product_status: str = os.getenv("BQ_COL_PRODUCT_STATUS", "status")
-    query_timeout_s: float = float(os.getenv("BQ_TIMEOUT_S", "5"))
 
 
 @dataclass(frozen=True)
@@ -44,7 +29,6 @@ class FraudPolicy:
 
 @dataclass(frozen=True)
 class Settings:
-    bq: BigQueryConfig = field(default_factory=BigQueryConfig)
     policy: ValidationPolicy = field(default_factory=ValidationPolicy)
     fraud_policy: FraudPolicy = field(default_factory=FraudPolicy)
     llm_model: str = os.getenv("LLM_MODEL", "groq:openai/gpt-oss-120b")

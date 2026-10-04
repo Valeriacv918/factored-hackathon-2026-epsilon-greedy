@@ -4,8 +4,8 @@ from datetime import date, datetime, timedelta, timezone
 import pytest
 
 from bank_agent.nodes.validator_agent.language import detect_language
-from bank_agent.clients.repository import (CustomerRecord, InMemoryCustomerRepository, Product)
-from bank_agent.nodes.validator_agent.validator import IdentityValidator, Status, parse_dob
+from bank_agent.clients.identity import (CustomerRecord, IdentityResult, InMemoryIdentityChecker, Product)
+from bank_agent.nodes.validator_agent.validator import IdentityValidator, Status, normalize_id, parse_dob
 
 CUSTOMERS = {
     "1020304050": CustomerRecord("1020304050", date(1990, 4, 3), (
@@ -30,7 +30,7 @@ class Clock:
 @pytest.fixture
 def env():
     clock = Clock()
-    repo = InMemoryCustomerRepository(CUSTOMERS)
+    repo = InMemoryIdentityChecker(CUSTOMERS)
     v = IdentityValidator(repo, clock=clock)
     return v, v.new_session().session_id, clock, repo
 
@@ -117,8 +117,8 @@ def test_unauthenticated_has_no_access(env):
 
 
 # --- fallo de herramienta ---
-def test_bigquery_down_fails_safe():
-    v = IdentityValidator(InMemoryCustomerRepository(CUSTOMERS, fail=True))
+def test_identity_service_down_fails_safe():
+    v = IdentityValidator(InMemoryIdentityChecker(CUSTOMERS, fail=True))
     sid = v.new_session().session_id
     r = v.verify(sid, "1020304050", "03/04/1990", "4111222233334444")
     assert r.status == Status.SERVICE_UNAVAILABLE and r.next_step == "handoff_human"
@@ -153,3 +153,33 @@ def test_short_text_keeps_previous_language():
 
 def test_short_text_without_history_is_ambiguous():
     assert detect_language("ok").ambiguous
+
+
+# --- verificación en el servidor MCP ---
+class LockedByServer:
+    """El servidor ya bloqueó al cliente (p. ej. intentos desde otra conversación)."""
+    def verify(self, customer_id, date_of_birth, product_number):
+        return IdentityResult("locked")
+
+
+def test_server_lockout_locks_this_conversation_too():
+    v = IdentityValidator(LockedByServer())
+    sid = v.new_session().session_id
+    r = v.verify(sid, "1020304050", "03/04/1990", "4111222233334444")
+    assert r.status == Status.LOCKED and r.next_step == "handoff_human"
+
+
+def test_session_keeps_server_token_and_products():
+    v = IdentityValidator(InMemoryIdentityChecker(CUSTOMERS))
+    sid = v.new_session().session_id
+    v.verify(sid, "1020304050", "03/04/1990", "4111222233334444")
+    s = v.get_session(sid)
+    assert s.session_token == "test-token:1020304050"
+    assert s.authorized_products == ("4111222233334444", "00987654321")
+
+
+@pytest.mark.parametrize("raw,expected", [("CLI-0001", "CLI-0001"), ("cli-0001", "CLI-0001"),
+                                          ("1.020.304.050", "1020304050"), (" 99887766 ", "99887766"),
+                                          ("-CLI1", None), ("AB", None), ("CLI_0001", None)])
+def test_normalize_id_keeps_hyphens(raw, expected):
+    assert normalize_id(raw) == expected

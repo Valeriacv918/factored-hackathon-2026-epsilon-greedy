@@ -1,0 +1,70 @@
+{
+  "name": "verify_identity",
+  "description": "Check the customer's identity: customer_id, date of birth and one of their product numbers.\n\nOn success returns a session_token for the other tools and the customer's product\nnumbers. Returns status \"failed\" without saying which value was wrong, and \"locked\"\nafter too many failures. Never returns the customer's data.\n",
+  "input_schema": {
+    "properties": {
+      "customer_id": {
+        "description": "customer_id the customer gave.",
+        "pattern": "^[A-Za-z0-9_-]{1,64}$",
+        "title": "Customer Id",
+        "type": "string"
+      },
+      "date_of_birth": {
+        "format": "date",
+        "title": "Date Of Birth",
+        "type": "string"
+      },
+      "product_number": {
+        "description": "Number of one of the customer's products (card or account).",
+        "pattern": "^[A-Za-z0-9 -]{4,40}$",
+        "title": "Product Number",
+        "type": "string"
+      }
+    },
+    "required": [
+      "customer_id",
+      "date_of_birth",
+      "product_number"
+    ],
+    "title": "verify_identityArguments",
+    "type": "object"
+  },
+  "output_schema": {
+    "properties": {
+      "status": {
+        "enum": [
+          "verified",
+          "failed",
+          "locked"
+        ],
+        "title": "Status",
+        "type": "string"
+      },
+      "session_token": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Session Token"
+      },
+      "product_numbers": {
+        "default": [],
+        "items": {
+          "type": "string"
+        },
+        "title": "Product Numbers",
+        "type": "array"
+      }
+    },
+    "required": [
+      "status"
+    ],
+    "title": "IdentityResult",
+    "type": "object"
+  }
+}

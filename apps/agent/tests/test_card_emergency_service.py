@@ -4,7 +4,7 @@ from datetime import date, datetime, timezone
 import pytest
 
 from bank_agent.clients.fraud_repository import Card, InMemoryCardRepository
-from bank_agent.clients.repository import CustomerRecord, InMemoryCustomerRepository, Product
+from bank_agent.clients.identity import CustomerRecord, InMemoryIdentityChecker, Product
 from bank_agent.nodes.card_emergency_agent.service import CardEmergencyService
 from bank_agent.nodes.validator_agent.validator import IdentityValidator
 
@@ -29,7 +29,7 @@ class Clock:
 @pytest.fixture
 def authenticated_session():
     """IdentityValidator con una sesión YA autenticada (agente 1 ya hizo su trabajo)."""
-    validator = IdentityValidator(InMemoryCustomerRepository(CUSTOMERS), clock=Clock())
+    validator = IdentityValidator(InMemoryIdentityChecker(CUSTOMERS), clock=Clock())
     session = validator.new_session()
     result = validator.verify(session.session_id, CUSTOMER_ID, "1990-04-03", CARD_1)
     assert result.status.value == "VERIFIED"
@@ -42,7 +42,7 @@ def make_service(validator, cards=None):
 
 
 def test_start_requires_authenticated_session():
-    validator = IdentityValidator(InMemoryCustomerRepository(CUSTOMERS), clock=Clock())
+    validator = IdentityValidator(InMemoryIdentityChecker(CUSTOMERS), clock=Clock())
     session = validator.new_session()   # nunca verificada
     service = make_service(validator)
     with pytest.raises(PermissionError):

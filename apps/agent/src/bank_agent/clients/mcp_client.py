@@ -12,9 +12,18 @@ import threading
 from pathlib import Path
 from typing import Any
 
-from bank_agent.clients.contracts import ServiceFailure
+from bank_agent.clients.contracts import ServiceFailure, SessionExpired
 
 logger = logging.getLogger(__name__)
+
+# Error text the bank MCP server returns for a bad, expired or forged session token.
+SESSION_INVALID = "session_invalid"
+
+
+def _error_code(result) -> str:
+    """The server's message without the SDK's 'Error executing tool <name>: ' prefix."""
+    text = " ".join(getattr(c, "text", "") for c in result.content or []).strip()
+    return text.rpartition(": ")[2]
 
 
 class McpToolClient:
@@ -92,6 +101,8 @@ class McpToolClient:
         if result.is_error:
             # Server error text stays in logs; it is not shown to the customer.
             logger.info("MCP tool %s returned an error", name)
+            if _error_code(result) == SESSION_INVALID:
+                raise SessionExpired()
             raise ServiceFailure(f"{name} returned an error")
         if not isinstance(result.structured_content, dict):
             raise ServiceFailure(f"{name} returned no structured content")
