@@ -4,7 +4,7 @@ The one secret here is SESSION_SIGNING_KEY, which signs session tokens."""
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import AliasChoices, Field, SecretStr
+from pydantic import AliasChoices, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 APP_ROOT = Path(__file__).resolve().parents[3]   # apps/mcp-server
@@ -23,6 +23,15 @@ class Settings(BaseSettings):
     bq_location: str = Field("us-central1", validation_alias=AliasChoices("BQ_LOCATION", "GCP_REGION"))
     bq_billing_project: str | None = Field(None, validation_alias="BQ_BILLING_PROJECT")
 
+    # Simulated writes (docs/mcp-sandbox.md). Without a scenario the write tools refuse
+    # and cards show their curated status.
+    bq_sandbox_dataset: str = Field("bank_sandbox", pattern=r"^[A-Za-z0-9_]+$",
+                                    validation_alias=AliasChoices("BQ_SANDBOX_DATASET", "BIGQUERY_SANDBOX_DATASET"))
+    sandbox_scenario_id: str | None = Field(None, pattern=r"^[A-Za-z0-9_.:-]{1,128}$",
+                                            validation_alias="SANDBOX_SCENARIO_ID")
+    # recent_dispute_count looks back this many days from the scenario clock.
+    dispute_history_days: int = Field(default=90, gt=0, le=366)
+
     max_bytes_billed: int = Field(default=1_000_000_000, gt=0)
     max_rows: int = Field(default=200, gt=0, le=10_000)
     query_timeout_s: float = Field(default=30, gt=0)
@@ -38,6 +47,12 @@ class Settings(BaseSettings):
     session_ttl_minutes: int = Field(default=15, gt=0, le=24 * 60)
     identity_max_attempts: int = Field(default=3, gt=0)
     identity_lockout_minutes: int = Field(default=15, gt=0)
+
+    @field_validator("sandbox_scenario_id", "bq_billing_project", mode="before")
+    @classmethod
+    def _blank_is_unset(cls, v):
+        # `SANDBOX_SCENARIO_ID=` in .env means "not configured", not an invalid ID.
+        return v or None
 
     @property
     def billing_project(self) -> str:

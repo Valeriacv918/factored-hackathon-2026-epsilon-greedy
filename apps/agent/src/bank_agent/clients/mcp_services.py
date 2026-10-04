@@ -1,11 +1,14 @@
-"""Services implementation over the bank MCP server (read tools only for now).
+"""Services implementation over the bank MCP server.
 
 - The server learns the customer from the session token, never from an argument;
   the token comes from the resolved session, never from model output.
-- Only allow-listed arguments reach the server.
-- Tools the server does not offer yet (writes, dispute_context) raise
-  ServiceFailure, which the graph turns into an escalation or a safe
-  "service unavailable" ending, never a claimed success.
+- Only allow-listed tools and arguments reach the server.
+- Card blocks and disputes are SIMULATED writes in the server's sandbox scenario
+  (docs/mcp-sandbox.md); the graph proves each one with its read_* tool.
+- Tools the server does not offer (handoffs, notifications, account suspension)
+  raise ServiceFailure, which the graph turns into an escalation or a safe
+  "service unavailable" ending, never a claimed success. list_accounts/get_account
+  are allowed through but the server has no such tools yet, so they fail the same way.
 """
 import datetime as dt
 import os
@@ -22,12 +25,17 @@ from bank_agent.clients.narrative import LlmNarrator
 REPO_ROOT = Path(__file__).resolve().parents[5]
 
 # Tool name -> arguments the graph may pass through. session_token is added here.
-READ_TOOLS = {
+TOOLS = {
     "find_transactions": ("slots", "limit", "window_days"),
     "list_cards": (),
     "get_card": ("card_id",),
     "list_accounts": (),
     "get_account": ("account_id",),
+    "dispute_context": ("transaction_id",),
+    "block_card": ("card_id", "idempotency_key"),
+    "read_block": ("id",),
+    "file_dispute": ("transaction_id", "idempotency_key"),
+    "read_dispute": ("id",),
 }
 
 
@@ -130,9 +138,9 @@ class McpServices:
         grant = self._session_grant(session_ref)
         if not grant or not customer_id or grant.customer_id != customer_id:
             raise SessionExpired()
-        if name not in READ_TOOLS:
+        if name not in TOOLS:
             raise ServiceFailure(f"{name} is not available yet")
-        mcp_arguments = {key: arguments[key] for key in READ_TOOLS[name] if key in arguments}
+        mcp_arguments = {key: arguments[key] for key in TOOLS[name] if key in arguments}
         mcp_arguments["session_token"] = grant.token
         if name == "find_transactions":
             mcp_arguments["reference_date"] = self.now().date().isoformat()

@@ -45,6 +45,32 @@ class CardList(BaseModel):
     cards: list[Card]
 
 
+class ActionReceipt(BaseModel):
+    """What a write returns: only the id. The agent proves the effect with read_*."""
+    id: str
+
+
+class BlockRecord(BaseModel):
+    id: str
+    card_id: str
+    customer_id: str
+    status: str
+    verified: bool
+
+
+class DisputeRecord(BaseModel):
+    id: str
+    customer_id: str
+    transaction_id: str
+    status: str
+    verified: bool
+
+
+class DisputeContext(BaseModel):
+    existing_case_id: str | None   # an OPEN dispute on this transaction in this scenario
+    recent_dispute_count: int      # curated complaints only, see docs/mcp-sandbox.md
+
+
 class IdentityResult(BaseModel):
     # Same "failed" for an unknown customer and a wrong answer: no enumeration oracle.
     status: Literal["verified", "failed", "locked"]

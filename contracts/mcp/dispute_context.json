@@ -1,0 +1,52 @@
+{
+  "name": "dispute_context",
+  "description": "What the dispute policy needs before filing: an OPEN case on this transaction in the\nscenario, if any, and how many complaints about unrecognized or wrong charges the\ncustomer made in the dispute_history_days before the scenario clock.",
+  "input_schema": {
+    "properties": {
+      "session_token": {
+        "description": "session_token from verify_identity.",
+        "maxLength": 512,
+        "minLength": 1,
+        "title": "Session Token",
+        "type": "string"
+      },
+      "transaction_id": {
+        "description": "transaction_id.",
+        "pattern": "^[A-Za-z0-9_-]{1,64}$",
+        "title": "Transaction Id",
+        "type": "string"
+      }
+    },
+    "required": [
+      "session_token",
+      "transaction_id"
+    ],
+    "title": "dispute_contextArguments",
+    "type": "object"
+  },
+  "output_schema": {
+    "properties": {
+      "existing_case_id": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Existing Case Id"
+      },
+      "recent_dispute_count": {
+        "title": "Recent Dispute Count",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "existing_case_id",
+      "recent_dispute_count"
+    ],
+    "title": "DisputeContext",
+    "type": "object"
+  }
+}

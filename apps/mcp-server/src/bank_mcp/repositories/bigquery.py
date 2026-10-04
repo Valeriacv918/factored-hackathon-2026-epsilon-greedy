@@ -1,7 +1,8 @@
 """BigQuery access. Credentials only from ADC (gcloud locally, attached SA on Cloud Run).
 
 Every query is parameterized, dry-run first against a byte cap, and time-limited.
-Rows are returned raw (Decimal, datetime); services.mapping shapes them.
+Rows are returned raw (Decimal, datetime); services.mapping shapes them. The same
+path runs the sandbox INSERT ... SELECT statements, which return no rows.
 """
 import hashlib
 import logging
@@ -15,8 +16,10 @@ from bank_mcp.config.settings import Settings
 
 audit = logging.getLogger("bank_mcp.audit")
 
-# Running query jobs needs the bigquery scope; read-only is enforced by IAM roles
-# and by the server exposing only fixed SELECT statements.
+# Running query jobs needs the bigquery scope. What may be written is enforced by IAM
+# (bank-mcp edits only the sandbox action tables) and by the server exposing only
+# fixed statements: SELECTs over curated and sandbox, and INSERTs into card_blocks
+# and disputes.
 _SCOPES = ["https://www.googleapis.com/auth/bigquery"]
 
 Param = bigquery.ScalarQueryParameter | bigquery.ArrayQueryParameter
@@ -36,6 +39,10 @@ class BigQueryGateway:
     def table(self, name: str) -> str:
         s = self.settings
         return f"`{s.bq_project}.{s.bq_dataset}.{name}`"
+
+    def sandbox_table(self, name: str) -> str:
+        s = self.settings
+        return f"`{s.bq_project}.{s.bq_sandbox_dataset}.{name}`"
 
     def query(self, sql: str, params: list[Param], *, tool: str) -> list[dict[str, Any]]:
         s = self.settings

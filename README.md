@@ -9,8 +9,10 @@ AI-first **transaction-dispute intake** agent for a LATAM bank (Spanish and Port
 This repository combines the existing analysis notebook with the GCP data
 pipelines, a LangGraph agent and an MCP server.
 The agent runs an executable six-component LangGraph workflow (Spanish and
-Portuguese) and talks to a read-only MCP server over BigQuery. MCP write tools
-and the end-to-end deployed application remain pending. See
+Portuguese) and talks to an MCP server over BigQuery. The server reads `bank_curated`
+and records simulated card blocks and disputes in `bank_sandbox`
+([MCP and sandbox](docs/mcp-sandbox.md)); handoff and notification tools and the
+end-to-end deployed application remain pending. See
 [agent setup](apps/agent/README.md) and [MCP server](apps/mcp-server/README.md).
 
 ## Repository structure
@@ -159,6 +161,7 @@ It includes scenario isolation, effective card-state queries, receipt checks,
 and quality audits. Deployment is separate from Dataform. Cloud Shell results
 shared on October 4 confirm the schema, permissions checks and one persisted
 simulated card block with its audit. See the [handoff](docs/sandbox-handoff.md)
-for evidence and limits. MCP write tools remain the application team's responsibility.
+for evidence and limits. The MCP server writes card blocks and disputes to it; see
+[MCP and sandbox](docs/mcp-sandbox.md). Handoff and notification tools are still pending.
 
 Offline check: `python scripts/verify/sandbox_contract.py --check`.

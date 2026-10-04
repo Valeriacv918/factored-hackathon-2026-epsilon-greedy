@@ -1,8 +1,10 @@
 # MCP
 
 MCP server over `bank_curated` for the dispute agent. Bounded tools only;
-no arbitrary SQL (see ../../docs/architecture.md). Writes (block, dispute, handoff)
-and `dispute_context` are pending a decision on where writes are stored.
+no arbitrary SQL (see ../../docs/architecture.md). Card blocks and disputes are
+SIMULATED rows in `bank_sandbox`, inside one scenario; curated is never modified.
+How the sandbox is used, and why: [docs/mcp-sandbox.md](../../docs/mcp-sandbox.md).
+Handoffs, notifications and account suspension are not offered yet.
 
 | Tool | Returns (agent field names, see agent `clients/README.md`) |
 |---|---|
@@ -10,6 +12,15 @@ and `dispute_context` are pending a decision on where writes are stored.
 | find_transactions(session_token, reference_date, window_days, slots?, limit=3) | transactions[id, customer_id, card_id, status, fraud_score, amount, amount_usd, currency, date, merchant], has_more |
 | list_cards(session_token) | cards[id, customer_id, last4, status, type] |
 | get_card(session_token, card_id) | id, customer_id, last4, status, type |
+| block_card(session_token, card_id, idempotency_key) | id (receipt) |
+| read_block(session_token, id) | id, card_id, customer_id, status, verified |
+| file_dispute(session_token, transaction_id, idempotency_key) | id (case) |
+| read_dispute(session_token, id) | id, customer_id, transaction_id, status, verified |
+| dispute_context(session_token, transaction_id) | existing_case_id, recent_dispute_count |
+
+The last five need `SANDBOX_SCENARIO_ID`. With it, `list_cards`/`get_card` return the
+effective status (a sandbox block shows as `Blocked`) and `find_transactions` uses the
+scenario clock instead of `reference_date`.
 
 **Trust model.** The server decides who the customer is; it never takes
 `customer_id` from a data tool's caller. The customer identifies with their
@@ -57,12 +68,49 @@ hackaton-509923, bank_curated, us-central1. After changing a tool signature run
 
 ## Verificación de identidad para el grafo local
 
-`verify_identity(customer_id, date_of_birth, product_number)` compara los tres
-factores y la titularidad en BigQuery. `customer_id` admite CLI-... o documento.
-En discordancia devuelve solo verified=false, customer_id=null y products=[].
-En coincidencia entrega ID canónico/productos al repositorio de confianza del
-validador, nunca la fecha de nacimiento ni el documento. No es una herramienta
-para obtener datos antes de verificar. Consulta parametrizada y limitada por el
-gateway; contrato en `contracts/mcp/verify_identity.json`.
-Los intentos/TTL se controlan en IdentityValidator del cliente local. El servidor
-HTTP no debe exponerse públicamente sin autenticación y límites persistentes.
+`verify_identity(document_number, date_of_birth, product_number)` compara los tres
+factores y la titularidad en BigQuery. `document_number` es el documento del cliente
+(cédula, CURP, DNI); se ignoran espacios, puntos y guiones. El `customer_id` interno
+no se acepta como entrada: se obtiene de la coincidencia.
+En discordancia devuelve `status="failed"` con `attempts_left`, o `status="locked"`
+con `locked_until`; nunca `customer_id`, `session_token` ni productos.
+En coincidencia devuelve `status="verified"`, el `customer_id` interno, el
+`session_token`, los `product_numbers` y `expires_at`; nunca la fecha de nacimiento
+ni el documento. No es una herramienta para obtener datos antes de verificar.
+Consulta parametrizada y limitada por el gateway; contrato en
+`contracts/mcp/verify_identity.json`.
+Los intentos, el bloqueo y la vigencia del token los controla el servidor
+(`IDENTITY_MAX_ATTEMPTS`, `IDENTITY_LOCKOUT_MINUTES`, `SESSION_TTL_MINUTES`),
+contando por documento y en memoria; IdentityValidator del cliente solo los
+informa y respeta. El servidor HTTP no debe exponerse públicamente sin
+autenticación y límites persistentes.
+
+## Sandbox scenario
+
+1. An admin creates the scenario with `infra/bigquery/sandbox/create_scenario.sql`
+   (see `infra/bigquery/sandbox/README.md`); `bank-mcp` cannot create one.
+2. Set `SANDBOX_SCENARIO_ID` (`.env` locally) and `SCENARIO_NOW` to its `scenario_clock`.
+   On Cloud Run: `--set-env-vars SANDBOX_SCENARIO_ID=...` and
+   `--service-account bank-mcp@hackaton-509923.iam.gserviceaccount.com` (never a key file).
+3. Locally, run as `bank-mcp` through ADC:
+   `gcloud auth application-default login --impersonate-service-account=bank-mcp@hackaton-509923.iam.gserviceaccount.com`
+   (needs Token Creator on that account).
+
+On start the server logs whether the sandbox tools are enabled.
+
+**Idempotency.** Scope: table + scenario + customer + `idempotency_key`. `request_hash`
+is the lowercase SHA-256 hex of `{"action": ..., <arguments>}` serialized with sorted
+keys and no spaces (`services/sandbox.request_hash`). Same key and hash: the original
+receipt. Same key, other arguments: error.
+
+**Known limitations.**
+- The conditional `INSERT ... SELECT` does not guarantee uniqueness under concurrent
+  calls with the same key (BigQuery has no unique constraints).
+- One scenario per server: every conversation shares it.
+- `find_transactions` shows the curated status even after a dispute is filed.
+- Every block and dispute is SIMULATED.
+- No account tools: a fraud case on an account (not a card) escalates.
+- `recent_dispute_count` counts curated complaints only (subcategories
+  `Cargo no reconocido`, `Cobro indebido`, 90 days before the scenario clock), so
+  disputes filed during the scenario do not count toward DSP-011. Duplicates on the
+  same transaction are still caught by `existing_case_id`.
