@@ -19,7 +19,7 @@ Column renaming lives only in `services/mapping.py`. JSON Schemas: `../../contra
 ## Run (from the repo root, with uv)
 
 ```bash
-uv sync --project apps/mcp-server --extra test
+uv sync --project apps/mcp-server
 uv run --project apps/mcp-server pytest apps/mcp-server -q   # no GCP needed
 gcloud auth application-default login                         # ADC for live queries
 uv run --project apps/mcp-server bank-mcp                     # stdio; --http for streamable HTTP

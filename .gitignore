@@ -49,4 +49,22 @@ Thumbs.db
 
 # Local cloud audit exports
 gcp-audit-*/
+
+# IDE and editor settings
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+*~
+
+# Python tooling caches and build output
+.mypy_cache/
+.ruff_cache/
+.tox/
+.coverage
+.coverage.*
+*.egg-info/
+build/
+dist/
 *.egg-info/
