@@ -63,7 +63,7 @@ FILTER_MERCHANT = "AND STRPOS(LOWER(t.merchant_name), LOWER(@merchant)) > 0"
 FILTER_CURRENCY = "AND t.currency = @currency"
 
 
-# --- Sandbox (bank_sandbox): simulated card blocks and disputes -------------------
+# --- Sandbox (bank_sandbox): simulated card blocks, disputes, handoffs, notifications
 # Ported from infra/bigquery/sandbox/*.sql with table names as placeholders. Every
 # statement filters by @scenario_id and @customer_id; the customer comes from the
 # session token and the scenario from the server's configuration, never the caller.
@@ -212,4 +212,95 @@ SELECT
   (SELECT COUNT(*) FROM {complaints}
    WHERE customer_id = @customer_id AND subcategory IN UNNEST(@subcategories)
      AND creation_date >= @history_start AND creation_date < @history_end) AS recent_dispute_count
+"""
+
+# --- Handoffs and notifications --------------------------------------------------
+# A handoff packet may only cite the customer's own items: each count must equal the
+# number of distinct ids sent. Ownership, not state: a card the agent found already
+# Blocked in curated has no sandbox block, and a case is cited whatever its status.
+HANDOFF_REFS = """
+SELECT
+  (SELECT COUNT(DISTINCT transaction_id) FROM {transactions}
+   WHERE customer_id = @customer_id AND _curation_run_id = @transactions_run_id
+     AND transaction_id IN UNNEST(@transaction_ids)) AS transactions,
+  (SELECT COUNT(DISTINCT case_id) FROM {disputes}
+   WHERE scenario_id = @scenario_id AND customer_id = @customer_id AND mode = 'SIMULATED'
+     AND case_id IN UNNEST(@case_ids)) AS cases,
+  (SELECT COUNT(DISTINCT product_id) FROM {products}
+   WHERE customer_id = @customer_id AND _curation_run_id = @products_run_id
+     AND product_type IN UNNEST(@card_types) AND product_id IN UNNEST(@card_ids)) AS cards
+"""
+
+# One ticket per key; unlike blocks there is no "same item" to deduplicate on.
+# The customer must exist in curated, as read_handoff.sql requires.
+INSERT_HANDOFF = """
+INSERT INTO {handoffs}
+  (ticket_id, scenario_id, customer_id, idempotency_key, request_hash, created_at, actor_service,
+   correlation_id, mode, contract_version, packet)
+SELECT @ticket_id, s.scenario_id, @customer_id, @idempotency_key, @request_hash, CURRENT_TIMESTAMP(),
+       SESSION_USER(), @idempotency_key, 'SIMULATED', '1.0.0', PARSE_JSON(@packet)
+FROM {scenarios} AS s
+WHERE s.scenario_id = @scenario_id
+  AND EXISTS (SELECT 1 FROM {customers} AS c WHERE c.customer_id = @customer_id)
+  AND NOT EXISTS (
+    SELECT 1 FROM {handoffs} AS h
+    WHERE h.scenario_id = @scenario_id AND h.customer_id = @customer_id AND h.idempotency_key = @idempotency_key)
+"""
+
+FIND_HANDOFF_RECEIPT = """
+SELECT ticket_id AS id, request_hash, TRUE AS same_key
+FROM {handoffs}
+WHERE scenario_id = @scenario_id AND customer_id = @customer_id AND idempotency_key = @idempotency_key
+ORDER BY created_at
+LIMIT 1
+"""
+
+# read_handoff.sql keyed by the receipt id.
+READ_HANDOFF = """
+SELECT h.ticket_id AS id, h.customer_id, TRUE AS verified
+FROM {handoffs} AS h
+JOIN {scenarios} AS s ON s.scenario_id = h.scenario_id
+JOIN {customers} AS c ON c.customer_id = h.customer_id
+WHERE h.scenario_id = @scenario_id AND h.customer_id = @customer_id AND h.ticket_id = @id
+  AND h.mode = 'SIMULATED' AND h.contract_version = '1.0.0'
+QUALIFY COUNT(*) OVER () = 1
+"""
+
+# The ticket must be this customer's in this scenario. One notification per ticket,
+# like one block per card: a second key for the same ticket gets the first receipt.
+INSERT_NOTIFICATION = """
+INSERT INTO {notifications}
+  (delivery_id, scenario_id, customer_id, idempotency_key, request_hash, created_at, actor_service,
+   correlation_id, mode, contract_version, ticket_id, status)
+SELECT @delivery_id, h.scenario_id, h.customer_id, @idempotency_key, @request_hash, CURRENT_TIMESTAMP(),
+       SESSION_USER(), @idempotency_key, 'SIMULATED', '1.0.0', h.ticket_id, 'SIMULATED'
+FROM {handoffs} AS h
+WHERE h.scenario_id = @scenario_id AND h.customer_id = @customer_id AND h.ticket_id = @ticket_id
+  AND h.mode = 'SIMULATED' AND h.contract_version = '1.0.0'
+  AND NOT EXISTS (
+    SELECT 1 FROM {notifications} AS n
+    WHERE n.scenario_id = @scenario_id AND n.customer_id = @customer_id
+      AND (n.idempotency_key = @idempotency_key OR n.ticket_id = @ticket_id))
+"""
+
+FIND_NOTIFICATION_RECEIPT = """
+SELECT delivery_id AS id, request_hash, idempotency_key = @idempotency_key AS same_key
+FROM {notifications}
+WHERE scenario_id = @scenario_id AND customer_id = @customer_id
+  AND (idempotency_key = @idempotency_key OR ticket_id = @ticket_id)
+ORDER BY same_key DESC, created_at
+LIMIT 1
+"""
+
+# read_notification.sql keyed by the receipt id. Verifies the SIMULATED record, not a delivery.
+READ_NOTIFICATION = """
+SELECT n.delivery_id AS id, n.ticket_id, n.customer_id, n.status, TRUE AS verified
+FROM {notifications} AS n
+JOIN {scenarios} AS s ON s.scenario_id = n.scenario_id
+JOIN {handoffs} AS h
+  ON h.scenario_id = n.scenario_id AND h.customer_id = n.customer_id AND h.ticket_id = n.ticket_id
+WHERE n.scenario_id = @scenario_id AND n.customer_id = @customer_id AND n.delivery_id = @id
+  AND n.mode = 'SIMULATED' AND n.status = 'SIMULATED' AND n.contract_version = '1.0.0'
+  AND h.mode = 'SIMULATED' AND h.contract_version = '1.0.0'
+QUALIFY COUNT(*) OVER () = 1
 """

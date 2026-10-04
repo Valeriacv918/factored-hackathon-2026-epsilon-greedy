@@ -1,10 +1,10 @@
 # MCP
 
 MCP server over `bank_curated` for the dispute agent. Bounded tools only;
-no arbitrary SQL (see ../../docs/architecture.md). Card blocks and disputes are
-SIMULATED rows in `bank_sandbox`, inside one scenario; curated is never modified.
-How the sandbox is used, and why: [docs/mcp-sandbox.md](../../docs/mcp-sandbox.md).
-Handoffs, notifications and account suspension are not offered yet.
+no arbitrary SQL (see ../../docs/architecture.md). Card blocks, disputes, handoffs
+and notifications are SIMULATED rows in `bank_sandbox`, inside one scenario; curated
+is never modified. How the sandbox is used, and why:
+[docs/mcp-sandbox.md](../../docs/mcp-sandbox.md). Account tools are not offered yet.
 
 | Tool | Returns (agent field names, see agent `clients/README.md`) |
 |---|---|
@@ -17,8 +17,12 @@ Handoffs, notifications and account suspension are not offered yet.
 | file_dispute(session_token, transaction_id, idempotency_key) | id (case) |
 | read_dispute(session_token, id) | id, customer_id, transaction_id, status, verified |
 | dispute_context(session_token, transaction_id) | existing_case_id, recent_dispute_count |
+| create_handoff(session_token, packet, idempotency_key) | id (ticket) |
+| read_handoff(session_token, id) | id, customer_id, verified |
+| notify_employee(session_token, ticket_id, idempotency_key) | id (delivery) |
+| read_notification(session_token, id) | id, ticket_id, customer_id, status, verified |
 
-The last five need `SANDBOX_SCENARIO_ID`. With it, `list_cards`/`get_card` return the
+The last nine need `SANDBOX_SCENARIO_ID`. With it, `list_cards`/`get_card` return the
 effective status (a sandbox block shows as `Blocked`) and `find_transactions` uses the
 scenario clock instead of `reference_date`.
 
@@ -108,8 +112,10 @@ receipt. Same key, other arguments: error.
   calls with the same key (BigQuery has no unique constraints).
 - One scenario per server: every conversation shares it.
 - `find_transactions` shows the curated status even after a dispute is filed.
-- Every block and dispute is SIMULATED.
-- No account tools: a fraud case on an account (not a card) escalates.
+- Every block, dispute, handoff and notification is SIMULATED; a notification reaches
+  nobody (the table has no recipient).
+- No account tools: a fraud case on an account (not a card) escalates, and a handoff
+  packet's `suspended_accounts` must be empty.
 - `recent_dispute_count` counts curated complaints only (subcategories
   `Cargo no reconocido`, `Cobro indebido`, 90 days before the scenario clock), so
   disputes filed during the scenario do not count toward DSP-011. Duplicates on the

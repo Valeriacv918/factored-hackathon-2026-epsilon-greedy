@@ -32,6 +32,8 @@ def dev_token(customer_id):
 
 TOKEN = dev_token("CLI-1")
 BLOCK = {"id": "BLK-1", "card_id": "PRD-1", "customer_id": "CLI-1", "status": "Blocked", "verified": True}
+HANDOFF = {"id": "TKT-1", "customer_id": "CLI-1", "verified": True}
+NOTIFICATION = {"id": "NTF-1", "ticket_id": "TKT-1", "customer_id": "CLI-1", "status": "SIMULATED", "verified": True}
 
 
 class FakeMcpClient:
@@ -44,7 +46,9 @@ class FakeMcpClient:
             raise ServiceFailure(name)
         return deepcopy({"find_transactions": {"transactions": [TX], "has_more": False},
                          "list_cards": {"cards": [CARD]}, "get_card": CARD,
-                         "block_card": {"id": "BLK-1"}, "read_block": BLOCK}[name])
+                         "block_card": {"id": "BLK-1"}, "read_block": BLOCK,
+                         "create_handoff": {"id": "TKT-1"}, "read_handoff": HANDOFF,
+                         "notify_employee": {"id": "NTF-1"}, "read_notification": NOTIFICATION}[name])
 
     def close(self):
         pass
@@ -96,8 +100,7 @@ def test_session_must_match_customer():
         services().tool("list_cards", session_ref="unknown", customer_id="CLI-1", arguments={})
 
 
-@pytest.mark.parametrize("name", ["create_handoff", "notify_employee", "suspend_account_transactions", "run_query",
-                                  "verify_identity"])
+@pytest.mark.parametrize("name", ["suspend_account_transactions", "read_suspension", "run_query", "verify_identity"])
 def test_tools_not_offered_yet_fail_without_reaching_server(name):
     s = services()
     with pytest.raises(ServiceFailure):
@@ -112,6 +115,19 @@ def test_writes_send_only_allow_listed_arguments_and_the_token():
                       "scenario_id": "forged", "session_token": "forged"})
     assert s._client.calls == [("block_card", {"card_id": "PRD-1", "idempotency_key": "t:block_card:PRD-1",
                                                "session_token": TOKEN})]
+
+
+def test_handoff_and_notification_pass_through_the_allow_list():
+    s = services()
+    packet = {"reason": "card_replacement", "queue": "cards"}
+    s.tool("create_handoff", session_ref="dev", customer_id="CLI-1",
+           arguments={"packet": packet, "idempotency_key": "t:create_handoff:handoff", "customer_id": "CLI-OTHER"})
+    s.tool("notify_employee", session_ref="dev", customer_id="CLI-1",
+           arguments={"ticket_id": "TKT-1", "idempotency_key": "t:notify_employee:TKT-1", "scenario_id": "forged"})
+    assert s._client.calls == [
+        ("create_handoff", {"packet": packet, "idempotency_key": "t:create_handoff:handoff", "session_token": TOKEN}),
+        ("notify_employee", {"ticket_id": "TKT-1", "idempotency_key": "t:notify_employee:TKT-1",
+                             "session_token": TOKEN})]
 
 
 def test_scenario_clock_runs_from_start_and_requires_timezone():

@@ -146,11 +146,11 @@ a rutas del repo se validan localmente; aún no se han vuelto a ejecutar en GCP.
 
 - Ingeniería de datos: retención compartida de evidencia, política de limpieza
   y pruebas equivalentes de las otras tres gestiones.
-- Equipo MCP: hecho para bloqueos y disputas ([mcp-sandbox.md](mcp-sandbox.md)):
-  consultas y escrituras conectadas, cliente y escenario desde el contexto del
-  servidor, estados permitidos e idempotencia por clave, con prueba real y
-  auditoría PASSED (escenario `demo-20261004T211122Z-10525`). Pendiente:
-  derivaciones y notificaciones, recuperación de timeout más allá de reintentar
+- Equipo MCP: hecho para bloqueos, disputas, derivaciones y notificaciones
+  ([mcp-sandbox.md](mcp-sandbox.md)): consultas y escrituras conectadas, cliente y
+  escenario desde el contexto del servidor, estados permitidos, esquema del paquete
+  de derivación e idempotencia por clave, con prueba real y auditoría PASSED
+  (escenario `demo-20261004T211122Z-10525`). Pendiente: recuperación de timeout más allá de reintentar
   con la misma clave, y unicidad ante llamadas concurrentes. Las confirmaciones
   al cliente las hace el agente antes de llamar a la herramienta.
 - Validación conjunta: dos clientes/escenarios concurrentes, claves repetidas y

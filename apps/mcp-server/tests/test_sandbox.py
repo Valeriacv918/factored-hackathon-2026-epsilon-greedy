@@ -1,10 +1,12 @@
-"""Sandbox tools (block_card, file_dispute, read_*, dispute_context) with a fake gateway."""
+"""Sandbox tools (block_card, file_dispute, create_handoff, notify_employee, read_*, dispute_context) with a fake gateway."""
 import datetime as dt
 import hashlib
+import json
 
 import pytest
 from google.cloud import bigquery
 from mcp.server.mcpserver.exceptions import ToolError
+from pydantic import ValidationError
 
 from bank_mcp.config.settings import get_settings
 from bank_mcp.services import sandbox, session
@@ -64,6 +66,12 @@ def receipt(id_, digest, same_key=True):
 
 BLOCK_HASH = sandbox.request_hash("block_card", card_id="PRD-1")
 
+PACKET = {"reason": "card_replacement", "queue": "cards", "priority": "P3", "language": "es",
+          "customer_quote": "perdí mi tarjeta", "transaction_ids": ["TRX-1"], "case_ids": ["CASE-1"],
+          "blocked_cards": ["PRD-1", "PRD-1"], "suspended_accounts": [], "not_done": ["card_replacement"],
+          "next_steps": ["human_review"], "policy_version": "demo-v4", "narrative": "Escalado a la cola cards.",
+          "narrative_source": "template", "claim_issues": []}
+
 
 def test_request_hash_is_sha256_of_sorted_compact_json():
     expected = hashlib.sha256(b'{"action":"block_card","card_id":"PRD-1"}').hexdigest()
@@ -78,7 +86,11 @@ def test_sandbox_tools_refuse_without_a_scenario(monkeypatch):
                  lambda: server.read_block(token(), "BLK-1"),
                  lambda: server.file_dispute(token(), "TRX-1", "k1"),
                  lambda: server.read_dispute(token(), "CASE-1"),
-                 lambda: server.dispute_context(token(), "TRX-1")):
+                 lambda: server.dispute_context(token(), "TRX-1"),
+                 lambda: server.create_handoff(token(), server.HandoffPacket(**PACKET), "k1"),
+                 lambda: server.read_handoff(token(), "TKT-1"),
+                 lambda: server.notify_employee(token(), "TKT-1", "k1"),
+                 lambda: server.read_notification(token(), "NTF-1")):
         with pytest.raises(ToolError, match=server.SCENARIO_MISSING):
             call()
     assert gw.calls == []
@@ -186,3 +198,77 @@ def test_find_transactions_uses_the_scenario_clock(monkeypatch):
     params = gw.sent("find_transactions")[0][1]
     assert params["end_ts"] == dt.datetime(2026, 6, 18, tzinfo=dt.timezone.utc)
     assert params["start_ts"] == dt.datetime(2026, 5, 18, tzinfo=dt.timezone.utc)
+
+
+def handoff_gateway(monkeypatch, refs=None, digest=None, **answers):
+    """create_handoff runs three statements under one tool name: refs, insert, receipt lookup."""
+    packet = server.HandoffPacket(**PACKET).model_dump(mode="json")
+    digest = digest or sandbox.request_hash("create_handoff", packet=packet)
+    counts = refs or {"transactions": 1, "cases": 1, "cards": 1}
+
+    def answer(p):
+        if "transaction_ids" in p:
+            return [counts]
+        return [] if "packet" in p else receipt("TKT-1", digest)
+    return use(monkeypatch, create_handoff=answer, **answers)
+
+
+def test_create_handoff_checks_ownership_then_writes_the_packet(monkeypatch):
+    gw = handoff_gateway(monkeypatch)
+    result = server.create_handoff(token("CLI-1"), server.HandoffPacket(**PACKET), "conv-1:create_handoff:handoff")
+    assert result.id == "TKT-1"
+    (refs_sql, refs), (insert_sql, insert), _ = gw.sent("create_handoff")
+    assert refs["customer_id"] == "CLI-1" and refs["card_ids"] == ["PRD-1"]   # duplicates counted once
+    assert refs["transactions_run_id"] == "run-t" and refs["products_run_id"] == "run-p"
+    assert "INSERT INTO `p.sbx.handoffs`" in insert_sql and "`p.cur.customers`" in insert_sql
+    assert insert["ticket_id"].startswith("TKT-") and insert["customer_id"] == "CLI-1"
+    assert json.loads(insert["packet"])["customer_quote"] == "perdí mi tarjeta"
+
+
+def test_handoff_citing_someone_elses_item_is_refused_before_writing(monkeypatch):
+    gw = handoff_gateway(monkeypatch, refs={"transactions": 0, "cases": 1, "cards": 1})
+    with pytest.raises(ToolError, match="not the customer's"):
+        server.create_handoff(token(), server.HandoffPacket(**PACKET), "k1")
+    assert len(gw.sent("create_handoff")) == 1
+
+
+def test_handoff_key_reused_with_another_packet_is_a_conflict(monkeypatch):
+    handoff_gateway(monkeypatch, digest="0" * 64)
+    with pytest.raises(ToolError, match="Idempotency key reused"):
+        server.create_handoff(token(), server.HandoffPacket(**PACKET), "k1")
+
+
+@pytest.mark.parametrize("change", [{"session_token": "x"}, {"customer_quote": "x" * 1001},
+                                    {"suspended_accounts": ["ACC-1"]}, {"priority": "P0"},
+                                    {"transaction_ids": ["TRX 1"]}, {"narrative": ""}])
+def test_handoff_packet_schema_is_strict(change):
+    with pytest.raises(ValidationError):
+        server.HandoffPacket(**{**PACKET, **change})
+
+
+def test_read_handoff(monkeypatch):
+    row = {"id": "TKT-1", "customer_id": "CLI-1", "verified": True}
+    gw = use(monkeypatch, read_handoff=[row])
+    assert server.read_handoff(token(), "TKT-1").model_dump() == row
+    gw.answers["read_handoff"] = []
+    with pytest.raises(ToolError, match=server.NOT_VERIFIED):
+        server.read_handoff(token(), "TKT-1")
+
+
+def test_notify_employee_once_per_ticket(monkeypatch):
+    digest = sandbox.request_hash("notify_employee", ticket_id="TKT-1")
+    gw = use(monkeypatch, notify_employee=lambda p: [] if "delivery_id" in p
+             else receipt("NTF-1", "f" * 64, same_key=False))
+    assert server.notify_employee(token("CLI-1"), "TKT-1", "k2").id == "NTF-1"   # earlier notification, other key
+    insert_sql, insert = gw.sent("notify_employee")[0]
+    assert "INSERT INTO `p.sbx.notifications`" in insert_sql and "`p.sbx.handoffs`" in insert_sql
+    assert insert["request_hash"] == digest and insert["customer_id"] == "CLI-1"
+    gw.answers["notify_employee"] = []
+    with pytest.raises(ToolError, match="^Ticket not found.$"):
+        server.notify_employee(token(), "TKT-OTHER", "k3")
+
+
+def test_read_notification(monkeypatch):
+    row = {"id": "NTF-1", "ticket_id": "TKT-1", "customer_id": "CLI-1", "status": "SIMULATED", "verified": True}
+    use(monkeypatch, read_notification=[row])
+    assert server.read_notification(token(), "NTF-1").model_dump() == row

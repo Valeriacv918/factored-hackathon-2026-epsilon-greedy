@@ -1,7 +1,8 @@
 # MCP y sandbox bancario
 
 Cómo usa el servidor MCP (`apps/mcp-server`) el sandbox de BigQuery para los
-bloqueos de tarjeta y las disputas simuladas, y por qué. Complementa la
+bloqueos de tarjeta, las disputas, las derivaciones y las notificaciones simuladas,
+y por qué. Complementa la
 [entrega de ingeniería de datos](sandbox-handoff.md), que describe las tablas,
 los permisos y las consultas de origen.
 
@@ -58,6 +59,10 @@ resumen para el empleado a partir de hechos ya verificados.
 | `file_dispute` | Escribe en `bank_sandbox.disputes` |
 | `read_dispute` | Sandbox, comprobado contra curado |
 | `dispute_context` | Disputas del escenario + quejas curadas |
+| `create_handoff` | Escribe en `bank_sandbox.handoffs`; comprueba las referencias contra curado y sandbox |
+| `read_handoff` | Sandbox, comprobado contra `customers` curado |
+| `notify_employee` | Escribe en `bank_sandbox.notifications` |
+| `read_notification` | Sandbox, comprobado contra la derivación |
 
 Estado efectivo: una tarjeta `Active` en curado con un bloqueo en el escenario se
 devuelve como `Blocked`. Curado nunca cambia.
@@ -112,8 +117,11 @@ del sandbox.
     escenario. Una tarjeta ya bloqueada en el escenario devuelve ese bloqueo.
   - Disputa: transacción del cliente, `Approved`, en la versión del escenario. Una
     transacción con una disputa `OPEN` en el escenario devuelve ese caso.
-- **Errores genéricos:** `Card cannot be blocked.` / `Transaction cannot be disputed.`
-  sin distinguir si no existe, es de otro cliente o no es elegible.
+  - Derivación: un ticket por clave; ver la sección 7.
+  - Notificación: ticket del cliente en el escenario. Un ticket ya notificado
+    devuelve esa notificación.
+- **Errores genéricos:** `Card cannot be blocked.` / `Transaction cannot be disputed.` /
+  `Ticket not found.` sin distinguir si no existe, es de otro cliente o no es elegible.
 - **Verificación:** `read_*` exige exactamente una fila consistente con el escenario
   y la versión curada; si no, `Receipt not verified.`
 - **Concurrencia:** la inserción condicional (`INSERT ... SELECT ... NOT EXISTS`) no
@@ -138,18 +146,41 @@ del sandbox.
   `data/dataform/COMPLAINTS.md`): una queja en el límite de la ventana puede caer de
   cualquiera de los dos lados.
 
-## 7. Relojes
+## 7. Derivaciones y notificaciones
+
+Una escalación del agente termina con dos escrituras, cada una verificada con su
+lectura: `create_handoff` abre el ticket para un empleado y `notify_employee` avisa
+de que está esperando. Solo después el cliente ve "Caso enviado a atención humana".
+
+- **Paquete:** `create_handoff` recibe el paquete que arma el nodo de escalación
+  (`reason`, `queue`, `priority`, `language`, `customer_quote`, ids de transacciones,
+  casos y tarjetas, `not_done`, `next_steps`, `policy_version`, reglas, `narrative`,
+  `narrative_source`, `claim_issues`). El esquema es estricto (`HandoffPacket` en
+  `services/mapping.py`): un campo desconocido, un id mal formado o un texto
+  demasiado largo (`customer_quote` 1000, `narrative` 2000 caracteres) se rechazan,
+  así nunca se guardan tokens ni datos extra. Se guarda en `packet` (JSON).
+- **Referencias:** cada transacción, caso y tarjeta citados debe ser del cliente del
+  token (transacciones y tarjetas en la versión curada del escenario, casos en las
+  disputas del escenario); si no, `Handoff cites items that are not the customer's.`
+  sin escribir nada. Se comprueba la titularidad, no el estado: una tarjeta que ya
+  estaba `Blocked` en curado no tiene bloqueo en el sandbox.
+- **`suspended_accounts` siempre vacío:** no existe la suspensión de cuentas.
+- **Idempotencia:** el `request_hash` cubre el paquete completo. El agente arma el
+  paquete una vez y lo guarda en el checkpoint, así que un reintento envía el mismo.
+- **Una notificación por ticket**, como un bloqueo por tarjeta.
+- **Nadie recibe nada.** `status` es siempre `SIMULATED` y la tabla no tiene
+  destinatario ni canal: el recibo prueba que el aviso quedó registrado, no que se
+  entregó. Un destinatario real requiere cambiar el contrato de datos.
+
+## 8. Relojes
 
 `scenario_clock` es la referencia del servidor: ancla `find_transactions` y la
 ventana de `recent_dispute_count`. El agente usa `SCENARIO_NOW` para su política
 (antigüedad del cargo). Si difieren, el servidor registra un aviso y usa
 `scenario_clock`; conviene que coincidan.
 
-## 8. Fuera de alcance
+## 9. Fuera de alcance
 
-- Derivaciones (`create_handoff`) y notificaciones (`notify_employee`): las tablas
-  existen, pero el servidor no ofrece las herramientas. El agente las trata como
-  fallo de servicio.
 - Suspensión de cuentas (`list_accounts`, `get_account`,
   `suspend_account_transactions`): no hay tabla ni permisos en el sandbox, y
   `find_transactions` no devuelve `account_id`, así que un fraude sobre una cuenta

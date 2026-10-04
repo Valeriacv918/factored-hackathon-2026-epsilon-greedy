@@ -1,0 +1,214 @@
+{
+  "name": "create_handoff",
+  "description": "Open a ticket for a human agent with the case packet. SIMULATED, in the sandbox.\n\nEvery transaction, case and card in the packet must be the customer's. A retry with\nthe same idempotency_key returns the original ticket; reusing the key with another\npacket is an error. Confirm with read_handoff, then call notify_employee.",
+  "input_schema": {
+    "$defs": {
+      "HandoffPacket": {
+        "additionalProperties": false,
+        "description": "What a human agent needs to pick up the case (escalation node in apps/agent).\n\nThe server stores only these fields, so no token or other extra data reaches the\ntable. Every id listed must belong to the session's customer (checked in SQL).",
+        "properties": {
+          "reason": {
+            "pattern": "^[A-Za-z0-9_.:-]{1,64}$",
+            "title": "Reason",
+            "type": "string"
+          },
+          "queue": {
+            "pattern": "^[A-Za-z0-9_.:-]{1,64}$",
+            "title": "Queue",
+            "type": "string"
+          },
+          "priority": {
+            "enum": [
+              "P1",
+              "P2",
+              "P3"
+            ],
+            "title": "Priority",
+            "type": "string"
+          },
+          "language": {
+            "enum": [
+              "es",
+              "pt"
+            ],
+            "title": "Language",
+            "type": "string"
+          },
+          "customer_quote": {
+            "maxLength": 1000,
+            "title": "Customer Quote",
+            "type": "string"
+          },
+          "transaction_ids": {
+            "items": {
+              "pattern": "^[A-Za-z0-9_-]{1,64}$",
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Transaction Ids",
+            "type": "array"
+          },
+          "case_ids": {
+            "items": {
+              "pattern": "^[A-Za-z0-9_-]{1,64}$",
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Case Ids",
+            "type": "array"
+          },
+          "blocked_cards": {
+            "items": {
+              "pattern": "^[A-Za-z0-9_-]{1,64}$",
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Blocked Cards",
+            "type": "array"
+          },
+          "suspended_accounts": {
+            "description": "Always empty: no account suspension yet.",
+            "items": {
+              "pattern": "^[A-Za-z0-9_-]{1,64}$",
+              "type": "string"
+            },
+            "maxItems": 0,
+            "title": "Suspended Accounts",
+            "type": "array"
+          },
+          "not_done": {
+            "items": {
+              "pattern": "^[A-Za-z0-9_.:-]{1,64}$",
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Not Done",
+            "type": "array"
+          },
+          "next_steps": {
+            "items": {
+              "pattern": "^[A-Za-z0-9_.:-]{1,64}$",
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Next Steps",
+            "type": "array"
+          },
+          "policy_version": {
+            "pattern": "^[A-Za-z0-9_.:-]{1,64}$",
+            "title": "Policy Version",
+            "type": "string"
+          },
+          "policy_rule": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Za-z0-9_.:-]{1,64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Policy Rule"
+          },
+          "explanation_rule": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Za-z0-9_.:-]{1,64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Explanation Rule"
+          },
+          "narrative": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Narrative",
+            "type": "string"
+          },
+          "narrative_source": {
+            "enum": [
+              "llm",
+              "template"
+            ],
+            "title": "Narrative Source",
+            "type": "string"
+          },
+          "claim_issues": {
+            "items": {
+              "maxLength": 120,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Claim Issues",
+            "type": "array"
+          }
+        },
+        "required": [
+          "reason",
+          "queue",
+          "priority",
+          "language",
+          "customer_quote",
+          "transaction_ids",
+          "case_ids",
+          "blocked_cards",
+          "suspended_accounts",
+          "not_done",
+          "next_steps",
+          "policy_version",
+          "narrative",
+          "narrative_source",
+          "claim_issues"
+        ],
+        "title": "HandoffPacket",
+        "type": "object"
+      }
+    },
+    "properties": {
+      "session_token": {
+        "description": "session_token from verify_identity.",
+        "maxLength": 512,
+        "minLength": 1,
+        "title": "Session Token",
+        "type": "string"
+      },
+      "packet": {
+        "$ref": "#/$defs/HandoffPacket"
+      },
+      "idempotency_key": {
+        "description": "Caller-chosen key; a retry with the same key returns the same receipt.",
+        "pattern": "^[A-Za-z0-9_.:@/+=-]{1,200}$",
+        "title": "Idempotency Key",
+        "type": "string"
+      }
+    },
+    "required": [
+      "session_token",
+      "packet",
+      "idempotency_key"
+    ],
+    "title": "create_handoffArguments",
+    "type": "object"
+  },
+  "output_schema": {
+    "description": "What a write returns: only the id. The agent proves the effect with read_*.",
+    "properties": {
+      "id": {
+        "title": "Id",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "title": "ActionReceipt",
+    "type": "object"
+  }
+}

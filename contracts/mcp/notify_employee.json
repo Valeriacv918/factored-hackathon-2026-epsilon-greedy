@@ -1,0 +1,48 @@
+{
+  "name": "notify_employee",
+  "description": "Alert the human queue that a ticket is waiting. SIMULATED: recorded, nobody is contacted.\n\nThe ticket must be the customer's, from create_handoff in this scenario. A ticket\nalready notified returns that notification's receipt. Confirm with read_notification.",
+  "input_schema": {
+    "properties": {
+      "session_token": {
+        "description": "session_token from verify_identity.",
+        "maxLength": 512,
+        "minLength": 1,
+        "title": "Session Token",
+        "type": "string"
+      },
+      "ticket_id": {
+        "description": "id returned by create_handoff.",
+        "pattern": "^[A-Za-z0-9_-]{1,64}$",
+        "title": "Ticket Id",
+        "type": "string"
+      },
+      "idempotency_key": {
+        "description": "Caller-chosen key; a retry with the same key returns the same receipt.",
+        "pattern": "^[A-Za-z0-9_.:@/+=-]{1,200}$",
+        "title": "Idempotency Key",
+        "type": "string"
+      }
+    },
+    "required": [
+      "session_token",
+      "ticket_id",
+      "idempotency_key"
+    ],
+    "title": "notify_employeeArguments",
+    "type": "object"
+  },
+  "output_schema": {
+    "description": "What a write returns: only the id. The agent proves the effect with read_*.",
+    "properties": {
+      "id": {
+        "title": "Id",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "title": "ActionReceipt",
+    "type": "object"
+  }
+}
