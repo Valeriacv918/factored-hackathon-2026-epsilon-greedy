@@ -19,6 +19,7 @@ and the end-to-end deployed application remain pending. See
 apps/
   agent/                 # LangGraph workflow, nodes, service contracts, tests (+ tests/integration: live agent -> MCP)
   mcp-server/            # MCP: tools, services, repositories, sql, config, tests
+  web/                   # Chat web: FastAPI + static HTML/JS (identity, then disputes)
 data/
   ingestion/            # Existing Cloud Run ingestion engine and tests
   contracts/raw/        # Available structural CSV contracts
@@ -62,6 +63,7 @@ Tests run per app, each in its own environment; there is no repository-wide `pyt
 |---|---|---|---|
 | Agent unit tests | `apps/agent/tests/` | yes | `uv run --project apps/agent pytest apps/agent` |
 | MCP server unit tests | `apps/mcp-server/tests/` | yes | `uv run --project apps/mcp-server pytest apps/mcp-server` |
+| Web chat tests | `apps/web/tests/` | no | `uv run --project apps/web pytest apps/web` |
 | Live integration (agent → MCP → BigQuery) | `apps/agent/tests/integration/` | no (opt-in) | `uv run --project apps/agent pytest apps/agent -m integration` |
 | LLM quality evaluations | `evals/` | no | metrics, not pass/fail |
 | Data pipeline checks | `data/ingestion`, `data/dataform/tests` | Dataform only | `python scripts/verify/check_local.py` (see below) |

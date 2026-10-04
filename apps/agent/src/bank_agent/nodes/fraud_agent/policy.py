@@ -5,6 +5,10 @@ Implementa, para el path de fraude, las reglas de docs/STATE_MACHINE2.md:
 - DSP-005: la transaccion es mas vieja que la ventana permitida.
 - DSP-013: score > umbral, monto > umbral, o >= 2 cargos no disputados
   (denied) -> escalar al equipo de fraude, con prioridad P1 o P2.
+
+Los umbrales (FraudPolicy) no se definen aqui: vienen de graphs/policy.Policy,
+via config.settings.FraudPolicy. Esa es la unica fuente, compartida con el
+run() del grafo en nodes/fraud_agent/__init__.py.
 """
 from __future__ import annotations
 

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Asistente de disputas</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <main class="chat">
+    <header class="chat__header">
+      <div>
+        <h1>Asistente de disputas</h1>
+        <p id="status" class="chat__status">Verificación de identidad</p>
+      </div>
+      <button id="reset" class="ghost" type="button">Nueva conversación</button>
+    </header>
+
+    <section id="messages" class="chat__messages" aria-live="polite"></section>
+
+    <div id="options" class="chat__options" hidden></div>
+
+    <form id="composer" class="chat__composer">
+      <input id="text" type="text" autocomplete="off" maxlength="2000"
+             placeholder="Escribe tu mensaje…" aria-label="Mensaje">
+      <button id="send" type="submit">Enviar</button>
+    </form>
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>

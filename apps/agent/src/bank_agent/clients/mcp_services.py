@@ -68,15 +68,17 @@ class McpServices:
         self._clock, self._detect, self._narrator = clock, language_detector, narrator
 
     @classmethod
-
-    def from_env(cls, env: Mapping[str, str] = os.environ) -> "McpServices":
+    def from_env(cls, env: Mapping[str, str] = os.environ, *, client: McpToolClient | None = None,
+                 sessions: SessionResolver | None = None) -> "McpServices":
+        """Defaults: a new MCP client and DEV_SESSIONS. The web app passes its shared
+        client and ValidatorSessions, so sessions come from the identity validator."""
         from bank_agent.config.settings import settings
         clock = scenario_clock(dt.datetime.fromisoformat(env["SCENARIO_NOW"])) if env.get("SCENARIO_NOW") else utc_now
-        client = mcp_client_from_env(env)
+        client = client or mcp_client_from_env(env)
+        sessions = sessions or StaticSessions.from_string(env.get("DEV_SESSIONS", ""))
         model_id = env.get("LLM_MODEL") or settings.llm_model
         understanding = LlmUnderstanding.from_model_id(model_id, clock)
-        return cls(client, StaticSessions.from_string(env.get("DEV_SESSIONS", "")), understanding, clock=clock,
-                   narrator=LlmNarrator.from_model_id(model_id))
+        return cls(client, sessions, understanding, clock=clock, narrator=LlmNarrator.from_model_id(model_id))
 
     def close(self) -> None:
         self._client.close()

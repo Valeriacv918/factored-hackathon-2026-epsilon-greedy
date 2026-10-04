@@ -133,6 +133,6 @@ En producción las sesiones salen del validador (`ValidatorSessions`).
 - Petición humana en botones autenticados y comprensión. Texto libre no confirma
   acciones. La futura UI necesita un canal para nuevas emergencias durante
   cualquier pausa; hoy se detectan en entrada y aclaración de transacciones.
-- No hay frontend, endpoint, Dockerfile, alertas reales ni despliegue.
+- Chat web local en `apps/web` (FastAPI + HTML/JS). Aún no hay Dockerfile, alertas reales ni despliegue.
 
 Referencia: [interrupciones de LangGraph](https://docs.langchain.com/oss/python/langgraph/interrupts).
