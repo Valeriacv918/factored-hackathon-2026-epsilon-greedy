@@ -7,7 +7,7 @@ from langchain_core.messages import AIMessage
 from bank_agent.nodes.card_emergency_agent.agent import CardEmergencyAgent
 from bank_agent.nodes.card_emergency_agent.service import CardEmergencyService
 from bank_agent.clients.fraud_repository import Card, InMemoryCardRepository
-from bank_agent.clients.repository import CustomerRecord, InMemoryCustomerRepository, Product
+from bank_agent.clients.identity import CustomerRecord, InMemoryIdentityChecker, Product
 from bank_agent.nodes.validator_agent.validator import IdentityValidator
 
 CUSTOMER_ID = "1020304050"
@@ -27,7 +27,7 @@ class FakeLLM(GenericFakeChatModel):
 
 
 def make_authenticated_session():
-    validator = IdentityValidator(InMemoryCustomerRepository(CUSTOMERS))
+    validator = IdentityValidator(InMemoryIdentityChecker(CUSTOMERS))
     session = validator.new_session()
     result = validator.verify(session.session_id, CUSTOMER_ID, "1990-04-03", CARD_1)
     assert result.status.value == "VERIFIED"

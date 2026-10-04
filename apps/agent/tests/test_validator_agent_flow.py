@@ -4,7 +4,7 @@ from langchain_core.messages import AIMessage
 
 from bank_agent.clients.demo_data import DEMO_CUSTOMERS as CUSTOMERS
 from bank_agent.nodes.validator_agent.agent import ValidationAgent
-from bank_agent.clients.repository import InMemoryCustomerRepository
+from bank_agent.clients.identity import InMemoryIdentityChecker
 from bank_agent.nodes.validator_agent.validator import IdentityValidator
 
 
@@ -14,7 +14,7 @@ class FakeLLM(GenericFakeChatModel):
 
 
 def make_agent(messages):
-    v = IdentityValidator(InMemoryCustomerRepository(CUSTOMERS))
+    v = IdentityValidator(InMemoryIdentityChecker(CUSTOMERS))
     return ValidationAgent(v, model=FakeLLM(messages=iter(messages)))
 
 

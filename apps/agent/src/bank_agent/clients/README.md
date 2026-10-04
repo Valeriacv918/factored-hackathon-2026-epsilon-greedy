@@ -2,6 +2,9 @@
 
 `contracts.Services` se inyecta al construir el grafo. No hay adaptador real aún.
 Todas las herramientas reciben `session_ref`, `customer_id` y `arguments`.
+`McpServices` resuelve `session_ref` a un token firmado por el servidor MCP
+(`sessions.py`) y envía solo ese token: el servidor saca `customer_id` del token,
+nunca de un argumento. El token no se guarda en el checkpoint del grafo.
 El servidor debe comprobar autorización y validar estrictamente sus respuestas.
 Errores operativos o respuestas inválidas: `ServiceFailure`; sesión vencida:
 `SessionExpired`. No incluir datos sensibles en mensajes de error.

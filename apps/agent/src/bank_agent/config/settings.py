@@ -1,32 +1,22 @@
-"""Configuración del agente de validación.
+"""Configuración del agente: políticas y modelo.
 
-Todo lo que depende de TU base de datos está aquí. Ajusta los nombres
-de tablas/columnas con variables de entorno, sin tocar el código.
+El agente no tiene configuración de BigQuery: todos los datos llegan por el
+servidor MCP (apps/mcp-server), que tiene la suya.
 """
 import os
 from dataclasses import dataclass, field
 
+from bank_agent.graphs.policy import Policy
 
-@dataclass(frozen=True)
-class BigQueryConfig:
-    project: str = os.getenv("GCP_PROJECT_ID", "mi-proyecto")
-    dataset: str = os.getenv("BQ_DATASET", "banco")
-    customers_table: str = os.getenv("BQ_CUSTOMERS_TABLE", "customers")
-    products_table: str = os.getenv("BQ_PRODUCTS_TABLE", "products")
-    # Columnas
-    col_customer_id: str = os.getenv("BQ_COL_CUSTOMER_ID", "customer_id")
-    col_dob: str = os.getenv("BQ_COL_DOB", "date_of_birth")
-    col_product_number: str = os.getenv("BQ_COL_PRODUCT_NUMBER", "product_number")
-    col_product_type: str = os.getenv("BQ_COL_PRODUCT_TYPE", "product_type")
-    col_product_status: str = os.getenv("BQ_COL_PRODUCT_STATUS", "status")
-    query_timeout_s: float = float(os.getenv("BQ_TIMEOUT_S", "5"))
+# Single source for the dispute thresholds shared with the graph (graphs/policy.py).
+_POLICY = Policy()
 
 
 @dataclass(frozen=True)
 class ValidationPolicy:
-    max_attempts: int = 3                 # intentos fallidos antes de bloquear
-    lockout_minutes: int = 15             # duración del bloqueo
-    session_ttl_minutes: int = 15         # vida de la sesión autenticada
+    # Intentos, bloqueo y vida de la sesión son del servidor MCP (IDENTITY_MAX_ATTEMPTS,
+    # IDENTITY_LOCKOUT_MINUTES, SESSION_TTL_MINUTES): llegan en cada respuesta de
+    # verify_identity, así que aquí no hay copia.
     supported_languages: tuple = ("es", "pt")
     default_language: str = "es"
     min_lang_confidence: float = 0.60     # umbral de lingua
@@ -35,16 +25,18 @@ class ValidationPolicy:
 
 @dataclass(frozen=True)
 class FraudPolicy:
-    """Umbrales deterministicos del flujo de fraude (docs/STATE_MACHINE2.md, DSP-005/DSP-013)."""
-    fraud_score_threshold: float = float(os.getenv("DSP_FRAUD_SCORE_THRESHOLD", "30"))
-    high_amount_usd_threshold: float = float(os.getenv("DSP_HIGH_AMOUNT_USD", "500"))
-    dispute_window_days: int = int(os.getenv("DSP_WINDOW_DAYS", "90"))
-    max_charges_per_case: int = int(os.getenv("DSP_MAX_CHARGES_PER_CASE", "3"))   # ASK_MORE_CHARGES
+    """Umbrales deterministicos del flujo de fraude (docs/STATE_MACHINE2.md, DSP-005/DSP-013).
+
+    Los valores salen de graphs/policy.Policy, que es la única fuente: así el
+    agente de fraude y el grafo nunca aplican ventanas o umbrales distintos."""
+    fraud_score_threshold: float = float(_POLICY.fraud_score)
+    high_amount_usd_threshold: float = float(_POLICY.high_amount_usd)
+    dispute_window_days: int = _POLICY.window_days
+    max_charges_per_case: int = _POLICY.max_charges   # ASK_MORE_CHARGES
 
 
 @dataclass(frozen=True)
 class Settings:
-    bq: BigQueryConfig = field(default_factory=BigQueryConfig)
     policy: ValidationPolicy = field(default_factory=ValidationPolicy)
     fraud_policy: FraudPolicy = field(default_factory=FraudPolicy)
     llm_model: str = os.getenv("LLM_MODEL", "groq:openai/gpt-oss-120b")
