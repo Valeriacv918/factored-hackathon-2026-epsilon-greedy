@@ -104,6 +104,9 @@ def normalize_document(raw: Optional[str]) -> Optional[str]:
     documento. El servidor aplica la misma normalización a la columna document_number."""
     if not raw:
         return None
+    canonical = str(raw).strip().upper()
+    if re.fullmatch(r"CLI-[A-Z0-9]{1,16}", canonical):
+        return None
     s = re.sub(r"[\s.\-]", "", str(raw)).upper()
     return s if re.fullmatch(r"[A-Z0-9]{4,20}", s) else None
 
