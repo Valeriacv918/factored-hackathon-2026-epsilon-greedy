@@ -42,6 +42,12 @@ class FakeServices:
         self.calls.append("understand")
         return {"intent": self.intent, "confidence": self.confidence, "slots": {}}
 
+    def triage_understand(self, text):
+        from bank_agent.nodes.triage_agent.schemas import Understanding
+        self.calls.append("understand")   # same name, so tests that check call order still apply
+        intent = self.intent if self.intent in {"not_me", "charge_error", "emergency", "other"} else "other"
+        return Understanding(intent=intent, confidence=self.confidence, wants_human=False)
+
     def tool(self, name, *, session_ref, customer_id, arguments):
         assert self.validate_session(session_ref) == customer_id
         self.calls.append(name)

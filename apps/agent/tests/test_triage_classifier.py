@@ -1,8 +1,9 @@
 """Tests del clasificador LLM con un LLM FALSO (no gasta llamadas a Groq).
 Lo que se prueba aquí es nuestro código alrededor del LLM, no la calidad
 del LLM: eso se mide en la evaluación (evals/triage)."""
+import datetime as dt
 
-from bank_agent.nodes.triage_agent.classifier import FALLBACK, SYSTEM_PROMPT, LLMClassifier
+from bank_agent.nodes.triage_agent.classifier import FALLBACK, LLMClassifier, system_prompt, today
 from bank_agent.nodes.triage_agent.schemas import Intent, Understanding
 
 
@@ -59,5 +60,26 @@ def test_customer_message_is_wrapped_as_data():
 
 
 def test_prompt_uses_real_intent_values():
+    prompt = system_prompt(today())
     for intent in Intent:
-        assert intent.value in SYSTEM_PROMPT
+        assert intent.value in prompt
+
+
+def test_prompt_includes_todays_date():
+    """El LLM necesita saber qué día es hoy para convertir fechas relativas."""
+    fake = FakeLLM([FALLBACK])
+    LLMClassifier(structured_llm=fake).understand("me cobraron dos veces")
+    system, _ = fake.received[0]
+    assert today().isoformat() in system[1]
+
+
+def test_date_is_read_on_every_call():
+    """La fecha se calcula en cada mensaje, no una sola vez al arrancar."""
+    reads = []
+    def counting_today():
+        reads.append(1)
+        return today()
+    clf = LLMClassifier(structured_llm=FakeLLM([FALLBACK, FALLBACK]), today=counting_today)
+    clf.understand("uno")
+    clf.understand("dos")
+    assert len(reads) == 2
