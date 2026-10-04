@@ -44,7 +44,7 @@ class BigQueryGateway:
         s = self.settings
         return f"`{s.bq_project}.{s.bq_sandbox_dataset}.{name}`"
 
-    def query(self, sql: str, params: list[Param], *, tool: str) -> list[dict[str, Any]]:
+    def query(self, sql: str, params: list[Param], *, tool: str, job_id: str | None = None) -> list[dict[str, Any]]:
         s = self.settings
         sql_hash = hashlib.sha256(sql.encode()).hexdigest()[:12]
         base = dict(query_parameters=params, maximum_bytes_billed=s.max_bytes_billed,
@@ -54,7 +54,13 @@ class BigQueryGateway:
             estimated = dry.total_bytes_processed or 0
             if estimated > s.max_bytes_billed:
                 raise QueryError(f"Query would scan {estimated:,} bytes, above the {s.max_bytes_billed:,} byte limit.")
-            job = self.client.query(sql, job_config=bigquery.QueryJobConfig(use_query_cache=True, **base))
+            try:
+                job = self.client.query(sql, job_config=bigquery.QueryJobConfig(use_query_cache=True, **base),
+                                        **({"job_id": job_id, "job_retry": None} if job_id else {}))
+            except gexc.Conflict:
+                if not job_id:
+                    raise
+                job = self.client.get_job(job_id, location=s.bq_location)
             rows = [dict(r.items()) for r in job.result(timeout=s.query_timeout_s, max_results=s.max_rows)]
         except QueryError:
             audit.info("tool=%s sql=%s status=rejected_cost", tool, sql_hash)

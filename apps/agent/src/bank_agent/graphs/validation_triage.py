@@ -1,4 +1,4 @@
-"""Validation + triage only. Downstream agents remain explicit pending destinations.
+"""Validation + triage, with an optional isolated read-only charge-error test route.
 
 Keep the model call and the interrupt in separate nodes: resuming an interrupt
 must not replay a verification attempt or a model call. Agent sessions live in
@@ -15,7 +15,7 @@ from bank_agent.nodes.triage_agent.schemas import Understanding, Intent, Route, 
 logger = logging.getLogger(__name__)
 CHOICES = ["emergency", "not_me", "charge_error", "other", "human"]
 
-def build_graph(services, *, checkpointer, policy=None):
+def build_graph(services, *, checkpointer, policy=None, test_charge_error=False):
     def fail(s, reason, message):
         s.update(route="end", reason=reason, outcome="service_unavailable", response=message)
         return s
@@ -93,6 +93,8 @@ def build_graph(services, *, checkpointer, policy=None):
             elif decision.route == Route.EMERGENCY:
                 s.update(route="end", outcome="ready_for_card_emergency",
                          response="Clasificación: emergencia de tarjeta. La ejecución de ese agente está pendiente; no se ha bloqueado ninguna tarjeta.")
+            elif decision.route == Route.FIND_TRANSACTION and test_charge_error and decision.intent == Intent.CHARGE_ERROR:
+                s.update(route="charge_extract", phase="extract", slots={})
             elif decision.route == Route.FIND_TRANSACTION:
                 s.update(route="end", outcome="ready_for_transaction_search",
                          response="Clasificación: revisar un cargo. El siguiente paso es buscar la transacción; esta prueba termina antes de esa búsqueda.")
@@ -115,6 +117,10 @@ def build_graph(services, *, checkpointer, policy=None):
 
     nodes = {"validator_agent": validator, "validation_wait": validation_wait,
              "request_wait": request_wait, "triage_agent": triage, "triage_wait": triage_wait}
+    if test_charge_error:
+        from bank_agent.graphs.charge_test import build_nodes
+        from bank_agent.graphs.policy import Policy
+        nodes.update(build_nodes(services, policy or Policy()))
     builder = StateGraph(ConversationState)
     def wrap(name, fn):
         def run(state):

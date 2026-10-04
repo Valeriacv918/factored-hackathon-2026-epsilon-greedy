@@ -2,7 +2,7 @@
 
 from typing import Any, Literal, TypedDict
 
-Route = Literal["validator_agent", "validation_wait", "request_wait", "triage_agent", "triage_wait", "fraud_agent", "card_emergency_agent", "end"]
+Route = Literal["validator_agent", "validation_wait", "request_wait", "triage_agent", "triage_wait", "charge_extract", "charge_find", "charge_details", "charge_select", "charge_error", "charge_save", "fraud_agent", "card_emergency_agent", "end"]
 
 
 class ConversationState(TypedDict, total=False):
@@ -21,6 +21,8 @@ class ConversationState(TypedDict, total=False):
     intent: str
     intent_confidence: float
     slots: dict[str, Any]
+    charge_input: str
+    charge_candidates: list[dict[str, Any]]
     transaction: dict[str, Any]
     card_id: str
     account_id: str
@@ -33,6 +35,7 @@ class ConversationState(TypedDict, total=False):
     turns: int
     reason: str
     policy_rule: str  # DSP-xxx that decided a charge (DSP-004, DSP-005, DSP-100...)
+    explanation_result_id: str
     explanation_rule: str
     queue: str
     priority: str

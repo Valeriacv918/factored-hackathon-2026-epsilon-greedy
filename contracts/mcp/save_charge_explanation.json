@@ -1,0 +1,75 @@
+{
+  "name": "save_charge_explanation",
+  "description": "Save a verified charge status explanation in sandbox; never changes curated.",
+  "input_schema": {
+    "properties": {
+      "session_token": {
+        "description": "session_token from verify_identity.",
+        "maxLength": 512,
+        "minLength": 1,
+        "title": "Session Token",
+        "type": "string"
+      },
+      "conversation_id": {
+        "pattern": "^[A-Za-z0-9_-]{1,100}$",
+        "title": "Conversation Id",
+        "type": "string"
+      },
+      "transaction_id": {
+        "pattern": "^[A-Za-z0-9_-]{1,64}$",
+        "title": "Transaction Id",
+        "type": "string"
+      },
+      "observed_status": {
+        "enum": [
+          "Pending",
+          "Reversed",
+          "Declined"
+        ],
+        "title": "Observed Status",
+        "type": "string"
+      }
+    },
+    "required": [
+      "session_token",
+      "conversation_id",
+      "transaction_id",
+      "observed_status"
+    ],
+    "title": "save_charge_explanationArguments",
+    "type": "object"
+  },
+  "output_schema": {
+    "properties": {
+      "result_id": {
+        "title": "Result Id",
+        "type": "string"
+      },
+      "transaction_id": {
+        "title": "Transaction Id",
+        "type": "string"
+      },
+      "observed_status": {
+        "title": "Observed Status",
+        "type": "string"
+      },
+      "rule_id": {
+        "title": "Rule Id",
+        "type": "string"
+      },
+      "verified": {
+        "title": "Verified",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "result_id",
+      "transaction_id",
+      "observed_status",
+      "rule_id",
+      "verified"
+    ],
+    "title": "ExplanationReceipt",
+    "type": "object"
+  }
+}
