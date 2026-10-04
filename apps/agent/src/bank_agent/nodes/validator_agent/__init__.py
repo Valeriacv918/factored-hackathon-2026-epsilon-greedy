@@ -4,10 +4,10 @@ Reemplaza a security_language. Fases separadas para que retomar una pausa nunca
 repita un intento de login ni una llamada al LLM (mismo criterio que graphs/validation_triage.py):
 
 - start:    idioma (lingua; si duda, botones). Si la sesión ya es válida (web app, DEV_SESSIONS)
-            sigue directo a understanding; si no, pasa a identify.
+            sigue directo a triage_agent; si no, pasa a identify.
 - identify: ValidationAgent.chat() -> LLM + IdentityValidator + MCP verify_identity. Sin pausa.
 - wait:     pausa para que el cliente escriba sus datos de identidad.
-- request:  pausa "¿En qué te ayudo?" ya autenticado; ese texto es el que clasifica understanding.
+- request:  pausa "¿En qué te ayudo?" ya autenticado; ese texto es el que clasifica triage_agent.
 """
 from langgraph.types import interrupt
 
@@ -35,7 +35,7 @@ def run(s, services, policy):
         reported_at = s.get("reported_at", services.now().isoformat())
         customer = services.validate_session(s["session_ref"])
         if customer:   # ya autenticado afuera (web app, DEV_SESSIONS): sin segundo login
-            return go("understanding", language=language, customer_id=customer, reported_at=reported_at)
+            return go("triage_agent", language=language, customer_id=customer, reported_at=reported_at)
         return go("validator_agent", "identify", language=language, reported_at=reported_at,
                   validation_input=s["message"])
 
@@ -76,4 +76,4 @@ def run(s, services, policy):
                        "message": say(s, "Identidad verificada. ¿En qué te puedo ayudar?",
                                       "Identidade verificada. Como posso ajudar?"),
                        "fields": [TEXT]})
-    return go("understanding", message=_text(reply), turns=s.get("turns", 1) + 1)
+    return go("triage_agent", message=_text(reply), turns=s.get("turns", 1) + 1)

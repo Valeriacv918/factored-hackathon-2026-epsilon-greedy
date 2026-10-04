@@ -28,5 +28,5 @@ def run(s, services, policy):
     answer = ask(s, services, "unrecognized_charge", ["yes", "no"],
                  "¿Hay algún cargo que no reconoces?", "Há alguma transação que você não reconhece?")
     if answer == "yes":
-        return go("understanding", "clarify", intent="not_me", slots={})
+        return go("triage_agent", "clarify", intent="not_me", slots={})
     return escalate("card_replacement", "cards", "P3")

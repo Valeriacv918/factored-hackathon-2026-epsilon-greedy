@@ -8,11 +8,11 @@ from bank_agent.graphs.policy import Policy
 from bank_agent.graphs.state import ConversationState
 from bank_agent.nodes.common import HandoffRequested, escalate, finish, require_session
 from bank_agent.nodes import (charge_error, escalation, fraud_agent, card_emergency_agent, validator_agent,
-                              understanding)
+                              triage_agent)
 
 NODES = {
     "validator_agent": validator_agent.run,
-    "understanding": understanding.run,
+    "triage_agent": triage_agent.run,
     "card_emergency_agent": card_emergency_agent.run,
     "fraud_agent": fraud_agent.run,
     "charge_error": charge_error.run,
