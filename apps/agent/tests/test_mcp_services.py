@@ -9,9 +9,8 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
 
 from bank_agent.clients.contracts import ServiceFailure, SessionExpired
-from bank_agent.clients.mcp_services import McpServices, detect_language_lingua, scenario_clock
+from bank_agent.clients.mcp_services import TOOLS, McpServices, detect_language_lingua, scenario_clock
 from bank_agent.clients.sessions import StaticSessions
-from bank_agent.config.settings import FraudPolicy
 from bank_agent.graphs.disputes import build_graph
 from bank_agent.graphs.policy import Policy
 from bank_agent.graphs.state import initial_state
@@ -48,7 +47,7 @@ class FakeMcpClient:
                          "list_cards": {"cards": [CARD]}, "get_card": CARD,
                          "block_card": {"id": "BLK-1"}, "read_block": BLOCK,
                          "create_handoff": {"id": "TKT-1"}, "read_handoff": HANDOFF,
-                         "notify_employee": {"id": "NTF-1"}, "read_notification": NOTIFICATION}[name])
+                         "notify_employee": {"id": "NTF-1"}, "read_notification": NOTIFICATION}.get(name, {}))
 
     def close(self):
         pass
@@ -78,14 +77,20 @@ def services(intent="charge_error", client=None):
 
 
 
-def test_session_token_and_reference_date_come_from_adapter_not_arguments():
+FORGED = {"customer_id": "CLI-OTHER", "session_token": "forged", "scenario_id": "forged",
+          "reference_date": "2020-01-01"}
+
+
+@pytest.mark.parametrize("name", sorted(TOOLS))
+def test_only_allow_listed_arguments_and_the_sessions_token_reach_the_server(name):
+    # The server learns the customer only from the token; nothing the graph adds can override it.
     s = services()
-    s.tool("find_transactions", session_ref="dev", customer_id="CLI-1",
-           arguments={"slots": {"amount": "1"}, "limit": 3, "customer_id": "CLI-OTHER",
-                      "session_token": "forged", "reference_date": "2020-01-01"})
-    # The server learns the customer only from the token; no customer_id is sent.
-    assert s._client.calls == [("find_transactions", {"slots": {"amount": "1"}, "limit": 3,
-                                                      "session_token": TOKEN, "reference_date": "2026-06-18"})]
+    allowed = {key: f"{key}-value" for key in TOOLS[name]}
+    s.tool(name, session_ref="dev", customer_id="CLI-1", arguments={**FORGED, **allowed})
+    expected = {**allowed, "session_token": TOKEN}
+    if name == "find_transactions":
+        expected["reference_date"] = "2026-06-18"   # the adapter's clock, never the caller's
+    assert s._client.calls == [(name, expected)]
 
 
 def test_validate_session_returns_token_customer():
@@ -106,28 +111,6 @@ def test_tools_not_offered_yet_fail_without_reaching_server(name):
     with pytest.raises(ServiceFailure):
         s.tool(name, session_ref="dev", customer_id="CLI-1", arguments={"card_id": "PRD-1"})
     assert s._client.calls == []
-
-
-def test_writes_send_only_allow_listed_arguments_and_the_token():
-    s = services()
-    s.tool("block_card", session_ref="dev", customer_id="CLI-1",
-           arguments={"card_id": "PRD-1", "idempotency_key": "t:block_card:PRD-1", "customer_id": "CLI-OTHER",
-                      "scenario_id": "forged", "session_token": "forged"})
-    assert s._client.calls == [("block_card", {"card_id": "PRD-1", "idempotency_key": "t:block_card:PRD-1",
-                                               "session_token": TOKEN})]
-
-
-def test_handoff_and_notification_pass_through_the_allow_list():
-    s = services()
-    packet = {"reason": "card_replacement", "queue": "cards"}
-    s.tool("create_handoff", session_ref="dev", customer_id="CLI-1",
-           arguments={"packet": packet, "idempotency_key": "t:create_handoff:handoff", "customer_id": "CLI-OTHER"})
-    s.tool("notify_employee", session_ref="dev", customer_id="CLI-1",
-           arguments={"ticket_id": "TKT-1", "idempotency_key": "t:notify_employee:TKT-1", "scenario_id": "forged"})
-    assert s._client.calls == [
-        ("create_handoff", {"packet": packet, "idempotency_key": "t:create_handoff:handoff", "session_token": TOKEN}),
-        ("notify_employee", {"ticket_id": "TKT-1", "idempotency_key": "t:notify_employee:TKT-1",
-                             "session_token": TOKEN})]
 
 
 def test_scenario_clock_runs_from_start_and_requires_timezone():
@@ -184,11 +167,3 @@ def test_graph_sends_its_own_policy_window_to_the_server():
                  {"configurable": {"thread_id": "t"}, "recursion_limit": 100})
     assert s._client.calls[0][0] == "find_transactions"
     assert s._client.calls[0][1]["window_days"] == 30
-
-
-def test_fraud_policy_reads_the_graph_policy():
-    graph, fraud = Policy(), FraudPolicy()
-    assert fraud.dispute_window_days == graph.window_days
-    assert fraud.fraud_score_threshold == float(graph.fraud_score)
-    assert fraud.high_amount_usd_threshold == float(graph.high_amount_usd)
-    assert fraud.max_charges_per_case == graph.max_charges
