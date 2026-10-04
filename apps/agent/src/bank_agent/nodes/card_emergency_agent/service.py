@@ -3,8 +3,8 @@
 Implementa el diagrama "2. Card emergency" de docs/STATE_MACHINE2.md:
 SELECT_CARD -> CONFIRM_BLOCK -> BLOCK_AND_VERIFY -> ASK_CHARGE.
 
-Las decisiones de a donde ir despues las toma este codigo, nunca el LLM que
-conversa en `agent.py`. Ver ese modulo para el motivo por el que este flujo
+Las decisiones de a donde ir después las toma este codigo, nunca el LLM que
+conversa en `agent.py`. Ver ese módulo para el motivo por el que este flujo
 (a diferencia de `fraud_agent`) si necesita un LLM.
 """
 from __future__ import annotations
