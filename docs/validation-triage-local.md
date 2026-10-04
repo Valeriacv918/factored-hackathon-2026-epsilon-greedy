@@ -90,3 +90,60 @@ de este cambio; no se ha ocultado ni marcado como correcta.
 - Los mensajes fijos del orquestador están en español; el validador y clasificador
   mantienen los módulos de idioma existentes.
 
+
+## Prueba aislada de charge_error
+
+Con los entornos y credenciales preparados, desde Git Bash en Windows:
+
+```bash
+apps/agent/.venv/Scripts/python.exe scripts/run_disputes.py --flow charge-error --debug
+```
+
+Este modo extiende el grafo separado; no ejecuta disputes.py. El modo
+validation-triage mantiene su comportamiento anterior.
+
+1. Identificarse con documento, fecha de nacimiento y número de producto.
+2. Indicar el problema: "Me cobraron dos veces una compra".
+3. Aportar fecha, monto y comercio si se solicitan. Las fechas relativas se
+   interpretan contra SCENARIO_NOW.
+4. Elegir el movimiento mostrado, incluso cuando solo hay una coincidencia.
+5. Pending, Reversed y Declined aplican EXP-002/003/006. El nodo charge_save
+   guarda el resultado con save_charge_explanation y solo termina en explained
+   después de verificar su lectura. No se pide una confirmación adicional.
+6. Approved termina directamente en approved, sin explicación ni escritura.
+7. Un puntaje superior al umbral termina en ready_for_fraud; no ejecuta fraude.
+
+## Persistencia de explicaciones
+
+Migración: infra/bigquery/sandbox/003_agent_results.sql. Crea
+bank_sandbox.agent_results y concede dataEditor sobre esa tabla a bank-mcp.
+No modifica las tablas curated ni las otras tablas sandbox.
+
+MCP toma customer_id del token firmado, verifica titularidad y estado de la
+transacción en SQL y guarda la regla/texto fijo del servidor. No acepta un texto
+libre ni un cliente elegido por el LLM. El resultado incluye el run de curated.
+La clave estable se deriva de versión, conversación, cliente, transacción y
+estado. Un job_id determinista evita ejecutar dos inserciones concurrentes del
+mismo resultado; MERGE permite repetir después de la retención del job. La
+lectura posterior debe devolver exactamente una fila coincidente.
+
+Si el estado cambió antes del primer guardado, no se inserta una explicación
+incompatible. Si el guardado no puede verificarse, el flujo no reporta éxito.
+Los registros son SIMULATED; no representan reembolsos ni disputas abiertas.
+
+Pruebas: test_charge_test_graph.py y test_charge_results.py cubren rutas,
+titularidad, sesión, recibos y reintentos.
+
+## Fechas locales en búsquedas MCP
+
+find_transactions resuelve país, estado y ciudad del cliente autenticado desde
+bank_curated.customers. services/timezones.py mantiene las 16 ubicaciones
+observadas y su zona IANA; una ubicación desconocida produce error explícito.
+
+La fecha exacta y los rangos se interpretan como días locales completos. BigQuery
+convierte ambas medianoches locales a UTC para filtrar transaction_date, teniendo
+en cuenta el horario histórico. local_date contiene solo YYYY-MM-DD y se muestra
+en la selección. date conserva el timestamp original para trazabilidad.
+
+Verificación real: la búsqueda 2024-11-19, 416.73 encontró una coincidencia
+sin comercio para el cliente de prueba, en America/Mexico_City.

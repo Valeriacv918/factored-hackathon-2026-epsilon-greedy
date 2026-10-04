@@ -1,6 +1,6 @@
 {
   "name": "find_transactions",
-  "description": "Find the customer's transactions matching what they described, newest first.\n\nWithout dates, searches the last window_days ending on reference_date. The caller\nowns that policy; the server only caps it at MAX_SPAN_DAYS. `amount`\nmatches within a small tolerance; `merchant` is a case-insensitive substring.\nhas_more=true means more matches exist than were returned: ask for more detail.\nWith a sandbox scenario configured, the scenario clock replaces reference_date.",
+  "description": "Find the customer's transactions matching what they described, newest first.\n\nDates are calendar dates in the authenticated customer location timezone.\nWithout dates, searches the last window_days ending on reference_date. The caller\nowns that policy; the server only caps it at MAX_SPAN_DAYS. `amount`\nmatches within a small tolerance; `merchant` is a case-insensitive substring.\nhas_more=true means more matches exist than were returned: ask for more detail.\nWith a sandbox scenario configured, the scenario clock replaces reference_date.",
   "input_schema": {
     "$defs": {
       "TransactionSlots": {
@@ -207,6 +207,30 @@
           "date": {
             "title": "Date",
             "type": "string"
+          },
+          "local_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Local Date"
+          },
+          "customer_timezone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Customer Timezone"
           },
           "merchant": {
             "anyOf": [

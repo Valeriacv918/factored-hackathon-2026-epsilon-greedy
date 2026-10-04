@@ -18,7 +18,8 @@ def test_transaction_uses_agent_field_names():
     t = to_transaction(tx_row()).model_dump()
     assert t == {"id": "TX1", "customer_id": "C1", "card_id": "P1", "status": "Approved", "fraud_score": "12.5",
                  "amount": "40.00", "amount_usd": "40.00", "currency": "USD",
-                 "date": "2026-06-01T12:00:00+00:00", "merchant": "Shop"}
+                 "date": "2026-06-01T12:00:00+00:00", "merchant": "Shop",
+                 "local_date": None, "customer_timezone": None}
 
 
 def test_non_card_product_has_no_card_id():

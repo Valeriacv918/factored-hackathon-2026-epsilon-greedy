@@ -48,11 +48,14 @@ HAVING LOGICAL_OR({_PRODUCT_NUMBER} = @product_number)
 # another customer's product as its card.
 FIND_TRANSACTIONS = """
 SELECT t.transaction_id, t.customer_id, t.product_id, p.product_type, t.transaction_status,
-       t.fraud_score, t.amount, t.amount_usd, t.currency, t.transaction_date, t.merchant_name
+       t.fraud_score, t.amount, t.amount_usd, t.currency, t.transaction_date, t.merchant_name,
+       DATE(t.transaction_date, @customer_timezone) AS local_date,
+       @customer_timezone AS customer_timezone
 FROM {transactions} AS t
 LEFT JOIN {products} AS p ON p.product_id = t.product_id AND p.customer_id = t.customer_id
 WHERE t.customer_id = @customer_id
-  AND t.transaction_date >= @start_ts AND t.transaction_date < @end_ts
+  AND t.transaction_date >= TIMESTAMP(@start_date, @customer_timezone)
+  AND t.transaction_date < TIMESTAMP(@end_date, @customer_timezone)
   {filters}
 ORDER BY t.transaction_date DESC
 LIMIT @lim

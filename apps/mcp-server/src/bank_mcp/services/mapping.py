@@ -25,6 +25,8 @@ class Transaction(BaseModel):
     amount_usd: str | None
     currency: str
     date: str
+    local_date: str | None = None
+    customer_timezone: str | None = None
     merchant: str | None
 
 
@@ -153,6 +155,8 @@ def to_transaction(row: dict[str, Any]) -> Transaction:
         amount_usd=decimal_str(row["amount_usd"]),
         currency=row["currency"],
         date=iso_utc(row["transaction_date"]),
+        local_date=str(row["local_date"]) if row.get("local_date") else None,
+        customer_timezone=row.get("customer_timezone"),
         merchant=row.get("merchant_name"),
     )
 

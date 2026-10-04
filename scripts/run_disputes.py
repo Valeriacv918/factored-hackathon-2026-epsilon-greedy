@@ -80,7 +80,7 @@ def conversation(graph, session_ref: str, debug: bool) -> None:
         state = graph.invoke(answer(state["__interrupt__"][0].value), config)
     print(f"\nAgent: {state.get('response')}\n  outcome={state.get('outcome')}")
     if debug:
-        keys = ("language", "authenticated", "validation_status", "customer_id", "intent", "triage_route", "slots", "reason", "queue", "priority", "case_ids", "blocked_cards")
+        keys = ("language", "authenticated", "validation_status", "customer_id", "intent", "triage_route", "slots", "reason", "queue", "priority", "case_ids", "blocked_cards", "explanation_result_id")
         print(json.dumps({k: state.get(k) for k in keys} | {"transaction": (state.get("transaction") or {}).get("id")},
                          indent=2, ensure_ascii=False))
         for step in state.get("trace", []):
@@ -91,15 +91,15 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--session", default="dev", help="Session reference from DEV_SESSIONS")
     parser.add_argument("--debug", action="store_true", help="Print state and trace after each conversation")
-    parser.add_argument("--flow", choices=["validation-triage", "legacy"],
+    parser.add_argument("--flow", choices=["validation-triage", "charge-error", "legacy"],
                         default="validation-triage",
-                        help="Validate identity through MCP and classify; downstream agents are pending.")
+                        help="validation-triage: classify only; charge-error: charge search, explanation and sandbox result; legacy: general graph.")
     args = parser.parse_args()
 
     services = McpServices.from_env()
-    if args.flow == "validation-triage":
+    if args.flow in {"validation-triage", "charge-error"}:
         from bank_agent.graphs.validation_triage import build_graph as build_scoped_graph
-        graph = build_scoped_graph(services, checkpointer=InMemorySaver())
+        graph = build_scoped_graph(services, checkpointer=InMemorySaver(), test_charge_error=args.flow == "charge-error")
     else:
         graph = build_graph(services, checkpointer=InMemorySaver())
     print(f"Scenario date {services.now():%Y-%m-%d}. Session '{args.session}'. /new restarts, /quit exits.\n")
