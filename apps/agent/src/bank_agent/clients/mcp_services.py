@@ -16,6 +16,7 @@ from bank_agent.clients.contracts import ServiceFailure, SessionExpired
 from bank_agent.clients.mcp_client import McpToolClient
 from bank_agent.clients.sessions import SessionResolver, StaticSessions
 from bank_agent.clients.understanding import LlmUnderstanding
+from bank_agent.clients.narrative import LlmNarrator
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
 
@@ -47,12 +48,14 @@ def detect_language_lingua(text: str) -> str | None:
 
 class McpServices:
     def __init__(self, client, sessions: SessionResolver, understanding, *,
-                 clock: Callable[[], dt.datetime] = utc_now,
-                 language_detector: Callable[[str], str | None] = detect_language_lingua):
+                clock: Callable[[], dt.datetime] = utc_now,
+                language_detector: Callable[[str], str | None] = detect_language_lingua,
+                narrator: LlmNarrator | None = None):
         self._client, self._sessions, self._understanding = client, sessions, understanding
-        self._clock, self._detect = clock, language_detector
+        self._clock, self._detect, self._narrator = clock, language_detector, narrator
 
     @classmethod
+
     def from_env(cls, env: Mapping[str, str] = os.environ) -> "McpServices":
         from bank_agent.config.settings import settings
         clock = scenario_clock(dt.datetime.fromisoformat(env["SCENARIO_NOW"])) if env.get("SCENARIO_NOW") else utc_now
@@ -64,8 +67,10 @@ class McpServices:
             if not Path(command).is_absolute() and (REPO_ROOT / command).exists():
                 command = str(REPO_ROOT / command)
             client = McpToolClient(command=command, args=args, cwd=REPO_ROOT)
-        understanding = LlmUnderstanding.from_model_id(env.get("LLM_MODEL") or settings.llm_model, clock)
-        return cls(client, StaticSessions.from_string(env.get("DEV_SESSIONS", "")), understanding, clock=clock)
+        model_id = env.get("LLM_MODEL") or settings.llm_model
+        understanding = LlmUnderstanding.from_model_id(model_id, clock)
+        return cls(client, StaticSessions.from_string(env.get("DEV_SESSIONS", "")), understanding, clock=clock,
+                   narrator=LlmNarrator.from_model_id(model_id))
 
     def close(self) -> None:
         self._client.close()
@@ -81,6 +86,11 @@ class McpServices:
 
     def understand(self, text: str, language: str) -> dict[str, Any]:
         return self._understanding.understand(text, language)
+
+    def write_narrative(self, facts: dict[str, Any], language: str) -> str:
+        if self._narrator is None:
+            raise ServiceFailure("No narrative model configured")
+        return self._narrator.write(facts, language)
 
     def tool(self, name: str, *, session_ref: str, customer_id: str, arguments: dict[str, Any]) -> dict[str, Any]:
         if not customer_id or self._sessions.resolve(session_ref) != customer_id:

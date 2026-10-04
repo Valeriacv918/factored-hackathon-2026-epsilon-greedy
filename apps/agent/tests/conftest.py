@@ -7,6 +7,7 @@ import pytest
 from bank_agent.clients.contracts import ServiceFailure
 
 
+
 class FakeServices:
     def __init__(self, *, language="es", intent="not_me", status="Approved", score="12"):
         self.language, self.intent = language, intent
@@ -16,11 +17,14 @@ class FakeServices:
         self.timeout_after_write = set()
         self.records = {}
         self.confidence = 0.99
+        self.narrative = None   # None: no model (template). str, or callable(facts) -> str.
+        self.narrative_facts = None
         self.existing = None
         self.cards = [{"id": "card-1", "customer_id": "customer-1", "last4": "1234", "status": "Active"}]
         self.transactions = [{"id": "tx-1", "customer_id": "customer-1", "card_id": "card-1",
                               "status": status, "fraud_score": score, "amount": "40.00",
                               "amount_usd": "40.00", "currency": "USD", "date": "2026-09-30T12:00:00+00:00"}]
+
 
     def now(self):
         return datetime(2026, 10, 2, 12, tzinfo=timezone.utc)
@@ -70,6 +74,12 @@ class FakeServices:
                 raise ServiceFailure("Committed but response lost")
         return deepcopy(self.records[key])
 
+    def write_narrative(self, facts, language):
+        self.calls.append("write_narrative")
+        self.narrative_facts = deepcopy(facts)
+        if self.narrative is None:
+            raise ServiceFailure("no narrative model")
+        return self.narrative(facts) if callable(self.narrative) else self.narrative
 
 @pytest.fixture
 def fake_services():
