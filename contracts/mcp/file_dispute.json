@@ -1,6 +1,6 @@
 {
   "name": "file_dispute",
-  "description": "Open a dispute on one of the customer's Approved transactions. SIMULATED, in the sandbox.\n\nA transaction that already has an OPEN dispute in this scenario returns that case.\nA retry with the same idempotency_key returns the original receipt; reusing the key\nfor another transaction is an error. Confirm with read_dispute.\n",
+  "description": "Open a dispute on one of the customer's Approved transactions. SIMULATED, in the sandbox.\n\nA transaction that already has an OPEN dispute in this scenario returns that case.\nA retry with the same idempotency_key returns the original receipt; reusing the key\nfor another transaction is an error. Confirm with read_dispute.",
   "input_schema": {
     "properties": {
       "session_token": {

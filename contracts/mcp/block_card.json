@@ -1,6 +1,6 @@
 {
   "name": "block_card",
-  "description": "Block one of the customer's cards. SIMULATED: recorded in the sandbox, curated never changes.\n\nOnly an Active credit or debit card can be blocked. A card already blocked in this\nscenario returns that block's receipt. A retry with the same idempotency_key returns\nthe original receipt; reusing the key for another card is an error. Confirm with read_block.\n",
+  "description": "Block one of the customer's cards. SIMULATED: recorded in the sandbox, curated never changes.\n\nOnly an Active credit or debit card can be blocked. A card already blocked in this\nscenario returns that block's receipt. A retry with the same idempotency_key returns\nthe original receipt; reusing the key for another card is an error. Confirm with read_block.",
   "input_schema": {
     "properties": {
       "session_token": {
