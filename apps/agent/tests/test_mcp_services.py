@@ -15,6 +15,7 @@ from bank_agent.config.settings import FraudPolicy
 from bank_agent.graphs.disputes import build_graph
 from bank_agent.graphs.policy import Policy
 from bank_agent.graphs.state import initial_state
+from bank_agent.nodes.triage_agent.schemas import Understanding
 
 NOW = dt.datetime(2026, 6, 18, 12, tzinfo=dt.timezone.utc)
 CARD = {"id": "PRD-1", "customer_id": "CLI-1", "last4": "1245", "status": "Active", "type": "Tarjeta Crédito"}
@@ -30,6 +31,7 @@ def dev_token(customer_id):
 
 
 TOKEN = dev_token("CLI-1")
+BLOCK = {"id": "BLK-1", "card_id": "PRD-1", "customer_id": "CLI-1", "status": "Blocked", "verified": True}
 
 
 class FakeMcpClient:
@@ -41,11 +43,20 @@ class FakeMcpClient:
         if self.fail:
             raise ServiceFailure(name)
         return deepcopy({"find_transactions": {"transactions": [TX], "has_more": False},
-                         "list_cards": {"cards": [CARD]}, "get_card": CARD}[name])
+                         "list_cards": {"cards": [CARD]}, "get_card": CARD,
+                         "block_card": {"id": "BLK-1"}, "read_block": BLOCK}[name])
 
     def close(self):
         pass
 
+class StubTriage:
+    """Triage classifier stand-in: unit tests never call Groq."""
+
+    def __init__(self, intent):
+        self.intent = intent
+
+    def understand(self, text):
+        return Understanding(intent=self.intent, confidence=0.99, wants_human=False)
 
 class StubUnderstanding:
     def __init__(self, intent):
@@ -56,8 +67,11 @@ class StubUnderstanding:
 
 
 def services(intent="charge_error", client=None):
-    return McpServices(client or FakeMcpClient(), StaticSessions({"dev": TOKEN}), StubUnderstanding(intent),
+    services = McpServices(client or FakeMcpClient(), StaticSessions({"dev": TOKEN}), StubUnderstanding(intent),
                        clock=lambda: NOW, language_detector=lambda text: "es")
+    services._triage_classifier = StubTriage(intent)   # sin Groq en tests unitarios
+    return services
+
 
 
 def test_session_token_and_reference_date_come_from_adapter_not_arguments():
@@ -82,13 +96,22 @@ def test_session_must_match_customer():
         services().tool("list_cards", session_ref="unknown", customer_id="CLI-1", arguments={})
 
 
-@pytest.mark.parametrize("name", ["block_card", "file_dispute", "dispute_context", "create_handoff", "run_query",
+@pytest.mark.parametrize("name", ["create_handoff", "notify_employee", "suspend_account_transactions", "run_query",
                                   "verify_identity"])
 def test_tools_not_offered_yet_fail_without_reaching_server(name):
     s = services()
     with pytest.raises(ServiceFailure):
         s.tool(name, session_ref="dev", customer_id="CLI-1", arguments={"card_id": "PRD-1"})
     assert s._client.calls == []
+
+
+def test_writes_send_only_allow_listed_arguments_and_the_token():
+    s = services()
+    s.tool("block_card", session_ref="dev", customer_id="CLI-1",
+           arguments={"card_id": "PRD-1", "idempotency_key": "t:block_card:PRD-1", "customer_id": "CLI-OTHER",
+                      "scenario_id": "forged", "session_token": "forged"})
+    assert s._client.calls == [("block_card", {"card_id": "PRD-1", "idempotency_key": "t:block_card:PRD-1",
+                                               "session_token": TOKEN})]
 
 
 def test_scenario_clock_runs_from_start_and_requires_timezone():
@@ -112,15 +135,17 @@ def test_graph_explains_reversed_charge_end_to_end():
     assert [name for name, _ in s._client.calls] == ["find_transactions"]
 
 
-def test_graph_lost_card_reaches_confirmation_then_fails_safely_without_writes():
+def test_graph_lost_card_blocks_and_verifies_through_the_server():
     s = services("emergency")
     graph, config, state = run(s, "Perdí mi tarjeta")
     assert state["__interrupt__"][0].value["kind"] == "confirm_block"
     state = graph.invoke(Command(resume={"choice": "yes"}), config)
-    assert state["outcome"] == "service_unavailable"
-    assert state["block_verified_at"] == {} and state["blocked_cards"] == []
+    assert state["__interrupt__"][0].value["kind"] == "unrecognized_charge"
+    assert state["blocked_cards"] == ["PRD-1"] and set(state["block_verified_at"]) == {"PRD-1"}
     # get_card runs again because LangGraph re-executes the node on resume.
-    assert [name for name, _ in s._client.calls] == ["list_cards", "get_card", "get_card"]
+    assert [name for name, _ in s._client.calls] == ["list_cards", "get_card", "get_card", "block_card", "read_block"]
+    assert s._client.calls[3][1] == {"card_id": "PRD-1", "idempotency_key": "t:block_card:PRD-1", "session_token": TOKEN}
+    assert s._client.calls[4][1] == {"id": "BLK-1", "session_token": TOKEN}
 
 
 def test_server_failure_escalates_then_ends_safely():
