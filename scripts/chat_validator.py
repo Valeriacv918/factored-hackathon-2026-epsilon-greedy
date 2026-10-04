@@ -22,9 +22,9 @@ from dotenv import load_dotenv
 
 load_dotenv()  # lee el archivo .env si existe
 
-from bank_agent.validator_agent.agent import ValidationAgent
+from bank_agent.nodes.validator_agent.agent import ValidationAgent
 from bank_agent.clients.repository import (CustomerRecord, InMemoryCustomerRepository, Product)
-from bank_agent.validator_agent.validator import IdentityValidator
+from bank_agent.nodes.validator_agent.validator import IdentityValidator
 
 # Clientes SINTÉTICOS para probar sin BigQuery
 DEMO_CUSTOMERS = {

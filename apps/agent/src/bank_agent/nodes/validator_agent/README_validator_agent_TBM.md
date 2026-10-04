@@ -4,7 +4,7 @@
 ```
 validation_agent/
   config.py      # nombres de tablas/columnas de BigQuery y políticas (intentos, TTL...)
-  language.py    # detección de idioma con lingua (es / pt / en)
+  language.py    # detección de idioma con lingua (es / pt)
   repository.py  # acceso a BigQuery (consultas parametrizadas) + repo de prueba en memoria
   validator.py   # reglas de autenticación: 100% código, sin LLM
   agent.py       # agente LangChain (create_agent) que conversa y llama al validador

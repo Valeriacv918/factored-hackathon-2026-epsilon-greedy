@@ -1,0 +1,41 @@
+name: Python tests
+
+on:
+  pull_request:
+    paths:
+      - "apps/**"
+      - "contracts/**"
+      - ".github/workflows/python-tests.yml"
+  push:
+    branches: [main]
+    paths:
+      - "apps/**"
+      - "contracts/**"
+      - ".github/workflows/python-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test (${{ matrix.app }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [agent, mcp-server]
+    defaults:
+      run:
+        working-directory: apps/${{ matrix.app }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: apps/${{ matrix.app }}/uv.lock
+          python-version: "3.13"
+      - name: Install (locked)
+        run: uv sync --locked
+      - name: Run tests
+        run: uv run pytest -q

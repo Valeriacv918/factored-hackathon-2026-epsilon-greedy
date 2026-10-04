@@ -1,0 +1,40 @@
+"""Settings from environment variables / .env. Never credentials: auth is ADC."""
+from functools import lru_cache
+from pathlib import Path
+
+from pydantic import AliasChoices, Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+APP_ROOT = Path(__file__).resolve().parents[3]   # apps/mcp-server
+REPO_ROOT = APP_ROOT.parents[1]
+
+
+class Settings(BaseSettings):
+    # Later files win: the app's own .env overrides the repository one.
+    model_config = SettingsConfigDict(env_file=(REPO_ROOT / ".env", APP_ROOT / ".env"), extra="ignore")
+
+    # Accept the names from the repository .env.example as well as BQ_*.
+    bq_project: str = Field("hackaton-509923", min_length=1,
+                            validation_alias=AliasChoices("BQ_PROJECT", "GCP_PROJECT_ID"))
+    bq_dataset: str = Field("bank_curated", pattern=r"^[A-Za-z0-9_]+$",
+                            validation_alias=AliasChoices("BQ_DATASET", "BIGQUERY_CURATED_DATASET"))
+    bq_location: str = Field("us-central1", validation_alias=AliasChoices("BQ_LOCATION", "GCP_REGION"))
+    bq_billing_project: str | None = Field(None, validation_alias="BQ_BILLING_PROJECT")
+
+    max_bytes_billed: int = Field(default=1_000_000_000, gt=0)
+    max_rows: int = Field(default=200, gt=0, le=10_000)
+    query_timeout_s: float = Field(default=30, gt=0)
+    rate_limit_per_min: int = Field(default=60, gt=0)
+
+    # find_transactions defaults (demo policy: 90-day window).
+    window_days: int = Field(default=90, gt=0, le=366)
+    amount_tolerance_pct: float = Field(default=1.0, ge=0, le=50)
+
+    @property
+    def billing_project(self) -> str:
+        return self.bq_billing_project or self.bq_project
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()

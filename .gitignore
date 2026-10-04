@@ -67,3 +67,4 @@ gcp-audit-*/
 *.egg-info/
 build/
 dist/
+*.egg-info/

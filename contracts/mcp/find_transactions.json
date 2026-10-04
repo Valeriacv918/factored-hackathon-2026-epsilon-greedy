@@ -1,0 +1,250 @@
+{
+  "name": "find_transactions",
+  "description": "Find the customer's transactions matching what they described, newest first.\n\nWithout dates, searches the policy window ending on reference_date. `amount`\nmatches within a small tolerance; `merchant` is a case-insensitive substring.\nhas_more=true means more matches exist than were returned: ask for more detail.\n",
+  "input_schema": {
+    "$defs": {
+      "TransactionSlots": {
+        "properties": {
+          "date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact transaction date (YYYY-MM-DD).",
+            "title": "Date"
+          },
+          "date_from": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Start of a date range, inclusive.",
+            "title": "Date From"
+          },
+          "date_to": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "End of a date range, inclusive.",
+            "title": "Date To"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Amount in the transaction currency, as a decimal string.",
+            "title": "Amount"
+          },
+          "merchant": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Part of the merchant name.",
+            "title": "Merchant"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Za-z]{3}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "ISO 4217 code.",
+            "title": "Currency"
+          }
+        },
+        "title": "TransactionSlots",
+        "type": "object"
+      }
+    },
+    "properties": {
+      "customer_id": {
+        "description": "Authenticated customer (customer_id).",
+        "pattern": "^[A-Za-z0-9_-]{1,64}$",
+        "title": "Customer Id",
+        "type": "string"
+      },
+      "reference_date": {
+        "description": "Scenario 'today' (YYYY-MM-DD) that anchors the default window.",
+        "format": "date",
+        "title": "Reference Date",
+        "type": "string"
+      },
+      "slots": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/TransactionSlots"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null
+      },
+      "limit": {
+        "default": 3,
+        "maximum": 10,
+        "minimum": 1,
+        "title": "Limit",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "customer_id",
+      "reference_date"
+    ],
+    "title": "find_transactionsArguments",
+    "type": "object"
+  },
+  "output_schema": {
+    "$defs": {
+      "Transaction": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "customer_id": {
+            "title": "Customer Id",
+            "type": "string"
+          },
+          "card_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Card Id"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "fraud_score": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fraud Score"
+          },
+          "amount": {
+            "title": "Amount",
+            "type": "string"
+          },
+          "amount_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount Usd"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "date": {
+            "title": "Date",
+            "type": "string"
+          },
+          "merchant": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merchant"
+          }
+        },
+        "required": [
+          "id",
+          "customer_id",
+          "card_id",
+          "status",
+          "fraud_score",
+          "amount",
+          "amount_usd",
+          "currency",
+          "date",
+          "merchant"
+        ],
+        "title": "Transaction",
+        "type": "object"
+      }
+    },
+    "properties": {
+      "transactions": {
+        "items": {
+          "$ref": "#/$defs/Transaction"
+        },
+        "title": "Transactions",
+        "type": "array"
+      },
+      "has_more": {
+        "title": "Has More",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "transactions",
+      "has_more"
+    ],
+    "title": "TransactionSearch",
+    "type": "object"
+  }
+}

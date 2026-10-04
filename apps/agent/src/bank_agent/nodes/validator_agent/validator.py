@@ -26,8 +26,8 @@ from datetime import date, datetime, timedelta, timezone
 from enum import Enum
 from typing import Callable, Optional
 
-from ..config.settings import ValidationPolicy, settings
-from ..clients.repository import CustomerRepository, RepositoryUnavailable
+from ...config.settings import ValidationPolicy, settings
+from ...clients.repository import CustomerRepository, RepositoryUnavailable
 
 
 class Status(str, Enum):
