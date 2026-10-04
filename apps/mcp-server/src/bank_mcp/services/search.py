@@ -26,6 +26,15 @@ class TransactionSlots(BaseModel):
     merchant: str | None = Field(None, min_length=1, max_length=100, description="Part of the merchant name.")
     currency: str | None = Field(None, pattern=r"^[A-Za-z]{3}$", description="ISO 4217 code.")
 
+    @field_validator("merchant", mode="before")
+    @classmethod
+    def _optional_merchant(cls, value):
+        if isinstance(value, str):
+            value = value.strip()
+            if value.casefold() in {"", "null", "none", "n/a", "sin comercio", "sin comercio informado"}:
+                return None
+        return value
+
     @field_validator("currency")
     @classmethod
     def _upper(cls, v: str | None) -> str | None:
@@ -48,19 +57,17 @@ def date_range(slots: TransactionSlots, reference_date: dt.date, window_days: in
     return start, end + dt.timedelta(days=1)
 
 
-def _ts(day: dt.date) -> dt.datetime:
-    return dt.datetime.combine(day, dt.time.min, tzinfo=dt.timezone.utc)
-
-
 def build_find_query(
     *, slots: TransactionSlots, customer_id: str, reference_date: dt.date, limit: int,
     window_days: int, tolerance_pct: float, transactions: str, products: str,
+    customer_timezone: str = "UTC",
 ) -> tuple[str, list]:
     start, end = date_range(slots, reference_date, window_days)
     params = [
         bigquery.ScalarQueryParameter("customer_id", "STRING", customer_id),
-        bigquery.ScalarQueryParameter("start_ts", "TIMESTAMP", _ts(start)),
-        bigquery.ScalarQueryParameter("end_ts", "TIMESTAMP", _ts(end)),
+        bigquery.ScalarQueryParameter("start_date", "DATE", start),
+        bigquery.ScalarQueryParameter("end_date", "DATE", end),
+        bigquery.ScalarQueryParameter("customer_timezone", "STRING", customer_timezone),
         bigquery.ScalarQueryParameter("lim", "INT64", limit + 1),   # +1 detects has_more
     ]
     filters = []

@@ -10,8 +10,8 @@ This repository combines the existing analysis notebook with the GCP data
 pipelines, a LangGraph agent and an MCP server.
 The agent runs an executable six-component LangGraph workflow (Spanish and
 Portuguese) and talks to an MCP server over BigQuery. The server reads `bank_curated`
-and records simulated card blocks and disputes in `bank_sandbox`
-([MCP and sandbox](docs/mcp-sandbox.md)); handoff and notification tools and the
+and records simulated card blocks, disputes, handoffs and notifications in
+`bank_sandbox` ([MCP and sandbox](docs/mcp-sandbox.md)); account tools and the
 end-to-end deployed application remain pending. See
 [agent setup](apps/agent/README.md) and [MCP server](apps/mcp-server/README.md).
 
@@ -161,7 +161,7 @@ It includes scenario isolation, effective card-state queries, receipt checks,
 and quality audits. Deployment is separate from Dataform. Cloud Shell results
 shared on October 4 confirm the schema, permissions checks and one persisted
 simulated card block with its audit. See the [handoff](docs/sandbox-handoff.md)
-for evidence and limits. The MCP server writes card blocks and disputes to it; see
-[MCP and sandbox](docs/mcp-sandbox.md). Handoff and notification tools are still pending.
+for evidence and limits. The MCP server writes card blocks, disputes, handoffs and
+notifications to it; see [MCP and sandbox](docs/mcp-sandbox.md). Account tools are still pending.
 
 Offline check: `python scripts/verify/sandbox_contract.py --check`.

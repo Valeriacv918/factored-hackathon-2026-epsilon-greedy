@@ -23,6 +23,15 @@ class Slots(BaseModel):
     merchant: str | None = Field(None, max_length=100, description="Merchant name as the customer wrote it.")
     currency: str | None = Field(None, pattern=r"^[A-Z]{3}$", description="ISO 4217 code, only if stated.")
 
+    @field_validator("merchant", mode="before")
+    @classmethod
+    def _optional_merchant(cls, value):
+        if isinstance(value, str):
+            value = value.strip()
+            if value.casefold() in {"", "null", "none", "n/a", "sin comercio", "sin comercio informado"}:
+                return None
+        return value
+
     @field_validator("amount", mode="before")
     @classmethod
     def _amount(cls, v):

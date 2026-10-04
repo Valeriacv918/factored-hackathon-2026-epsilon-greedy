@@ -38,7 +38,7 @@ def test_bad_ranges_rejected(slots):
 
 def test_no_slots_only_customer_and_window():
     sql, params = build(TransactionSlots())
-    assert set(params) == {"customer_id", "start_ts", "end_ts", "lim"}
+    assert set(params) == {"customer_id", "start_date", "end_date", "customer_timezone", "lim"}
     assert params["lim"] == 4                       # limit + 1 for has_more
     assert "t.customer_id = @customer_id" in sql
     assert "@amount" not in sql and "@merchant" not in sql
@@ -57,3 +57,18 @@ def test_unknown_slot_keys_ignored_and_bad_values_rejected():
         TransactionSlots(amount="-5")
     with pytest.raises(ValidationError):
         TransactionSlots(currency="dollars")
+
+@pytest.mark.parametrize("merchant", [None, "null", " NULL ", "", "sin comercio"])
+def test_missing_merchant_does_not_filter_results(merchant):
+    sql, params = build(TransactionSlots(date="2024-11-20", amount="416.73", merchant=merchant))
+    assert "@merchant" not in sql and "merchant" not in params
+    assert params["start_date"] == dt.date(2024,11,20)
+
+def test_local_day_boundaries_use_customer_zone():
+    sql,params=build(TransactionSlots(date="2024-11-19"),customer_timezone="America/Tijuana")
+    assert params["start_date"]==dt.date(2024,11,19)
+    assert params["end_date"]==dt.date(2024,11,20)
+    assert params["customer_timezone"]=="America/Tijuana"
+    assert "TIMESTAMP(@start_date, @customer_timezone)" in sql
+    assert "TIMESTAMP(@end_date, @customer_timezone)" in sql
+    assert "DATE(t.transaction_date, @customer_timezone)" in sql

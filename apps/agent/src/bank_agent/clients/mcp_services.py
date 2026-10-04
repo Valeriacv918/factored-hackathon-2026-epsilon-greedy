@@ -3,10 +3,10 @@
 - The server learns the customer from the session token, never from an argument;
   the token comes from the resolved session, never from model output.
 - Only allow-listed tools and arguments reach the server.
-- Card blocks and disputes are SIMULATED writes in the server's sandbox scenario
-  (docs/mcp-sandbox.md); the graph proves each one with its read_* tool.
-- Tools the server does not offer (handoffs, notifications, account suspension)
-  raise ServiceFailure, which the graph turns into an escalation or a safe
+- Card blocks, disputes, handoffs and notifications are SIMULATED writes in the
+  server's sandbox scenario (docs/mcp-sandbox.md); the graph proves each one with
+  its read_* tool.
+- Tools the server does not offer (account suspension) raise ServiceFailure, which the graph turns into an escalation or a safe
   "service unavailable" ending, never a claimed success. list_accounts/get_account
   are allowed through but the server has no such tools yet, so they fail the same way.
 """
@@ -26,6 +26,7 @@ REPO_ROOT = Path(__file__).resolve().parents[5]
 
 # Tool name -> arguments the graph may pass through. session_token is added here.
 TOOLS = {
+    "save_charge_explanation": ("conversation_id", "transaction_id", "observed_status"),
     "find_transactions": ("slots", "limit", "window_days"),
     "list_cards": (),
     "get_card": ("card_id",),
@@ -36,6 +37,10 @@ TOOLS = {
     "read_block": ("id",),
     "file_dispute": ("transaction_id", "idempotency_key"),
     "read_dispute": ("id",),
+    "create_handoff": ("packet", "idempotency_key"),
+    "read_handoff": ("id",),
+    "notify_employee": ("ticket_id", "idempotency_key"),
+    "read_notification": ("id",),
 }
 
 
