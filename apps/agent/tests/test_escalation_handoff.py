@@ -18,7 +18,6 @@ from bank_agent.graphs.policy import Policy
 from bank_agent.graphs.state import initial_state
 from bank_agent.nodes.escalation.handoff import build_facts, claim_check, template_narrative
 from bank_agent.prompts.handoff import REASONS
-from conftest import FakeServices
 
 SRC = Path(__file__).resolve().parents[1] / "src" / "bank_agent"
 
@@ -95,7 +94,9 @@ def test_template_always_passes_claim_check(reason, language):
 
 def test_every_escalation_reason_has_a_text():
     """Si un nodo agrega escalate("nuevo_motivo"), hay que darle texto en prompts/handoff.py."""
-    code = "\n".join(p.read_text() for p in SRC.rglob("*.py"))
+    files = list(SRC.rglob("*.py"))
+    assert files, f"No source found under {SRC}"
+    code = "\n".join(p.read_text(encoding="utf-8") for p in files)
     used = set(re.findall(r'escalate\("([^"]+)"', code)) | set(re.findall(r'return "escalate", "([^"]+)"', code))
     used |= set(re.findall(r'\("escalate" if fraud else "deny"\), "([^"]+)"', code))
     assert used - set(REASONS) == set(), f"Faltan textos en REASONS: {sorted(used - set(REASONS))}"
@@ -127,8 +128,8 @@ def escalate_high_score(services):
     return state
 
 
-def test_graph_uses_llm_narrative_when_supported():
-    services = FakeServices()
+def test_graph_uses_llm_narrative_when_supported(fake_services):
+    services = fake_services()
     services.narrative = lambda f: (f"Fraude P1: cargo {f['transactions'][0]['id']} con puntaje 85. "
                                     f"Tarjeta {f['blocked_cards'][0]} bloqueada; caso {f['case_ids'][0]}.")
     handoff = escalate_high_score(services)["handoff"]
@@ -138,8 +139,8 @@ def test_graph_uses_llm_narrative_when_supported():
     assert "No hice esta compra" not in repr(services.narrative_facts)
 
 
-def test_graph_falls_back_to_template_when_llm_invents():
-    services = FakeServices()
+def test_graph_falls_back_to_template_when_llm_invents(fake_services):
+    services = fake_services()
     services.narrative = "Se le reembolsarán 999 USD al cliente."
     handoff = escalate_high_score(services)["handoff"]
     assert handoff["narrative_source"] == "template"
@@ -147,8 +148,8 @@ def test_graph_falls_back_to_template_when_llm_invents():
     assert "999" not in handoff["narrative"]
 
 
-def test_graph_falls_back_to_template_when_llm_is_down():
-    services = FakeServices()   # narrative=None: no model
+def test_graph_falls_back_to_template_when_llm_is_down(fake_services):
+    services = fake_services()   # narrative=None: no model
     state = escalate_high_score(services)
     assert state["handoff"]["narrative_source"] == "template"
     assert state["handoff"]["claim_issues"] == ["model_unavailable"]

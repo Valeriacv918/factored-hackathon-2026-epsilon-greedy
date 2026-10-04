@@ -25,7 +25,7 @@ class Scenario:
     transactions_run_id: str
 
 
-def request_hash(action: str, **arguments: str) -> str:
+def request_hash(action: str, **arguments: Any) -> str:
     """SHA-256 (lowercase hex) of the canonical request: sorted keys, no spaces.
 
     Example: block_card + card_id=PRD-1 hashes '{"action":"block_card","card_id":"PRD-1"}'.

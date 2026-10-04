@@ -15,6 +15,7 @@ from bank_agent.clients.fraud_repository import (
 )
 from bank_agent.clients.identity import CustomerRecord, InMemoryIdentityChecker, Product
 from bank_agent.config.settings import FraudPolicy
+from bank_agent.graphs.policy import Policy
 from bank_agent.nodes.fraud_agent.agent import FraudAgent
 from bank_agent.nodes.validator_agent.validator import IdentityValidator
 
@@ -300,3 +301,10 @@ def test_block_failure_once_then_succeeds_on_retry(authenticated_session):
 
     r = fraud.confirm_block(session_id, True)
     assert r.next_step == "confirm_dispute"   # el reintento unico funciono y siguio a POLICY
+
+def test_fraud_policy_reads_the_graph_policy():
+    graph, fraud = Policy(), FraudPolicy()
+    assert fraud.dispute_window_days == graph.window_days
+    assert fraud.fraud_score_threshold == float(graph.fraud_score)
+    assert fraud.high_amount_usd_threshold == float(graph.high_amount_usd)
+    assert fraud.max_charges_per_case == graph.max_charges
