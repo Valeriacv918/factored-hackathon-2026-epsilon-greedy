@@ -18,6 +18,7 @@ def search_slots(slots):
 def run(s, services, policy):
     phase = s.get("phase", "start")
     if phase == "start":
+        # UNDERSTAND + TRIAGE: keyword rules first (global rules 1 and 2), then the LLM classifier.
         u = services.triage_understand(s["message"])
         u = u if isinstance(u, Understanding) else Understanding.model_validate(u)
         decision = decide(s["message"], u)
@@ -63,14 +64,14 @@ def run(s, services, policy):
         require_session(s, services)
         if not isinstance(reply, dict) or set(reply) != {"text"} or not isinstance(reply["text"], str) or not reply["text"].strip():
             raise ValueError("Expected {'text': <nonempty clarification>}.")
-        parsed = services.understand(reply["text"], s["language"])
-        if parsed.get("wants_human") is True:
+        u = services.triage_understand(reply["text"])
+        u = u if isinstance(u, Understanding) else Understanding.model_validate(u)
+        decision = decide(reply["text"], u)          # same rules: "me robaron" or "quiero un humano" win
+        if decision.route == Route.ESCALATION:
             return escalate("requested_human")
-        if parsed.get("intent") == "emergency":
+        if decision.route == Route.EMERGENCY:
             return go("card_emergency_agent", intent="emergency")
-        if not isinstance(parsed.get("slots", {}), dict):
-            raise ServiceFailure("Invalid clarification schema")
-        return go("understanding", "find", slots={**s.get("slots", {}), **parsed.get("slots", {})},
+        return go("understanding", "find", slots={**s.get("slots", {}), **search_slots(u.slots)},
                   turns=s["turns"] + 1, clarification_attempts=s["clarification_attempts"] + 1)
 
     # Ownership is checked by the service before returning any candidates.
