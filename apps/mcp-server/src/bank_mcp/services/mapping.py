@@ -8,9 +8,9 @@ Missing values stay null: the agent's policy escalates instead of imputing.
 """
 import datetime as dt
 from decimal import Decimal
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 from bank_mcp.sql.queries import CARD_TYPES
 
@@ -71,6 +71,52 @@ class DisputeRecord(BaseModel):
 class DisputeContext(BaseModel):
     existing_case_id: str | None   # an OPEN dispute on this transaction in this scenario
     recent_dispute_count: int      # curated complaints only, see docs/mcp-sandbox.md
+
+
+Code = Annotated[str, Field(pattern=r"^[A-Za-z0-9_.:-]{1,64}$")]
+ItemId = Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{1,64}$")]
+Issue = Annotated[str, Field(min_length=1, max_length=120)]
+
+
+class HandoffPacket(BaseModel):
+    """What a human agent needs to pick up the case (escalation node in apps/agent).
+
+    The server stores only these fields, so no token or other extra data reaches the
+    table. Every id listed must belong to the session's customer (checked in SQL).
+    """
+    model_config = ConfigDict(extra="forbid")
+
+    reason: Code
+    queue: Code
+    priority: Literal["P1", "P2", "P3"]
+    language: Literal["es", "pt"]
+    customer_quote: str = Field(max_length=1000)
+    transaction_ids: list[ItemId] = Field(max_length=20)
+    case_ids: list[ItemId] = Field(max_length=20)
+    blocked_cards: list[ItemId] = Field(max_length=20)
+    suspended_accounts: list[ItemId] = Field(max_length=0, description="Always empty: no account suspension yet.")
+    not_done: list[Code] = Field(max_length=20)
+    next_steps: list[Code] = Field(max_length=20)
+    policy_version: Code
+    policy_rule: Code | None = None
+    explanation_rule: Code | None = None
+    narrative: str = Field(min_length=1, max_length=2000)
+    narrative_source: Literal["llm", "template"]
+    claim_issues: list[Issue] = Field(max_length=20)
+
+
+class HandoffRecord(BaseModel):
+    id: str
+    customer_id: str
+    verified: bool
+
+
+class NotificationRecord(BaseModel):
+    id: str
+    ticket_id: str
+    customer_id: str
+    status: str
+    verified: bool
 
 
 class IdentityResult(BaseModel):

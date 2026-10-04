@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "bank-mcp"
 version = "0.1.0"
-description = "Read-only MCP tools over bank_curated for the dispute agent"
+description = "MCP tools over bank_curated and the simulated bank_sandbox for the dispute agent"
 requires-python = ">=3.12"
 dependencies = [
     "google-cloud-bigquery>=3.46,<4",
@@ -26,3 +26,5 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["integration: BigQuery dry runs with your ADC; opt-in with -m integration"]
+addopts = "-m 'not integration'"

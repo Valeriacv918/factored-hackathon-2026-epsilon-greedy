@@ -1,0 +1,50 @@
+{
+  "name": "read_handoff",
+  "description": "Read a handoff ticket back from the sandbox. verified=true only if it is stored and consistent.",
+  "input_schema": {
+    "properties": {
+      "session_token": {
+        "description": "session_token from verify_identity.",
+        "maxLength": 512,
+        "minLength": 1,
+        "title": "Session Token",
+        "type": "string"
+      },
+      "id": {
+        "description": "id returned by the write.",
+        "pattern": "^[A-Za-z0-9_-]{1,64}$",
+        "title": "Id",
+        "type": "string"
+      }
+    },
+    "required": [
+      "session_token",
+      "id"
+    ],
+    "title": "read_handoffArguments",
+    "type": "object"
+  },
+  "output_schema": {
+    "properties": {
+      "id": {
+        "title": "Id",
+        "type": "string"
+      },
+      "customer_id": {
+        "title": "Customer Id",
+        "type": "string"
+      },
+      "verified": {
+        "title": "Verified",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "id",
+      "customer_id",
+      "verified"
+    ],
+    "title": "HandoffRecord",
+    "type": "object"
+  }
+}
