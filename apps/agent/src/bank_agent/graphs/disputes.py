@@ -6,14 +6,15 @@ from langgraph.graph import END, START, StateGraph
 from bank_agent.clients.contracts import ServiceFailure, SessionExpired
 from bank_agent.graphs.policy import Policy
 from bank_agent.graphs.state import ConversationState
-from bank_agent.nodes import charge_error, escalation, fraud, lost_card, security_language, understanding
+from bank_agent.nodes import (charge_error, escalation, fraud_agent, card_emergency_agent, security_language,
+                              understanding)
 from bank_agent.nodes.common import HandoffRequested, escalate, finish, require_session
 
 NODES = {
     "security_language": security_language.run,
     "understanding": understanding.run,
-    "lost_card": lost_card.run,
-    "fraud": fraud.run,
+    "card_emergency_agent": card_emergency_agent.run,
+    "fraud_agent": fraud_agent.run,
     "charge_error": charge_error.run,
     "escalation": escalation.run,
 }
@@ -48,7 +49,7 @@ def build_graph(services, *, checkpointer, policy=None):
                     result = finish(s, "service_unavailable", "No se pudo verificar la operación. Contacta atención humana.",
                                     "Não foi possível verificar a operação. Contate o atendimento humano.")
                 else:
-                    result = escalate("tool_failure", "general", "P2" if s.get("intent") in {"not_me", "emergency"} or name == "fraud" else "P3")
+                    result = escalate("tool_failure", "general", "P2" if s.get("intent") in {"not_me", "emergency"} or name == "fraud_agent" else "P3")
             # Interrupt exceptions intentionally propagate to LangGraph.
             result.setdefault("turns", s.get("turns", 1))
             result["trace"] = s.get("trace", []) + [{"node": name, "phase": s.get("phase"),

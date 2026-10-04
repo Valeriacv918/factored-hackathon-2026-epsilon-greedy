@@ -2,7 +2,7 @@
 
 from typing import Any, Literal, TypedDict
 
-Route = Literal["security_language", "understanding", "lost_card", "fraud", "charge_error", "escalation", "end"]
+Route = Literal["security_language", "understanding", "card_emergency_agent", "fraud_agent", "charge_error", "escalation", "end"]
 
 
 class ConversationState(TypedDict, total=False):
@@ -18,7 +18,9 @@ class ConversationState(TypedDict, total=False):
     slots: dict[str, Any]
     transaction: dict[str, Any]
     card_id: str
+    account_id: str
     blocked_cards: list[str]
+    suspended_accounts: list[str]
     denied_transactions: list[dict[str, Any]]
     risk_transactions: list[dict[str, Any]]
     case_ids: list[str]
@@ -44,6 +46,6 @@ def initial_state(conversation_id: str, session_ref: str, message: str) -> Conve
     return ConversationState(
         conversation_id=conversation_id, session_ref=session_ref, message=message,
         route="security_language", phase="start", turns=1,
-        blocked_cards=[], denied_transactions=[], risk_transactions=[], case_ids=[],
+        blocked_cards=[], suspended_accounts=[], denied_transactions=[], risk_transactions=[], case_ids=[],
         block_verified_at={}, case_verified_at={}, trace=[], clarification_attempts=0,
     )

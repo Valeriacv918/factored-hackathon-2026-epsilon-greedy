@@ -27,7 +27,7 @@ def run(s, services, policy):
                          "¿Cargo desconocido, error en un cargo o tarjeta perdida?",
                          "Compra não reconhecida, erro na cobrança ou cartão perdido?")
         if intent == "emergency":
-            return go("lost_card", intent=intent)
+            return go("card_emergency_agent", intent=intent)
         if intent == "other":
             return go("understanding", "out_of_scope", intent=intent)
         return go("understanding", "find", intent=intent)
@@ -54,7 +54,7 @@ def run(s, services, policy):
         if parsed.get("wants_human") is True:
             return escalate("requested_human")
         if parsed.get("intent") == "emergency":
-            return go("lost_card", intent="emergency")
+            return go("card_emergency_agent", intent="emergency")
         if not isinstance(parsed.get("slots", {}), dict):
             raise ServiceFailure("Invalid clarification schema")
         return go("understanding", "find", slots={**s.get("slots", {}), **parsed.get("slots", {})},
@@ -87,5 +87,5 @@ def run(s, services, policy):
     risks = {t["id"]: t for t in s.get("risk_transactions", [])}
     if fraud:
         risks[tx["id"]] = tx
-    return go("fraud" if fraud else "charge_error", transaction=tx,
+    return go("fraud_agent" if fraud else "charge_error", transaction=tx,
               denied_transactions=denied, risk_transactions=list(risks.values()), clarification_attempts=0)
