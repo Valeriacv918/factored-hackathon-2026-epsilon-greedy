@@ -53,6 +53,9 @@ class McpServices:
                 narrator: LlmNarrator | None = None):
         self._client, self._sessions, self._understanding = client, sessions, understanding
         self._clock, self._detect, self._narrator = clock, language_detector, narrator
+        self._validation_agents = {}
+        self._identity_validator = None
+        self._triage_classifier = None
 
     @classmethod
 
@@ -72,7 +75,25 @@ class McpServices:
         return cls(client, StaticSessions.from_string(env.get("DEV_SESSIONS", "")), understanding, clock=clock,
                    narrator=LlmNarrator.from_model_id(model_id))
 
+    def validation_agent(self, conversation_id):
+        from bank_agent.clients.mcp_identity import McpIdentityRepository
+        from bank_agent.nodes.validator_agent.validator import IdentityValidator
+        from bank_agent.nodes.validator_agent.agent import ValidationAgent
+        if self._identity_validator is None:
+            # Real time for authentication TTL; historical clock is for transaction searches.
+            self._identity_validator = IdentityValidator(McpIdentityRepository(self._client))
+        if conversation_id not in self._validation_agents:
+            self._validation_agents[conversation_id] = ValidationAgent(self._identity_validator)
+        return self._validation_agents[conversation_id]
+
+    def triage_understand(self, text):
+        from bank_agent.nodes.triage_agent.classifier import LLMClassifier
+        if self._triage_classifier is None:
+            self._triage_classifier = LLMClassifier()
+        return self._triage_classifier.understand(text)
+
     def close(self) -> None:
+        self._validation_agents.clear()
         self._client.close()
 
     def now(self) -> dt.datetime:
@@ -82,6 +103,9 @@ class McpServices:
         return self._detect(text)
 
     def validate_session(self, session_ref: str) -> str | None:
+        if self._identity_validator is not None:
+            if self._identity_validator.is_authenticated(session_ref):
+                return self._identity_validator.get_session(session_ref).customer_id
         return self._sessions.resolve(session_ref)
 
     def understand(self, text: str, language: str) -> dict[str, Any]:
@@ -93,7 +117,7 @@ class McpServices:
         return self._narrator.write(facts, language)
 
     def tool(self, name: str, *, session_ref: str, customer_id: str, arguments: dict[str, Any]) -> dict[str, Any]:
-        if not customer_id or self._sessions.resolve(session_ref) != customer_id:
+        if not customer_id or self.validate_session(session_ref) != customer_id:
             raise SessionExpired()
         if name not in READ_TOOLS:
             raise ServiceFailure(f"{name} is not available yet")

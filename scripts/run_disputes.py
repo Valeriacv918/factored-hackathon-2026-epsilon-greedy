@@ -1,8 +1,8 @@
-"""Interactive run of the disputes graph against the real MCP server and LLM.
+"""Interactive validation/triage graph against the real MCP server and LLM.
 
 Reads the repository .env (SCENARIO_NOW, DEV_SESSIONS, MCP_SERVER_*, LLM_MODEL,
-GROQ_API_KEY). Only the read tools exist yet: block, dispute and handoff steps
-fail safely and end in "service unavailable".
+GROQ_API_KEY). Default flow verifies identity through MCP then classifies the
+request. Downstream actions are pending. --flow legacy selects the older graph.
 
 Use (from the repository root, in the agent's uv env):
   uv run --project apps/agent scripts/run_disputes.py --session dev
@@ -58,7 +58,7 @@ def answer(question: dict) -> Command:
     for key in ("transactions", "cards", "transaction"):
         if key in question:
             print(f"  {key}: {json.dumps(question[key], ensure_ascii=False)}")
-    if question["kind"] == "transaction_details":
+    if question["kind"] in {"transaction_details", "validation_details", "request_details"}:
         return Command(resume={"text": read("You: ")})
     options = question["options"]
     for i, option in enumerate(options, 1):
@@ -80,7 +80,7 @@ def conversation(graph, session_ref: str, debug: bool) -> None:
         state = graph.invoke(answer(state["__interrupt__"][0].value), config)
     print(f"\nAgent: {state.get('response')}\n  outcome={state.get('outcome')}")
     if debug:
-        keys = ("language", "customer_id", "intent", "slots", "reason", "queue", "priority", "case_ids", "blocked_cards")
+        keys = ("language", "authenticated", "validation_status", "customer_id", "intent", "triage_route", "slots", "reason", "queue", "priority", "case_ids", "blocked_cards")
         print(json.dumps({k: state.get(k) for k in keys} | {"transaction": (state.get("transaction") or {}).get("id")},
                          indent=2, ensure_ascii=False))
         for step in state.get("trace", []):
@@ -91,10 +91,17 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--session", default="dev", help="Session reference from DEV_SESSIONS")
     parser.add_argument("--debug", action="store_true", help="Print state and trace after each conversation")
+    parser.add_argument("--flow", choices=["validation-triage", "legacy"],
+                        default="validation-triage",
+                        help="Validate identity through MCP and classify; downstream agents are pending.")
     args = parser.parse_args()
 
     services = McpServices.from_env()
-    graph = build_graph(services, checkpointer=InMemorySaver())
+    if args.flow == "validation-triage":
+        from bank_agent.graphs.validation_triage import build_graph as build_scoped_graph
+        graph = build_scoped_graph(services, checkpointer=InMemorySaver())
+    else:
+        graph = build_graph(services, checkpointer=InMemorySaver())
     print(f"Scenario date {services.now():%Y-%m-%d}. Session '{args.session}'. /new restarts, /quit exits.\n")
     try:
         while True:

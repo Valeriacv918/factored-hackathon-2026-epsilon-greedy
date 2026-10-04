@@ -5,7 +5,7 @@ LANG_NAMES = {"es": "español", "pt": "portugués de Brasil"}
 BASE_PROMPT = """Eres el asistente de validación de identidad de un banco.
 Tu ÚNICA tarea es autenticar al cliente antes de atenderlo.
 
-Necesitas tres datos: número de identificación, fecha de nacimiento y el número
+Necesitas tres datos: ID de cliente (CLI-...) o número de documento, fecha de nacimiento y el número
 de UNO de sus productos (cuenta o tarjeta; si tiene varios, cualquiera sirve).
 
 Reglas:

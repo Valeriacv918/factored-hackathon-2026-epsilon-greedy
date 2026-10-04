@@ -1,8 +1,9 @@
 # Agente de disputas con LangGraph
 
-Primera implementación ejecutable: seis componentes, transiciones en código y
-confirmaciones mediante botones. Los servicios de pruebas son sintéticos; aún no
-hay conexión a GCP, MCP o a un proveedor de modelos.
+Flujo local activo: validación de identidad por MCP y triage con Groq.
+Las rutas posteriores quedan pendientes mientras el equipo integra esos agentes.
+La arquitectura histórica de seis componentes se describe a continuación;
+ver el flujo acotado y sus límites al final de este documento.
 
 ## Estructura
 
@@ -110,8 +111,9 @@ BigQuery directamente, sin pasar por MCP (límite conocido); la dependencia se
 añade solo para esa ejecución:
 `uv run --project apps/agent --with google-cloud-bigquery scripts/chat_validator.py --bq`.
 
-`DEV_SESSIONS` asocia referencias fijas a clientes reales sin login; se reemplazará
-por el validador cuando `normalize_id` conserve los guiones de los IDs reales.
+`DEV_SESSIONS` se conserva para herramientas y flujo legacy. El flujo por defecto
+valida los tres factores por MCP, conserva los guiones de CLI-... y crea su propia
+sesión; no usa esa variable para omitir autenticación.
 
 ## Decisiones y límites
 
@@ -135,3 +137,11 @@ por el validador cuando `normalize_id` conserve los guiones de los IDs reales.
 - No hay frontend, endpoint, Dockerfile, alertas reales ni despliegue.
 
 Referencia: [interrupciones de LangGraph](https://docs.langchain.com/oss/python/langgraph/interrupts).
+
+## Flujo acotado de validación y triage
+
+La CLI usa ahora `graphs/validation_triage.py`: ejecuta ValidationAgent real,
+verifica identidad a través de MCP y clasifica con LLMClassifier/decide.
+Se detiene con un destino pendiente antes de emergency/fraud.
+Ver [configuración, pruebas y límites](../../docs/validation-triage-local.md).
+`DEV_SESSIONS` no salta la validación en este flujo.

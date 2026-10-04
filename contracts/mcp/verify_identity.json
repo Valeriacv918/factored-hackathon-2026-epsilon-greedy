@@ -1,0 +1,100 @@
+{
+  "name": "verify_identity",
+  "description": "Compare three submitted factors; return no personal data on mismatch.\n\n    For the trusted local validator only. Attempts/TTL belong to IdentityValidator.\n    Never expose this server publicly without authenticated transport and durable attempt limits.\n    ",
+  "input_schema": {
+    "properties": {
+      "customer_id": {
+        "description": "Submitted customer_id (CLI-...) or document number; not yet authenticated.",
+        "pattern": "^[A-Z0-9-]{4,20}$",
+        "title": "Customer Id",
+        "type": "string"
+      },
+      "date_of_birth": {
+        "format": "date",
+        "title": "Date Of Birth",
+        "type": "string"
+      },
+      "product_number": {
+        "pattern": "^[A-Z0-9]{4,30}$",
+        "title": "Product Number",
+        "type": "string"
+      }
+    },
+    "required": [
+      "customer_id",
+      "date_of_birth",
+      "product_number"
+    ],
+    "title": "verify_identityArguments",
+    "type": "object"
+  },
+  "output_schema": {
+    "$defs": {
+      "VerifiedProduct": {
+        "properties": {
+          "product_number": {
+            "title": "Product Number",
+            "type": "string"
+          },
+          "product_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Product Type"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          }
+        },
+        "required": [
+          "product_number"
+        ],
+        "title": "VerifiedProduct",
+        "type": "object"
+      }
+    },
+    "properties": {
+      "verified": {
+        "default": false,
+        "title": "Verified",
+        "type": "boolean"
+      },
+      "customer_id": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Customer Id"
+      },
+      "products": {
+        "items": {
+          "$ref": "#/$defs/VerifiedProduct"
+        },
+        "title": "Products",
+        "type": "array"
+      }
+    },
+    "title": "IdentityVerification",
+    "type": "object"
+  }
+}
