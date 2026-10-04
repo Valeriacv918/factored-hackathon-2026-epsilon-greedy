@@ -148,3 +148,16 @@ link to a product does not establish ownership or authorize product access.
 - [ ] 4Ã¢â‚¬â€œ6 slide presentation
 - [ ] Video pitch: working demo + core architecture decisions
 - [ ] Demo cases in ES and PT: normal resolution, ambiguous/unsupported, human-required
+
+## Banking sandbox (data engineering)
+
+The simulation storage is versioned in
+[infra/bigquery/sandbox](infra/bigquery/sandbox/README.md), with its
+[versioned contract](data/contracts/sandbox/bank_sandbox_v1.json).
+It includes scenario isolation, effective card-state queries, receipt checks,
+and quality audits. Deployment is separate from Dataform. Cloud Shell results
+shared on October 4 confirm the schema, permissions checks and one persisted
+simulated card block with its audit. See the [handoff](docs/sandbox-handoff.md)
+for evidence and limits. MCP write tools remain the application team's responsibility.
+
+Offline check: `python scripts/verify/sandbox_contract.py --check`.
