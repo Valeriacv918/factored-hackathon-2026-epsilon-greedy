@@ -3,7 +3,9 @@
 El LLM no decide si alguien está autenticado. Solo extrae los datos de la
 conversación y llama a `verify()`. Las reglas viven aquí, en código:
 
-1. Se necesitan los 3 factores: ID + fecha de nacimiento + número de producto.
+1. Se necesitan los 3 factores: número de documento (cédula, CURP, DNI...) +
+   fecha de nacimiento + número de producto. El servidor devuelve el customer_id
+   interno, que es el que se guarda en la sesión para la trazabilidad.
 2. El producto debe pertenecer a ESE cliente (un cliente puede tener varios;
    basta con uno). Tras validar, la sesión queda autorizada para TODOS sus
    productos, y los agentes siguientes solo pueden operar sobre esa lista.
@@ -12,7 +14,7 @@ conversación y llama a `verify()`. Las reglas viven aquí, en código:
 4. Máximo N intentos → bloqueo temporal → transferencia a humano.
 5. La sesión autenticada expira.
 6. Si el servidor MCP falla → no autenticamos y se ofrece humano (fallo seguro).
-7. Auditoría sin PII: guardamos hash del ID, nunca el ID ni la fecha.
+7. Auditoría sin PII: guardamos hash del documento, nunca el documento ni la fecha.
 
 La comparación de los 3 factores la hace el servidor MCP (`verify_identity`):
 el agente nunca ve la fecha de nacimiento guardada. Si coincide, el servidor
@@ -97,13 +99,13 @@ class VerificationResult:
 
 # ---------- Normalización ----------
 
-def normalize_id(raw: Optional[str]) -> Optional[str]:
-    """Quita espacios y puntos ("1.020.304.050"). Conserva guiones: los IDs reales
-    son como CLI-0001 y el servidor los compara tal cual."""
+def normalize_document(raw: Optional[str]) -> Optional[str]:
+    """Quita espacios, puntos y guiones: "1.020.304.050" y "1020-304-050" son el mismo
+    documento. El servidor aplica la misma normalización a la columna document_number."""
     if not raw:
         return None
-    s = re.sub(r"[\s.]", "", str(raw)).upper()
-    return s if re.fullmatch(r"[A-Z0-9][A-Z0-9-]{3,19}", s) else None
+    s = re.sub(r"[\s.\-]", "", str(raw)).upper()
+    return s if re.fullmatch(r"[A-Z0-9]{4,20}", s) else None
 
 
 def normalize_product(raw: Optional[str]) -> Optional[str]:
@@ -183,7 +185,7 @@ class IdentityValidator:
         return p is not None and p in self._sessions[session_id].authorized_products
 
     # --- verificación ---
-    def verify(self, session_id: str, customer_id: Optional[str],
+    def verify(self, session_id: str, document_number: Optional[str],
                date_of_birth: Optional[str], product_number: Optional[str]) -> VerificationResult:
         t0 = time.perf_counter()
         s = self._sessions[session_id]
@@ -197,40 +199,40 @@ class IdentityValidator:
             return self._res(s, Status.LOCKED, t0)
 
         # 1) completitud
-        missing = [n for n, v in (("customer_id", customer_id),
+        missing = [n for n, v in (("document_number", document_number),
                                   ("date_of_birth", date_of_birth),
                                   ("product_number", product_number)) if not v]
         if missing:
             return self._res(s, Status.MISSING_FIELDS, t0, missing=missing)
 
         # 2) formato (no cuenta como intento fallido: es un error de tipeo)
-        cid, dob, prod = normalize_id(customer_id), parse_dob(date_of_birth, now.date()), normalize_product(product_number)
-        bad = [n for n, v in (("customer_id", cid), ("date_of_birth", dob), ("product_number", prod)) if v is None]
+        doc, dob, prod = normalize_document(document_number), parse_dob(date_of_birth, now.date()), normalize_product(product_number)
+        bad = [n for n, v in (("document_number", doc), ("date_of_birth", dob), ("product_number", prod)) if v is None]
         if bad:
             return self._res(s, Status.INVALID_FORMAT, t0, missing=bad)
 
         # 3) verificación en el servidor (misma respuesta para "no existe" y "no coincide")
         try:
-            result = self.identity.verify(cid, dob, prod)
+            result = self.identity.verify(doc, dob, prod)
         except ServiceFailure:
             return self._res(s, Status.SERVICE_UNAVAILABLE, t0)
 
         if result.status == "locked":
             s.failed_attempts += 1
             s.locked_until = result.locked_until   # hasta entonces no se vuelve a consultar
-            return self._res(s, Status.LOCKED, t0, id_hash=_hash(cid))
+            return self._res(s, Status.LOCKED, t0, id_hash=_hash(doc))
         if result.status != "verified":
             s.failed_attempts += 1
-            return self._res(s, Status.FAILED, t0, id_hash=_hash(cid), attempts_left=result.attempts_left)
+            return self._res(s, Status.FAILED, t0, id_hash=_hash(doc), attempts_left=result.attempts_left)
 
         s.authenticated = True
         s.authenticated_at = now
         s.expires_at = result.expires_at
-        s.customer_id = result.customer_id
+        s.customer_id = result.customer_id        # interno: trazabilidad del cliente
         s.authorized_products = tuple(p.upper() for p in result.product_numbers)
         s.session_token = result.session_token
         s.failed_attempts = 0
-        return self._res(s, Status.VERIFIED, t0, id_hash=_hash(cid),
+        return self._res(s, Status.VERIFIED, t0, id_hash=_hash(doc),
                          products_count=len(s.authorized_products))
 
     # --- helpers ---

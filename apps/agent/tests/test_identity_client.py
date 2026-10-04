@@ -18,17 +18,17 @@ class FakeClient:
 
 def check(answer):
     client = FakeClient(answer)
-    return McpIdentityChecker(client).verify("CLI-1", date(1990, 4, 3), "4111222233334444"), client
+    return McpIdentityChecker(client).verify("1020304050", date(1990, 4, 3), "4111222233334444"), client
 
 
 def test_sends_iso_date_and_only_the_three_values():
     _, client = check({"status": "failed", "attempts_left": 2})
-    assert client.calls == [("verify_identity", {"customer_id": "CLI-1", "date_of_birth": "1990-04-03",
+    assert client.calls == [("verify_identity", {"document_number": "1020304050", "date_of_birth": "1990-04-03",
                                                  "product_number": "4111222233334444"})]
 
 
 def test_parses_server_limits():
-    verified, _ = check({"status": "verified", "session_token": "t", "product_numbers": ["1", "2"],
+    verified, _ = check({"status": "verified", "customer_id": "CLI-1", "session_token": "t", "product_numbers": ["1", "2"],
                          "expires_at": "2026-10-01T12:15:00+00:00"})
     assert (verified.customer_id, verified.product_numbers, verified.session_token) == ("CLI-1", ("1", "2"), "t")
     assert verified.expires_at == datetime(2026, 10, 1, 12, 15, tzinfo=timezone.utc)
@@ -38,7 +38,9 @@ def test_parses_server_limits():
 
 
 @pytest.mark.parametrize("answer", [
-    {"status": "verified", "product_numbers": [], "expires_at": "2026-10-01T12:15:00+00:00"},   # no token
+    {"status": "verified", "customer_id": "CLI-1", "product_numbers": [],
+     "expires_at": "2026-10-01T12:15:00+00:00"},                                                  # no token
+    {"status": "verified", "session_token": "t", "expires_at": "2026-10-01T12:15:00+00:00"},    # no customer_id
     {"status": "verified", "session_token": "t"},                                               # no expiry
     {"status": "verified", "session_token": "t", "expires_at": "2026-10-01T12:15:00"},          # naive time
     {"status": "failed"},

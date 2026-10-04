@@ -5,17 +5,18 @@ import pytest
 
 from bank_agent.nodes.validator_agent.language import detect_language
 from bank_agent.clients.identity import (CustomerRecord, IdentityResult, InMemoryIdentityChecker, Product)
-from bank_agent.nodes.validator_agent.validator import IdentityValidator, Status, normalize_id, parse_dob
+from bank_agent.nodes.validator_agent.validator import IdentityValidator, Status, normalize_document, parse_dob
 
+# document_number -> registro con el customer_id interno (trazabilidad)
 CUSTOMERS = {
-    "1020304050": CustomerRecord("1020304050", date(1990, 4, 3), (
+    "1020304050": CustomerRecord("CLI-0001", date(1990, 4, 3), (
         Product("4111222233334444", "credit_card", "active"),
         Product("00987654321", "savings", "active"),
     )),
-    "99887766": CustomerRecord("99887766", date(1985, 12, 1), (
+    "99887766": CustomerRecord("CLI-0002", date(1985, 12, 1), (
         Product("5500111122223333", "debit_card", "active"),
     )),
-    "55555555": CustomerRecord("55555555", None, ()),   # registro incompleto
+    "55555555": CustomerRecord("CLI-0003", None, ()),   # registro incompleto
 }
 
 
@@ -159,7 +160,7 @@ def test_short_text_without_history_is_ambiguous():
 # --- verificación en el servidor MCP ---
 class LockedByServer:
     """El servidor ya bloqueó al cliente (p. ej. intentos desde otra conversación)."""
-    def verify(self, customer_id, date_of_birth, product_number):
+    def verify(self, document_number, date_of_birth, product_number):
         return IdentityResult("locked")
 
 
@@ -175,15 +176,16 @@ def test_session_keeps_server_token_and_products():
     sid = v.new_session().session_id
     v.verify(sid, "1020304050", "03/04/1990", "4111222233334444")
     s = v.get_session(sid)
-    assert s.session_token == "test-token:1020304050"
+    assert s.customer_id == "CLI-0001"           # el cliente escribió su documento; se guarda su ID interno
+    assert s.session_token == "test-token:CLI-0001"
     assert s.authorized_products == ("4111222233334444", "00987654321")
 
 
-@pytest.mark.parametrize("raw,expected", [("CLI-0001", "CLI-0001"), ("cli-0001", "CLI-0001"),
-                                          ("1.020.304.050", "1020304050"), (" 99887766 ", "99887766"),
-                                          ("-CLI1", None), ("AB", None), ("CLI_0001", None)])
-def test_normalize_id_keeps_hyphens(raw, expected):
-    assert normalize_id(raw) == expected
+@pytest.mark.parametrize("raw,expected", [("1.020.304.050", "1020304050"), ("1020-304-050", "1020304050"),
+                                          (" 99887766 ", "99887766"), ("gomp800101hdfrrn09", "GOMP800101HDFRRN09"),
+                                          ("AB", None), ("1020_304", None), ("1" * 21, None)])
+def test_normalize_document(raw, expected):
+    assert normalize_document(raw) == expected
 
 
 # --- los límites son del servidor ---

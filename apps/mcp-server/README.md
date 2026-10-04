@@ -6,15 +6,16 @@ and `dispute_context` are pending a decision on where writes are stored.
 
 | Tool | Returns (agent field names, see agent `clients/README.md`) |
 |---|---|
-| verify_identity(customer_id, date_of_birth, product_number) | status (verified / failed / locked), session_token, product_numbers, attempts_left, locked_until, expires_at |
+| verify_identity(document_number, date_of_birth, product_number) | status (verified / failed / locked), customer_id, session_token, product_numbers, attempts_left, locked_until, expires_at |
 | find_transactions(session_token, reference_date, window_days, slots?, limit=3) | transactions[id, customer_id, card_id, status, fraud_score, amount, amount_usd, currency, date, merchant], has_more |
 | list_cards(session_token) | cards[id, customer_id, last4, status, type] |
 | get_card(session_token, card_id) | id, customer_id, last4, status, type |
 
 **Trust model.** The server decides who the customer is; it never takes
-`customer_id` from a data tool's caller. `verify_identity` compares the three
-values in SQL (the date of birth is never returned) and, on a match, returns a
-session token signed with `SESSION_SIGNING_KEY` (HMAC-SHA256, `SESSION_TTL_MINUTES`,
+`customer_id` from a data tool's caller. The customer identifies with their
+`document_number` (cédula, CURP, DNI; spaces, dots and dashes ignored). `verify_identity`
+compares the three values in SQL (the date of birth is never returned) and, on a match,
+returns the internal `customer_id` (for traceability) and a session token signed with `SESSION_SIGNING_KEY` (HMAC-SHA256, `SESSION_TTL_MINUTES`,
 default 15). The data tools take that token and filter by its customer; a bad,
 expired or forged token gets the error `session_invalid`. An unknown customer and a
 wrong answer both return `failed`. After `IDENTITY_MAX_ATTEMPTS` failures (default 3)

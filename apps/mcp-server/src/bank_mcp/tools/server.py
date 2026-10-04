@@ -1,8 +1,8 @@
 """MCP server: bounded tools over bank_curated for the dispute agent.
 
 No arbitrary SQL (docs/architecture.md). Trust model: the server decides who the
-customer is. verify_identity checks customer_id + date of birth + product number
-in SQL and returns a signed session token (services/session.py). Every data tool
+customer is. verify_identity checks document_number + date of birth + product number
+in SQL and returns the customer_id and a signed session token (services/session.py). Every data tool
 takes that token, never a customer_id, and filters by the token's customer in SQL,
 so a caller, over stdio or HTTP, can only see the customer who logged in.
 
@@ -49,7 +49,8 @@ LOGIN = ToolAnnotations(read_only_hint=False, destructive_hint=False, idempotent
 # The agent matches this text to end the session instead of retrying.
 SESSION_INVALID = "session_invalid"
 
-CustomerId = Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{1,64}$", description="customer_id the customer gave.")]
+DocumentNumber = Annotated[str, Field(pattern=r"^[A-Za-z0-9 .-]{4,40}$",
+                                      description="Identity document number the customer gave (cédula, CURP, DNI...).")]
 ProductNumber = Annotated[str, Field(pattern=r"^[A-Za-z0-9 -]{4,40}$",
                                      description="Number of one of the customer's products (card or account).")]
 SessionToken = Annotated[str, Field(min_length=1, max_length=512, description="session_token from verify_identity.")]
@@ -114,33 +115,35 @@ def _card_params(customer_id: str) -> list:
 
 
 @mcp.tool(annotations=LOGIN)
-def verify_identity(customer_id: CustomerId, date_of_birth: dt.date, product_number: ProductNumber) -> IdentityResult:
-    """Check the customer's identity: customer_id, date of birth and one of their product numbers.
+def verify_identity(document_number: DocumentNumber, date_of_birth: dt.date,
+                    product_number: ProductNumber) -> IdentityResult:
+    """Check the customer's identity: document number, date of birth and one of their product numbers.
 
-    On success returns a session_token for the other tools and the customer's product
-    numbers. Returns status "failed" without saying which value was wrong, and "locked"
-    after too many failures. Never returns the customer's data.
+    On success returns the customer_id, a session_token for the other tools and the
+    customer's product numbers. Returns status "failed" without saying which value was
+    wrong, and "locked" after too many failures. Never returns the customer's data.
     """
+    document = re.sub(r"[\s.-]", "", document_number).upper()   # same normalization as the SQL
     throttle = _login_throttle()
-    if until := throttle.locked_until(customer_id):
+    if until := throttle.locked_until(document):
         return IdentityResult(status="locked", locked_until=until.isoformat())
     gw = _gw()
-    params = [bigquery.ScalarQueryParameter("customer_id", "STRING", customer_id),
+    params = [bigquery.ScalarQueryParameter("document_number", "STRING", document),
               bigquery.ScalarQueryParameter("date_of_birth", "DATE", date_of_birth),
               bigquery.ScalarQueryParameter("product_number", "STRING", re.sub(r"[\s-]", "", product_number).upper())]
     sql = queries.VERIFY_IDENTITY.format(customers=gw.table("customers"), products=gw.table("products"))
     rows = _run(gw, sql, params, "verify_identity")
     if len(rows) > 1:
-        # Data contract: customer_id is unique. If not, nobody is authenticated.
+        # Two customers with the same document (e.g. different document types): nobody is authenticated.
         raise ToolError("Identity data is inconsistent.")
     if not rows:
-        if left := throttle.failed(customer_id):
+        if left := throttle.failed(document):
             return IdentityResult(status="failed", attempts_left=left)
-        return IdentityResult(status="locked", locked_until=throttle.locked_until(customer_id).isoformat())
-    throttle.succeeded(customer_id)
+        return IdentityResult(status="locked", locked_until=throttle.locked_until(document).isoformat())
+    throttle.succeeded(document)
     now = session.utc_now().replace(microsecond=0)   # tokens carry whole seconds
     ttl = dt.timedelta(minutes=get_settings().session_ttl_minutes)
-    return IdentityResult(status="verified",
+    return IdentityResult(status="verified", customer_id=rows[0]["customer_id"],
                           session_token=session.issue(rows[0]["customer_id"], _signing_key(), ttl, lambda: now),
                           product_numbers=sorted(rows[0]["product_numbers"]),
                           expires_at=(now + ttl).isoformat())
