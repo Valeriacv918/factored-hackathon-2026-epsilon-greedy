@@ -1,4 +1,4 @@
-"""Six-node graph. Each phase commits separately before any next human wait."""
+"""Active graph for the dispute flow using the real agent modules under bank_agent.nodes."""
 from copy import deepcopy
 
 from langgraph.graph import END, START, StateGraph
@@ -21,12 +21,7 @@ NODES = {
 
 
 def build_graph(services, *, checkpointer, policy=None):
-    """Require an explicit saver; InMemorySaver is suitable only for local tests.
-
-    The hosting service must bind thread_id and session_ref to the authenticated
-    principal, restrict initial input to initial_state(), and only allow validated
-    Command(resume=...) payloads thereafter. Do not expose graph.invoke directly.
-    """
+    """Create the active graph with the supported agents only."""
     policy = policy or Policy()
     builder = StateGraph(ConversationState)
 
@@ -61,5 +56,5 @@ def build_graph(services, *, checkpointer, policy=None):
     for name, function in NODES.items():
         builder.add_node(name, wrap(name, function))
         builder.add_conditional_edges(name, lambda s: s["route"], routes)
-    builder.add_edge(START, "security_language")
+    builder.add_edge(START, "validator_agent")
     return builder.compile(checkpointer=checkpointer)
