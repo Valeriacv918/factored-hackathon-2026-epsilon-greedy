@@ -11,7 +11,9 @@ from langgraph.types import Command
 from bank_agent.clients.contracts import ServiceFailure, SessionExpired
 from bank_agent.clients.mcp_services import McpServices, detect_language_lingua, scenario_clock
 from bank_agent.clients.sessions import StaticSessions
+from bank_agent.config.settings import FraudPolicy
 from bank_agent.graphs.disputes import build_graph
+from bank_agent.graphs.policy import Policy
 from bank_agent.graphs.state import initial_state
 
 NOW = dt.datetime(2026, 6, 18, 12, tzinfo=dt.timezone.utc)
@@ -132,3 +134,20 @@ def test_server_failure_escalates_then_ends_safely():
 def test_real_language_detector_is_wired(text, language):
     # The graph tests inject a fake detector; this one imports the real lingua path.
     assert detect_language_lingua(text) == language
+
+
+def test_graph_sends_its_own_policy_window_to_the_server():
+    s = services("charge_error")
+    graph = build_graph(s, checkpointer=InMemorySaver(), policy=Policy(window_days=30))
+    graph.invoke(initial_state("t", "dev", "No reconozco este cargo"),
+                 {"configurable": {"thread_id": "t"}, "recursion_limit": 100})
+    assert s._client.calls[0][0] == "find_transactions"
+    assert s._client.calls[0][1]["window_days"] == 30
+
+
+def test_fraud_policy_reads_the_graph_policy():
+    graph, fraud = Policy(), FraudPolicy()
+    assert fraud.dispute_window_days == graph.window_days
+    assert fraud.fraud_score_threshold == float(graph.fraud_score)
+    assert fraud.high_amount_usd_threshold == float(graph.high_amount_usd)
+    assert fraud.max_charges_per_case == graph.max_charges

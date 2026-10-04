@@ -46,7 +46,7 @@ class Clock:
 def test_validator_sessions_follow_authentication_and_ttl():
     clock = Clock()
     customers = {"CLI-0001": CustomerRecord("CLI-0001", date(1990, 4, 3), (Product("4111222233334444"),))}
-    validator = IdentityValidator(InMemoryIdentityChecker(customers), clock=clock)
+    validator = IdentityValidator(InMemoryIdentityChecker(customers, clock=clock), clock=clock)
     sessions = ValidatorSessions(validator)
     sid = validator.new_session().session_id
     assert sessions.resolve(sid) is None and sessions.resolve("unknown") is None

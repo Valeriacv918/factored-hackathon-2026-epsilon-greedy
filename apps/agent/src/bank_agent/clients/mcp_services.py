@@ -23,7 +23,7 @@ REPO_ROOT = Path(__file__).resolve().parents[5]
 
 # Tool name -> arguments the graph may pass through. session_token is added here.
 READ_TOOLS = {
-    "find_transactions": ("slots", "limit"),
+    "find_transactions": ("slots", "limit", "window_days"),
     "list_cards": (),
     "get_card": ("card_id",),
 }

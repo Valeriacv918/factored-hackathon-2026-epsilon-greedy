@@ -54,6 +54,12 @@ def test_verified_returns_token_for_that_customer_and_no_personal_data(monkeypat
     assert result.status == "verified"
     assert result.product_numbers == ["00987654321", "4111222233334444"]
     assert session.verify(result.session_token, KEY.encode()) == "CLI-1"
+    # expires_at is exactly the token's expiry (15 minutes, whole seconds).
+    expires = dt.datetime.fromisoformat(result.expires_at)
+    assert dt.timedelta(minutes=14) < expires - dt.datetime.now(dt.timezone.utc) <= dt.timedelta(minutes=15)
+    assert session.verify(result.session_token, KEY.encode(), clock=lambda: expires - dt.timedelta(seconds=1))
+    with pytest.raises(session.InvalidSession):
+        session.verify(result.session_token, KEY.encode(), clock=lambda: expires)
     assert "1990" not in result.model_dump_json()
     # The product number is normalized before it reaches SQL; the DOB is a DATE parameter.
     _, sql, params = gw.calls[0]
@@ -67,15 +73,20 @@ def test_verified_returns_token_for_that_customer_and_no_personal_data(monkeypat
 def test_wrong_answer_and_unknown_customer_look_the_same(monkeypatch, args):
     use(monkeypatch, known_customer)
     result = server.verify_identity(*args)
-    assert result.model_dump() == {"status": "failed", "session_token": None, "product_numbers": []}
+    # Unknown customers count attempts exactly like real ones: no enumeration oracle.
+    assert result.model_dump() == {"status": "failed", "session_token": None, "product_numbers": [],
+                                   "attempts_left": 2, "locked_until": None, "expires_at": None}
 
 
 def test_locks_after_max_attempts_without_querying_again(monkeypatch):
     gw = use(monkeypatch, known_customer)
-    statuses = [server.verify_identity("CLI-1", DOB, "0000").status for _ in range(3)]
-    assert statuses == ["failed", "failed", "locked"]
+    results = [server.verify_identity("CLI-1", DOB, "0000") for _ in range(3)]
+    assert [(r.status, r.attempts_left) for r in results] == [("failed", 2), ("failed", 1), ("locked", None)]
+    until = dt.datetime.fromisoformat(results[-1].locked_until)
+    assert dt.timedelta(minutes=14) < until - dt.datetime.now(dt.timezone.utc) <= dt.timedelta(minutes=15)
     # Even the right answer is refused while locked, and BigQuery is not queried.
-    assert server.verify_identity("CLI-1", DOB, "4111222233334444").status == "locked"
+    locked = server.verify_identity("CLI-1", DOB, "4111222233334444")
+    assert (locked.status, locked.locked_until, locked.session_token) == ("locked", results[-1].locked_until, None)
     assert len(gw.calls) == 3
 
 
@@ -96,7 +107,7 @@ def test_data_tools_take_customer_from_token(monkeypatch):
 def test_data_tools_reject_bad_tokens_before_querying(monkeypatch, token):
     gw = use(monkeypatch, [])
     for call in (lambda: server.list_cards(token), lambda: server.get_card(token, "PRD-1"),
-                 lambda: server.find_transactions(token, dt.date(2026, 6, 18))):
+                 lambda: server.find_transactions(token, dt.date(2026, 6, 18), 90)):
         with pytest.raises(ToolError, match=server.SESSION_INVALID):
             call()
     assert gw.calls == []

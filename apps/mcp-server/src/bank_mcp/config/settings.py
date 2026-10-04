@@ -28,8 +28,8 @@ class Settings(BaseSettings):
     query_timeout_s: float = Field(default=30, gt=0)
     rate_limit_per_min: int = Field(default=60, gt=0)
 
-    # find_transactions defaults (demo policy: 90-day window).
-    window_days: int = Field(default=90, gt=0, le=366)
+    # find_transactions matching. The search window is the agent's policy and
+    # arrives as a tool argument (window_days), capped by search.MAX_SPAN_DAYS.
     amount_tolerance_pct: float = Field(default=10.0, ge=0, le=50)
 
     # Session tokens (services/session.py). The key signs every token: keep it secret,

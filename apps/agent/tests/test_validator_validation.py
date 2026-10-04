@@ -30,7 +30,7 @@ class Clock:
 @pytest.fixture
 def env():
     clock = Clock()
-    repo = InMemoryIdentityChecker(CUSTOMERS)
+    repo = InMemoryIdentityChecker(CUSTOMERS, clock=clock)
     v = IdentityValidator(repo, clock=clock)
     return v, v.new_session().session_id, clock, repo
 
@@ -58,10 +58,11 @@ def test_missing_fields(env):
 
 
 def test_invalid_format_does_not_consume_attempt(env):
-    v, sid, *_ = env
+    v, sid, _, repo = env
     r = v.verify(sid, "1020304050", "31/02/1990", "4111222233334444")
     assert r.status == Status.INVALID_FORMAT
-    assert v.get_session(sid).failed_attempts == 0
+    # The server counts attempts; a typo never reaches it.
+    assert repo.calls == 0 and v.get_session(sid).failed_attempts == 0
 
 
 def test_future_dob_rejected():
@@ -183,3 +184,40 @@ def test_session_keeps_server_token_and_products():
                                           ("-CLI1", None), ("AB", None), ("CLI_0001", None)])
 def test_normalize_id_keeps_hyphens(raw, expected):
     assert normalize_id(raw) == expected
+
+
+# --- los límites son del servidor ---
+def test_attempts_and_lockout_come_from_the_server():
+    clock = Clock()
+    server = InMemoryIdentityChecker(CUSTOMERS, clock=clock, max_attempts=5, lockout=timedelta(minutes=40))
+    v = IdentityValidator(server, clock=clock)
+    sid = v.new_session().session_id
+    lefts = [v.verify(sid, "1020304050", "01/01/1991", "4111222233334444").attempts_left for _ in range(4)]
+    assert lefts == [4, 3, 2, 1]
+    assert v.verify(sid, "1020304050", "01/01/1991", "4111222233334444").status == Status.LOCKED
+    assert v.get_session(sid).locked_until == clock.now + timedelta(minutes=40)
+
+
+def test_session_lifetime_comes_from_the_server():
+    clock = Clock()
+    v = IdentityValidator(InMemoryIdentityChecker(CUSTOMERS, clock=clock, ttl=timedelta(minutes=5)), clock=clock)
+    sid = v.new_session().session_id
+    v.verify(sid, "1020304050", "03/04/1990", "4111222233334444")
+    clock.now += timedelta(minutes=4, seconds=59)
+    assert v.is_authenticated(sid)
+    clock.now += timedelta(seconds=1)
+    assert not v.is_authenticated(sid)
+
+
+def test_lockout_is_per_customer_across_conversations():
+    clock = Clock()
+    v = IdentityValidator(InMemoryIdentityChecker(CUSTOMERS, clock=clock), clock=clock)
+    first = v.new_session().session_id
+    for _ in range(3):
+        v.verify(first, "1020304050", "01/01/1991", "4111222233334444")
+    # A new conversation for the same customer is locked too, even with the right answer.
+    second = v.new_session().session_id
+    assert v.verify(second, "1020304050", "03/04/1990", "4111222233334444").status == Status.LOCKED
+    # Another customer is not affected.
+    third = v.new_session().session_id
+    assert v.verify(third, "99887766", "01/12/1985", "5500111122223333").status == Status.VERIFIED

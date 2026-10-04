@@ -6,8 +6,8 @@ and `dispute_context` are pending a decision on where writes are stored.
 
 | Tool | Returns (agent field names, see agent `clients/README.md`) |
 |---|---|
-| verify_identity(customer_id, date_of_birth, product_number) | status (verified / failed / locked), session_token, product_numbers |
-| find_transactions(session_token, reference_date, slots?, limit=3) | transactions[id, customer_id, card_id, status, fraud_score, amount, amount_usd, currency, date, merchant], has_more |
+| verify_identity(customer_id, date_of_birth, product_number) | status (verified / failed / locked), session_token, product_numbers, attempts_left, locked_until, expires_at |
+| find_transactions(session_token, reference_date, window_days, slots?, limit=3) | transactions[id, customer_id, card_id, status, fraud_score, amount, amount_usd, currency, date, merchant], has_more |
 | list_cards(session_token) | cards[id, customer_id, last4, status, type] |
 | get_card(session_token, card_id) | id, customer_id, last4, status, type |
 
@@ -23,6 +23,12 @@ kept in memory per server instance: with several Cloud Run instances each counts
 its own. Anyone holding the signing key can mint tokens, so keep it in Secret Manager.
 On Cloud Run, also deploy with `--no-allow-unauthenticated` and grant `run.invoker`
 only to the agent's service account.
+
+**Who owns each limit.** The server enforces the identity limits, so it owns them
+and reports them in every `verify_identity` answer (`attempts_left`, `locked_until`,
+`expires_at`); the agent keeps no copy. The dispute window is the agent's policy
+(`graphs/policy.Policy.window_days`), so the agent sends it as `window_days`; the
+server only caps it at `MAX_SPAN_DAYS` (366).
 
 `reference_date` anchors the
 search window (the demo data ends 2026-06-18). Amounts are decimal strings;

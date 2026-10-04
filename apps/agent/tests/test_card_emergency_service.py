@@ -29,7 +29,7 @@ class Clock:
 @pytest.fixture
 def authenticated_session():
     """IdentityValidator con una sesión YA autenticada (agente 1 ya hizo su trabajo)."""
-    validator = IdentityValidator(InMemoryIdentityChecker(CUSTOMERS), clock=Clock())
+    validator = IdentityValidator(InMemoryIdentityChecker(CUSTOMERS, clock=(clock := Clock())), clock=clock)
     session = validator.new_session()
     result = validator.verify(session.session_id, CUSTOMER_ID, "1990-04-03", CARD_1)
     assert result.status.value == "VERIFIED"
@@ -42,7 +42,7 @@ def make_service(validator, cards=None):
 
 
 def test_start_requires_authenticated_session():
-    validator = IdentityValidator(InMemoryIdentityChecker(CUSTOMERS), clock=Clock())
+    validator = IdentityValidator(InMemoryIdentityChecker(CUSTOMERS, clock=(clock := Clock())), clock=clock)
     session = validator.new_session()   # nunca verificada
     service = make_service(validator)
     with pytest.raises(PermissionError):

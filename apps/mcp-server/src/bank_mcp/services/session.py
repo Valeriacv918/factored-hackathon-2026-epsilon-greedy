@@ -77,21 +77,29 @@ class LoginThrottle:
         # Keep no customer IDs in memory, only their hashes.
         return hashlib.sha256(customer_id.encode()).hexdigest()
 
-    def is_locked(self, customer_id: str) -> bool:
+    def locked_until(self, customer_id: str) -> dt.datetime | None:
+        """When the lockout ends, or None if the customer is not locked."""
         with self._lock:
             until = self._locked_until.get(self._key(customer_id))
-            return until is not None and self.clock() < until
+            return until if until is not None and self.clock() < until else None
 
-    def failed(self, customer_id: str) -> bool:
-        """Record a failure; return True if the customer is now locked."""
+    def is_locked(self, customer_id: str) -> bool:
+        return self.locked_until(customer_id) is not None
+
+    def failed(self, customer_id: str) -> int:
+        """Record a failure; return the attempts left (0 means the customer is now locked).
+
+        Any customer_id string counts, known or not, so the answer reveals nothing
+        about whether the customer exists."""
         key = self._key(customer_id)
         with self._lock:
             self._failures[key] = self._failures.get(key, 0) + 1
-            if self._failures[key] < self.max_attempts:
-                return False
+            left = self.max_attempts - self._failures[key]
+            if left > 0:
+                return left
             self._failures.pop(key)
             self._locked_until[key] = self.clock() + self.lockout
-            return True
+            return 0
 
     def succeeded(self, customer_id: str) -> None:
         key = self._key(customer_id)

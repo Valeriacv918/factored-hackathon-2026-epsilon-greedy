@@ -26,7 +26,7 @@ from bank_mcp.repositories.bigquery import BigQueryGateway, QueryError
 from bank_mcp.services import session
 from bank_mcp.services.mapping import Card, CardList, IdentityResult, TransactionSearch, to_card, to_search
 from bank_mcp.services.ratelimit import RateLimited, TokenBucket
-from bank_mcp.services.search import TransactionSlots, build_find_query
+from bank_mcp.services.search import MAX_SPAN_DAYS, TransactionSlots, build_find_query
 from bank_mcp.sql import queries
 
 logger = logging.getLogger("bank_mcp")
@@ -122,8 +122,8 @@ def verify_identity(customer_id: CustomerId, date_of_birth: dt.date, product_num
     after too many failures. Never returns the customer's data.
     """
     throttle = _login_throttle()
-    if throttle.is_locked(customer_id):
-        return IdentityResult(status="locked")
+    if until := throttle.locked_until(customer_id):
+        return IdentityResult(status="locked", locked_until=until.isoformat())
     gw = _gw()
     params = [bigquery.ScalarQueryParameter("customer_id", "STRING", customer_id),
               bigquery.ScalarQueryParameter("date_of_birth", "DATE", date_of_birth),
@@ -134,23 +134,31 @@ def verify_identity(customer_id: CustomerId, date_of_birth: dt.date, product_num
         # Data contract: customer_id is unique. If not, nobody is authenticated.
         raise ToolError("Identity data is inconsistent.")
     if not rows:
-        return IdentityResult(status="locked" if throttle.failed(customer_id) else "failed")
+        if left := throttle.failed(customer_id):
+            return IdentityResult(status="failed", attempts_left=left)
+        return IdentityResult(status="locked", locked_until=throttle.locked_until(customer_id).isoformat())
     throttle.succeeded(customer_id)
+    now = session.utc_now().replace(microsecond=0)   # tokens carry whole seconds
     ttl = dt.timedelta(minutes=get_settings().session_ttl_minutes)
-    return IdentityResult(status="verified", session_token=session.issue(rows[0]["customer_id"], _signing_key(), ttl),
-                          product_numbers=sorted(rows[0]["product_numbers"]))
+    return IdentityResult(status="verified",
+                          session_token=session.issue(rows[0]["customer_id"], _signing_key(), ttl, lambda: now),
+                          product_numbers=sorted(rows[0]["product_numbers"]),
+                          expires_at=(now + ttl).isoformat())
 
 
 @mcp.tool(annotations=READ_ONLY)
 def find_transactions(
     session_token: SessionToken,
     reference_date: Annotated[dt.date, Field(description="Scenario 'today' (YYYY-MM-DD) that anchors the default window.")],
+    window_days: Annotated[int, Field(ge=1, le=MAX_SPAN_DAYS,
+                                      description="Caller's dispute-policy window, in days, ending on reference_date.")],
     slots: TransactionSlots | None = None,
     limit: Annotated[int, Field(ge=1, le=10)] = 3,
 ) -> TransactionSearch:
     """Find the customer's transactions matching what they described, newest first.
 
-    Without dates, searches the policy window ending on reference_date. `amount`
+    Without dates, searches the last window_days ending on reference_date. The caller
+    owns that policy; the server only caps it at MAX_SPAN_DAYS. `amount`
     matches within a small tolerance; `merchant` is a case-insensitive substring.
     has_more=true means more matches exist than were returned: ask for more detail.
     """
@@ -160,7 +168,7 @@ def find_transactions(
     try:
         sql, params = build_find_query(
             slots=slots or TransactionSlots(), customer_id=customer_id, reference_date=reference_date,
-            limit=limit, window_days=s.window_days, tolerance_pct=s.amount_tolerance_pct,
+            limit=limit, window_days=window_days, tolerance_pct=s.amount_tolerance_pct,
             transactions=gw.table("transactions"), products=gw.table("products"))
     except (ValueError, ValidationError) as e:
         raise ToolError(f"Invalid slots: {e}") from None

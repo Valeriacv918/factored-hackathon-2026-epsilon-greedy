@@ -69,10 +69,11 @@ def test_signed_payload_with_bad_claims_is_rejected():
 def test_throttle_locks_after_max_attempts_then_expires():
     clock = Clock()
     t = LoginThrottle(3, dt.timedelta(minutes=15), clock)
-    assert [t.failed("CLI-1") for _ in range(3)] == [False, False, True]
-    assert t.is_locked("CLI-1") and not t.is_locked("CLI-2")
+    assert [t.failed("CLI-1") for _ in range(3)] == [2, 1, 0]
+    assert t.locked_until("CLI-1") == T0 + dt.timedelta(minutes=15)
+    assert t.is_locked("CLI-1") and t.locked_until("CLI-2") is None
     clock.now = T0 + dt.timedelta(minutes=15)
-    assert not t.is_locked("CLI-1")
+    assert not t.is_locked("CLI-1") and t.locked_until("CLI-1") is None
 
 
 def test_throttle_success_resets_failures():
@@ -80,7 +81,7 @@ def test_throttle_success_resets_failures():
     t.failed("CLI-1")
     t.failed("CLI-1")
     t.succeeded("CLI-1")
-    assert not t.failed("CLI-1")
+    assert t.failed("CLI-1") == 2
 
 
 def test_throttle_keeps_only_hashes():

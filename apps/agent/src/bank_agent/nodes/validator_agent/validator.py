@@ -10,15 +10,18 @@ conversación y llama a `verify()`. Las reglas viven aquí, en código:
 3. Mensaje de error genérico: nunca decimos cuál dato falló
    (evita enumerar clientes o adivinar fechas).
 4. Máximo N intentos → bloqueo temporal → transferencia a humano.
-5. La sesión autenticada expira (TTL).
+5. La sesión autenticada expira.
 6. Si el servidor MCP falla → no autenticamos y se ofrece humano (fallo seguro).
 7. Auditoría sin PII: guardamos hash del ID, nunca el ID ni la fecha.
 
 La comparación de los 3 factores la hace el servidor MCP (`verify_identity`):
 el agente nunca ve la fecha de nacimiento guardada. Si coincide, el servidor
 devuelve un token de sesión firmado; los demás tools lo usan para saber quién
-es el cliente. El servidor también bloquea por cliente tras varios fallos (la
-protección real); el conteo de aquí es por conversación y alimenta los mensajes.
+es el cliente. Los límites (intentos, bloqueo, vida de la sesión) también son
+del servidor: cada respuesta trae `attempts_left`, `locked_until` o `expires_at`,
+y aquí solo se usan esos valores, sin copias propias que puedan desincronizarse.
+Esas horas son UTC reales: el reloj del validador debe ser real, nunca el reloj
+de escenario (SCENARIO_NOW).
 """
 from __future__ import annotations
 
@@ -27,7 +30,7 @@ import re
 import secrets
 import time
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 from enum import Enum
 from typing import Callable, Optional
 
@@ -62,12 +65,13 @@ NEXT_STEP = {
 class Session:
     session_id: str
     language: Optional[str] = None
-    failed_attempts: int = 0
-    locked_until: Optional[datetime] = None
+    failed_attempts: int = 0                 # en esta conversación; solo informativo (handoff)
+    locked_until: Optional[datetime] = None  # del servidor
     authenticated: bool = False
     customer_id: Optional[str] = None
     authorized_products: tuple = ()          # números de producto permitidos
     authenticated_at: Optional[datetime] = None
+    expires_at: Optional[datetime] = None    # del servidor: vence junto con el token
     session_token: Optional[str] = None      # firmado por el servidor MCP; nunca va al LLM
     audit: list = field(default_factory=list)
 
@@ -161,12 +165,13 @@ class IdentityValidator:
         s = self._sessions.get(session_id)
         if not s or not s.authenticated:
             return False
-        if self.clock() - s.authenticated_at > timedelta(minutes=self.policy.session_ttl_minutes):
+        if s.expires_at is None or self.clock() >= s.expires_at:
             self._log(s, "session_expired")
             s.authenticated = False
             s.customer_id = None
             s.authorized_products = ()
             s.session_token = None
+            s.expires_at = None
             return False
         return True
 
@@ -210,16 +215,17 @@ class IdentityValidator:
         except ServiceFailure:
             return self._res(s, Status.SERVICE_UNAVAILABLE, t0)
 
+        if result.status == "locked":
+            s.failed_attempts += 1
+            s.locked_until = result.locked_until   # hasta entonces no se vuelve a consultar
+            return self._res(s, Status.LOCKED, t0, id_hash=_hash(cid))
         if result.status != "verified":
             s.failed_attempts += 1
-            if result.status == "locked" or s.failed_attempts >= self.policy.max_attempts:
-                s.locked_until = now + timedelta(minutes=self.policy.lockout_minutes)
-                return self._res(s, Status.LOCKED, t0, id_hash=_hash(cid))
-            return self._res(s, Status.FAILED, t0, id_hash=_hash(cid),
-                             attempts_left=self.policy.max_attempts - s.failed_attempts)
+            return self._res(s, Status.FAILED, t0, id_hash=_hash(cid), attempts_left=result.attempts_left)
 
         s.authenticated = True
         s.authenticated_at = now
+        s.expires_at = result.expires_at
         s.customer_id = result.customer_id
         s.authorized_products = tuple(p.upper() for p in result.product_numbers)
         s.session_token = result.session_token

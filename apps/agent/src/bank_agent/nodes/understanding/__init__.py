@@ -54,7 +54,8 @@ def run(s, services, policy):
                   turns=s["turns"] + 1, clarification_attempts=s["clarification_attempts"] + 1)
 
     # Ownership is checked by the service before returning any candidates.
-    result = tool(s, services, "find_transactions", slots=s.get("slots", {}), limit=3)
+    result = tool(s, services, "find_transactions", slots=s.get("slots", {}), limit=3,
+                  window_days=policy.window_days)
     candidates = result.get("transactions", [])
     if any(t.get("customer_id") != s["customer_id"] for t in candidates):
         raise ServiceFailure("Cross-customer result rejected")
