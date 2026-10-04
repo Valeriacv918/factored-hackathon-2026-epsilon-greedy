@@ -2,7 +2,7 @@
 
 from typing import Any, Literal, TypedDict
 
-Route = Literal["security_language", "understanding", "lost_card", "fraud", "charge_error", "escalation", "end"]
+Route = Literal["validator_agent", "triage_agent", "fraud_agent", "card_emergency_agent", "end"]
 
 
 class ConversationState(TypedDict, total=False):
@@ -42,8 +42,18 @@ class ConversationState(TypedDict, total=False):
 
 def initial_state(conversation_id: str, session_ref: str, message: str) -> ConversationState:
     return ConversationState(
-        conversation_id=conversation_id, session_ref=session_ref, message=message,
-        route="security_language", phase="start", turns=1,
-        blocked_cards=[], denied_transactions=[], risk_transactions=[], case_ids=[],
-        block_verified_at={}, case_verified_at={}, trace=[], clarification_attempts=0,
+        conversation_id=conversation_id,
+        session_ref=session_ref,
+        message=message,
+        route="validator_agent",
+        phase="start",
+        turns=1,
+        blocked_cards=[],
+        denied_transactions=[],
+        risk_transactions=[],
+        case_ids=[],
+        block_verified_at={},
+        case_verified_at={},
+        trace=[],
+        clarification_attempts=0,
     )
