@@ -25,5 +25,5 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-markers = ["integration: live agent -> MCP -> BigQuery tests; need ADC and DEV_SESSIONS=dev=<customer_id>"]
+markers = ["integration: live agent -> MCP -> BigQuery tests; the server needs ADC and SESSION_SIGNING_KEY; DEV_SESSIONS=dev=<token from bank-mcp-token>"]
 addopts = "-m 'not integration'"

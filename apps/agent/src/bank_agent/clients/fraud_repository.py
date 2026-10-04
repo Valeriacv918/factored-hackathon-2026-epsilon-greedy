@@ -1,9 +1,9 @@
 """Acceso a datos para el flujo de fraude: tarjetas, transacciones y disputas.
 
-Misma separación que `repository.py`: el agente de fraude nunca consulta
-BigQuery directamente. Protocolos + implementación en memoria para tests;
-la implementación real contra `transactions`/`products`/`complaints`
-(ver data/contracts/raw) se agrega cuando exista el servidor MCP.
+El agente de fraude nunca consulta BigQuery directamente: los datos reales
+llegan por el servidor MCP (apps/mcp-server). Aquí viven los protocolos y la
+implementación en memoria para tests; la implementación sobre MCP se agrega
+cuando el servidor ofrezca los tools de escritura (block_card, file_dispute...).
 """
 from __future__ import annotations
 
@@ -12,7 +12,6 @@ from datetime import date
 from enum import Enum
 from typing import Optional, Protocol
 
-from .repository import RepositoryUnavailable
 
 __all__ = [
     "TransactionStatus",
@@ -29,6 +28,10 @@ __all__ = [
     "InMemoryTransactionRepository",
     "InMemoryDisputeRepository",
 ]
+
+
+class RepositoryUnavailable(Exception):
+    """Servicio caído, timeout o credenciales inválidas."""
 
 
 class TransactionStatus(str, Enum):

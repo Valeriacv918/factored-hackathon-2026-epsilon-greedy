@@ -44,7 +44,7 @@ from bank_agent.clients.fraud_repository import (
     Transaction,
     TransactionStatus,
 )
-from bank_agent.clients.repository import CustomerRecord, InMemoryCustomerRepository, Product
+from bank_agent.clients.identity import CustomerRecord, InMemoryIdentityChecker, Product
 from bank_agent.nodes.fraud_agent import FraudAgent
 from bank_agent.nodes.validator_agent.validator import IdentityValidator
 from bank_agent.nodes.validator_agent.agent import ValidationAgent
@@ -153,13 +153,13 @@ def main():
     ap.add_argument("--debug", action="store_true", help="mostrar next_step/estado por turno")
     args = ap.parse_args()
 
-    customers_repo = InMemoryCustomerRepository(DEMO_CUSTOMERS)
+    identity = InMemoryIdentityChecker(DEMO_CUSTOMERS)
     cards_repo = InMemoryCardRepository({CUSTOMER_ID: [Card(CARD_1, "active")]})
     accounts_repo = InMemoryAccountRepository({CUSTOMER_ID: [Account(SAVINGS_1, "active")]})
     transactions_repo = InMemoryTransactionRepository(DEMO_TRANSACTIONS)
     disputes_repo = InMemoryDisputeRepository()
 
-    validator = IdentityValidator(customers_repo)
+    validator = IdentityValidator(identity)
     fraud = FraudAgent(validator, cards_repo, accounts_repo, transactions_repo, disputes_repo,
                         today=lambda: date(2026, 10, 1))
 

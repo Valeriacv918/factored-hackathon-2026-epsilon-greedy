@@ -5,7 +5,7 @@ import pytest
 
 pytest.importorskip("mcp")
 
-from bank_agent.clients.contracts import ServiceFailure  # noqa: E402
+from bank_agent.clients.contracts import ServiceFailure, SessionExpired  # noqa: E402
 from bank_agent.clients.mcp_client import McpToolClient  # noqa: E402
 
 SERVER = str(Path(__file__).with_name("mcp_echo_server.py"))
@@ -28,6 +28,11 @@ def test_tool_error_is_service_failure_without_detail(client):
     with pytest.raises(ServiceFailure) as exc:
         client.call("boom", {})
     assert "secret" not in str(exc.value)
+
+
+def test_invalid_session_from_server_is_session_expired(client):
+    with pytest.raises(SessionExpired):
+        client.call("expired", {})
 
 
 def test_timeout_is_service_failure_and_session_survives(client):

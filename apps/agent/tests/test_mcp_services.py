@@ -1,5 +1,7 @@
 """McpServices with a fake MCP client: no network, GCP or model."""
+import base64
 import datetime as dt
+import json
 from copy import deepcopy
 
 import pytest
@@ -9,7 +11,9 @@ from langgraph.types import Command
 from bank_agent.clients.contracts import ServiceFailure, SessionExpired
 from bank_agent.clients.mcp_services import McpServices, detect_language_lingua, scenario_clock
 from bank_agent.clients.sessions import StaticSessions
+from bank_agent.config.settings import FraudPolicy
 from bank_agent.graphs.disputes import build_graph
+from bank_agent.graphs.policy import Policy
 from bank_agent.graphs.state import initial_state
 
 NOW = dt.datetime(2026, 6, 18, 12, tzinfo=dt.timezone.utc)
@@ -17,6 +21,15 @@ CARD = {"id": "PRD-1", "customer_id": "CLI-1", "last4": "1245", "status": "Activ
 TX = {"id": "TRX-1", "customer_id": "CLI-1", "card_id": "PRD-1", "status": "Reversed", "fraud_score": "5.1",
       "amount": "329.6", "amount_usd": "329.6", "currency": "USD", "date": "2026-06-11T14:48:29+00:00",
       "merchant": "Internet Plus"}
+
+
+def dev_token(customer_id):
+    """Token-shaped string. The fake client does not check signatures; the real server does."""
+    payload = base64.urlsafe_b64encode(json.dumps({"sub": customer_id}).encode()).rstrip(b"=").decode()
+    return f"{payload}.fake-signature"
+
+
+TOKEN = dev_token("CLI-1")
 
 
 class FakeMcpClient:
@@ -43,16 +56,23 @@ class StubUnderstanding:
 
 
 def services(intent="charge_error", client=None):
-    return McpServices(client or FakeMcpClient(), StaticSessions({"dev": "CLI-1"}), StubUnderstanding(intent),
+    return McpServices(client or FakeMcpClient(), StaticSessions({"dev": TOKEN}), StubUnderstanding(intent),
                        clock=lambda: NOW, language_detector=lambda text: "es")
 
 
-def test_customer_and_reference_date_come_from_adapter_not_arguments():
+def test_session_token_and_reference_date_come_from_adapter_not_arguments():
     s = services()
     s.tool("find_transactions", session_ref="dev", customer_id="CLI-1",
-           arguments={"slots": {"amount": "1"}, "limit": 3, "customer_id": "CLI-OTHER", "reference_date": "2020-01-01"})
+           arguments={"slots": {"amount": "1"}, "limit": 3, "customer_id": "CLI-OTHER",
+                      "session_token": "forged", "reference_date": "2020-01-01"})
+    # The server learns the customer only from the token; no customer_id is sent.
     assert s._client.calls == [("find_transactions", {"slots": {"amount": "1"}, "limit": 3,
-                                                      "customer_id": "CLI-1", "reference_date": "2026-06-18"})]
+                                                      "session_token": TOKEN, "reference_date": "2026-06-18"})]
+
+
+def test_validate_session_returns_token_customer():
+    assert services().validate_session("dev") == "CLI-1"
+    assert services().validate_session("unknown") is None
 
 
 def test_session_must_match_customer():
@@ -62,7 +82,8 @@ def test_session_must_match_customer():
         services().tool("list_cards", session_ref="unknown", customer_id="CLI-1", arguments={})
 
 
-@pytest.mark.parametrize("name", ["block_card", "file_dispute", "dispute_context", "create_handoff", "run_query"])
+@pytest.mark.parametrize("name", ["block_card", "file_dispute", "dispute_context", "create_handoff", "run_query",
+                                  "verify_identity"])
 def test_tools_not_offered_yet_fail_without_reaching_server(name):
     s = services()
     with pytest.raises(ServiceFailure):
@@ -113,3 +134,20 @@ def test_server_failure_escalates_then_ends_safely():
 def test_real_language_detector_is_wired(text, language):
     # The graph tests inject a fake detector; this one imports the real lingua path.
     assert detect_language_lingua(text) == language
+
+
+def test_graph_sends_its_own_policy_window_to_the_server():
+    s = services("charge_error")
+    graph = build_graph(s, checkpointer=InMemorySaver(), policy=Policy(window_days=30))
+    graph.invoke(initial_state("t", "dev", "No reconozco este cargo"),
+                 {"configurable": {"thread_id": "t"}, "recursion_limit": 100})
+    assert s._client.calls[0][0] == "find_transactions"
+    assert s._client.calls[0][1]["window_days"] == 30
+
+
+def test_fraud_policy_reads_the_graph_policy():
+    graph, fraud = Policy(), FraudPolicy()
+    assert fraud.dispute_window_days == graph.window_days
+    assert fraud.fraud_score_threshold == float(graph.fraud_score)
+    assert fraud.high_amount_usd_threshold == float(graph.high_amount_usd)
+    assert fraud.max_charges_per_case == graph.max_charges
