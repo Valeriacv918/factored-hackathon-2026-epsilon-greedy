@@ -81,7 +81,9 @@ No hay desbloqueo ni transiciones posteriores de disputas en v1.
 
 Idempotencia: ámbito tabla/acción + escenario + cliente + clave. Reutilizar una
 clave con argumentos distintos es conflicto. request_hash es SHA-256 hexadecimal
-minúsculo de argumentos canónicos, cuya serialización debe acordar el equipo MCP.
+minúsculo de argumentos canónicos. El servidor MCP ya fijó la serialización:
+`{"action": ..., <argumentos>}` con claves ordenadas y sin espacios
+(`services/sandbox.request_hash`, ver [mcp-sandbox.md](mcp-sandbox.md)).
 El hash usado por el smoke test identifica exclusivamente esa prueba; no impone
 un algoritmo de serialización de producción. MERGE no garantiza unicidad concurrente.
 
@@ -144,9 +146,14 @@ a rutas del repo se validan localmente; aún no se han vuelto a ejecutar en GCP.
 
 - Ingeniería de datos: retención compartida de evidencia, política de limpieza
   y pruebas equivalentes de las otras tres gestiones.
-- Equipo MCP: conectar consultas/escrituras, autenticar contexto, implementar
-  confirmaciones, estados permitidos, idempotencia durable y recuperación de timeout.
+- Equipo MCP: hecho para bloqueos y disputas ([mcp-sandbox.md](mcp-sandbox.md)):
+  consultas y escrituras conectadas, cliente y escenario desde el contexto del
+  servidor, estados permitidos e idempotencia por clave, con prueba real y
+  auditoría PASSED (escenario `demo-20261004T211122Z-10525`). Pendiente:
+  derivaciones y notificaciones, recuperación de timeout más allá de reintentar
+  con la misma clave, y unicidad ante llamadas concurrentes. Las confirmaciones
+  al cliente las hace el agente antes de llamar a la herramienta.
 - Validación conjunta: dos clientes/escenarios concurrentes, claves repetidas y
   conflictos, fallos de red y tratamiento de ausencia de resultados.
-- Publicación: cambios locales sin push. No confundir este paquete con despliegue
+- Publicación: integrado en `main` (PR #13). No confundir este paquete con despliegue
   automático de Dataform o de la aplicación.

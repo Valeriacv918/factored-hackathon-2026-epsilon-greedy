@@ -68,15 +68,22 @@ hackaton-509923, bank_curated, us-central1. After changing a tool signature run
 
 ## Verificación de identidad para el grafo local
 
-`verify_identity(customer_id, date_of_birth, product_number)` compara los tres
-factores y la titularidad en BigQuery. `customer_id` admite CLI-... o documento.
-En discordancia devuelve solo verified=false, customer_id=null y products=[].
-En coincidencia entrega ID canónico/productos al repositorio de confianza del
-validador, nunca la fecha de nacimiento ni el documento. No es una herramienta
-para obtener datos antes de verificar. Consulta parametrizada y limitada por el
-gateway; contrato en `contracts/mcp/verify_identity.json`.
-Los intentos/TTL se controlan en IdentityValidator del cliente local. El servidor
-HTTP no debe exponerse públicamente sin autenticación y límites persistentes.
+`verify_identity(document_number, date_of_birth, product_number)` compara los tres
+factores y la titularidad en BigQuery. `document_number` es el documento del cliente
+(cédula, CURP, DNI); se ignoran espacios, puntos y guiones. El `customer_id` interno
+no se acepta como entrada: se obtiene de la coincidencia.
+En discordancia devuelve `status="failed"` con `attempts_left`, o `status="locked"`
+con `locked_until`; nunca `customer_id`, `session_token` ni productos.
+En coincidencia devuelve `status="verified"`, el `customer_id` interno, el
+`session_token`, los `product_numbers` y `expires_at`; nunca la fecha de nacimiento
+ni el documento. No es una herramienta para obtener datos antes de verificar.
+Consulta parametrizada y limitada por el gateway; contrato en
+`contracts/mcp/verify_identity.json`.
+Los intentos, el bloqueo y la vigencia del token los controla el servidor
+(`IDENTITY_MAX_ATTEMPTS`, `IDENTITY_LOCKOUT_MINUTES`, `SESSION_TTL_MINUTES`),
+contando por documento y en memoria; IdentityValidator del cliente solo los
+informa y respeta. El servidor HTTP no debe exponerse públicamente sin
+autenticación y límites persistentes.
 
 ## Sandbox scenario
 

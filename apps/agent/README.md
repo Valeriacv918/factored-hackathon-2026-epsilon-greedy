@@ -92,10 +92,14 @@ Usar un checkpointer persistente y protegido al desplegar; `InMemorySaver` es lo
 ## Ejecutar contra el servidor MCP (datos reales)
 
 `clients/mcp_services.py:McpServices` implementa `Services` sobre `apps/mcp-server`
-(solo lectura: `find_transactions`, `list_cards`, `get_card`), un LLM para
-`understand` y lingua para el idioma. Bloqueos, disputas, `dispute_context` y
-derivaciones aún no existen: fallan con `ServiceFailure` y el grafo termina de forma
-segura (escalación o "servicio no disponible"), nunca anunciando un éxito.
+(`find_transactions`, `list_cards`, `get_card`, y bloqueos y disputas simulados en
+`bank_sandbox`: `block_card`, `read_block`, `file_dispute`, `read_dispute`,
+`dispute_context`), un LLM para `understand` y lingua para el idioma. Las herramientas
+del sandbox requieren `SANDBOX_SCENARIO_ID` en el servidor
+([MCP y sandbox](../../docs/mcp-sandbox.md)); el grafo por defecto
+(`validation_triage`) aún no las llama. Derivaciones, notificaciones y cuentas aún
+no existen: fallan con `ServiceFailure` y el grafo termina de forma segura
+(escalación o "servicio no disponible"), nunca anunciando un éxito.
 El servidor obtiene `customer_id` del token de sesión, nunca de un argumento;
 `reference_date` sale del reloj de escenario.
 

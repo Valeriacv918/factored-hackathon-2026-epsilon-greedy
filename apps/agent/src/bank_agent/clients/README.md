@@ -1,6 +1,7 @@
 # Contratos de servicios
 
-`contracts.Services` se inyecta al construir el grafo. No hay adaptador real aún.
+`contracts.Services` se inyecta al construir el grafo. El adaptador real es
+`mcp_services.McpServices`, sobre el servidor MCP (`apps/mcp-server`).
 Todas las herramientas reciben `session_ref`, `customer_id` y `arguments`.
 `McpServices` resuelve `session_ref` a un token firmado por el servidor MCP
 (`sessions.py`) y envía solo ese token: el servidor saca `customer_id` del token,
