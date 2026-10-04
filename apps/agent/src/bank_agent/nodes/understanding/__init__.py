@@ -18,6 +18,7 @@ def run(s, services, policy):
             raise ServiceFailure("Invalid extraction schema")
         return go("understanding", "triage", intent=intent if intent in INTENTS else "other",
                   slots=parsed.get("slots", {}),
+                  intent_confidence=float(confidence) if confidence is not None else None,
                   reason="clarify_intent" if confidence is None or confidence < policy.intent_confidence else "")
     if phase == "triage":
         intent = s["intent"]

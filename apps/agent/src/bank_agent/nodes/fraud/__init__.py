@@ -21,7 +21,11 @@ def run(s, services, policy):
         context = tool(s, services, "dispute_context", transaction_id=tx["id"])
         decision, rule = decide(tx, context, services.now(), policy, fraud=True)
         if decision == "duplicate":
-            return go("fraud", "more", case_ids=list(dict.fromkeys(s["case_ids"] + [context["existing_case_id"]])))
+            return go("fraud", "more", policy_rule=rule,
+                      case_ids=list(dict.fromkeys(s["case_ids"] + [context["existing_case_id"]])))
+        if decision == "escalate":
+            return {**escalate(rule, "fraud", "P2"), "policy_rule": rule}
+        return go("fraud", "file", policy_rule=rule)
         if decision == "escalate":
             return escalate(rule, "fraud", "P2")
         return go("fraud", "file")
@@ -39,11 +43,11 @@ def run(s, services, policy):
     scores = [number(t.get("fraud_score")) for t in transactions]
     amounts = [number(t.get("amount_usd")) for t in transactions]
     if any(score is not None and score > policy.fraud_score for score in scores) or len(s["denied_transactions"]) >= 2:
-        return escalate("DSP-013", "fraud", "P1")
+        return {**escalate("DSP-013", "fraud", "P1"), "policy_rule": "DSP-013"}
     if any(value is None for value in scores + amounts):
         return escalate("missing_risk_data", "fraud", "P2")
     if any(amount > policy.high_amount_usd for amount in amounts):
-        return escalate("DSP-013", "fraud", "P2")
+       return {**escalate("DSP-013", "fraud", "P2"), "policy_rule": "DSP-013"}
     ids = ", ".join(s["case_ids"]) or "—"
     return finish(s, "fraud_intake_complete", f"Bloqueo verificado. Casos registrados o existentes: {ids}.",
                   f"Bloqueio verificado. Casos registrados ou existentes: {ids}.")

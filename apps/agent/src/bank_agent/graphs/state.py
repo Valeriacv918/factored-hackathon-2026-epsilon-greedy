@@ -14,6 +14,7 @@ class ConversationState(TypedDict, total=False):
     route: Route
     phase: str
     intent: str
+    intent_confidence: float
     slots: dict[str, Any]
     transaction: dict[str, Any]
     card_id: str
@@ -24,6 +25,8 @@ class ConversationState(TypedDict, total=False):
     clarification_attempts: int
     turns: int
     reason: str
+    policy_rule: str  # DSP-xxx that decided a charge (DSP-004, DSP-005, DSP-100...)
+    explanation_rule: str
     queue: str
     priority: str
     handoff: dict[str, Any]

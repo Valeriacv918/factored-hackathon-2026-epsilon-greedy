@@ -1,5 +1,8 @@
 from bank_agent.nodes.common import finish, go, tool, verified_action
 from bank_agent.clients.contracts import ServiceFailure
+from bank_agent.nodes.escalation.handoff import build_facts, write_narrative
+
+
 
 
 def run(s, services, policy):
@@ -14,8 +17,11 @@ def run(s, services, policy):
         }
         if s.get("transaction"):
             packet["transaction_ids"] = list(dict.fromkeys(packet["transaction_ids"] + [s["transaction"]["id"]]))
-        # Factual template until a narrative model and claim checker are connected.
-        packet["narrative"] = f"{packet['reason']}; cases={packet['case_ids']}; blocked={packet['blocked_cards']}"
+        packet.update({k: s[k] for k in ("policy_rule", "explanation_rule") if s.get(k)})
+        # WRITE_NARRATIVE + claim check: the LLM sees only verified facts, never the customer's text.
+        facts = build_facts(s, policy)
+        packet["narrative"], packet["narrative_source"], packet["claim_issues"] = write_narrative(
+            services, facts, s.get("language", "es"))
         return go("escalation", "ticket", handoff=packet)
     if s["phase"] == "ticket":
         record = verified_action(s, services, "create_handoff", "read_handoff", "handoff", packet=s["handoff"])
