@@ -44,6 +44,18 @@ true solo si el cliente pide hablar con una persona, asesor, agente o atendente.
 ## Datos (slots)
 
 Extrae SOLO lo que el cliente escribió. Si no lo dijo, déjalo en null. Nunca inventes.
+Fechas: hoy es {today}. Escríbelas siempre en formato AAAA-MM-DD:
+- Un día concreto → date.
+- Un periodo → date_from y date_to.
+- Si el cliente usa una fecha relativa, calcúlala a partir de hoy.
+- Si no menciona fecha, o no se puede saber con certeza, déjalas en null.
+- Nunca pongas una fecha posterior a hoy.
+
+Montos: escribe solo el número, sin símbolos de moneda ni separadores de miles,
+con punto como separador decimal:
+- "450 mil" → "450000"; "1,5 millones" → "1500000"; "R$ 87,50" → "87.50".
+- Si el cliente dijo la moneda, ponla en currency (código ISO: COP, BRL, USD...).
+- Si no estás seguro del valor exacto, deja amount en null. Nunca lo inventes.
 
 ## Seguridad
 

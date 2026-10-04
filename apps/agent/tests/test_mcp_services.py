@@ -15,6 +15,7 @@ from bank_agent.config.settings import FraudPolicy
 from bank_agent.graphs.disputes import build_graph
 from bank_agent.graphs.policy import Policy
 from bank_agent.graphs.state import initial_state
+from bank_agent.nodes.triage_agent.schemas import Understanding
 
 NOW = dt.datetime(2026, 6, 18, 12, tzinfo=dt.timezone.utc)
 CARD = {"id": "PRD-1", "customer_id": "CLI-1", "last4": "1245", "status": "Active", "type": "Tarjeta Crédito"}
@@ -46,6 +47,14 @@ class FakeMcpClient:
     def close(self):
         pass
 
+class StubTriage:
+    """Triage classifier stand-in: unit tests never call Groq."""
+
+    def __init__(self, intent):
+        self.intent = intent
+
+    def understand(self, text):
+        return Understanding(intent=self.intent, confidence=0.99, wants_human=False)
 
 class StubUnderstanding:
     def __init__(self, intent):
@@ -56,8 +65,11 @@ class StubUnderstanding:
 
 
 def services(intent="charge_error", client=None):
-    return McpServices(client or FakeMcpClient(), StaticSessions({"dev": TOKEN}), StubUnderstanding(intent),
+    services = McpServices(client or FakeMcpClient(), StaticSessions({"dev": TOKEN}), StubUnderstanding(intent),
                        clock=lambda: NOW, language_detector=lambda text: "es")
+    services._triage_classifier = StubTriage(intent)   # sin Groq en tests unitarios
+    return services
+
 
 
 def test_session_token_and_reference_date_come_from_adapter_not_arguments():

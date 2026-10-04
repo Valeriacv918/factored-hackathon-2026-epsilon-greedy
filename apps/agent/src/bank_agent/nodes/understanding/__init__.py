@@ -2,24 +2,37 @@ from langgraph.types import interrupt
 
 from bank_agent.clients.contracts import ServiceFailure
 from bank_agent.nodes.common import ask, escalate, finish, go, number, require_session, say, tool
+from bank_agent.nodes.triage_agent.router import decide
+from bank_agent.nodes.triage_agent.schemas import Route, Understanding
 
 INTENTS = {"not_me", "charge_error", "emergency", "other"}
 
 
+SEARCH_FIELDS = {"merchant", "amount", "currency", "date", "date_from", "date_to"}
+
+def search_slots(slots):
+    """Triage slots -> find_transactions slots (contracts/mcp/find_transactions.json).
+    Slots are already normalized by triage_agent.schemas.Slots; product_hint is not a search field."""
+    return slots.model_dump(mode="json", exclude_none=True, include=SEARCH_FIELDS)
+
 def run(s, services, policy):
     phase = s.get("phase", "start")
     if phase == "start":
-        parsed = services.understand(s["message"], s["language"])
-        if parsed.get("wants_human") is True:
-            return escalate("requested_human")
-        intent = parsed.get("intent")
-        confidence = number(parsed.get("confidence"))
-        if not isinstance(parsed.get("slots", {}), dict):
-            raise ServiceFailure("Invalid extraction schema")
-        return go("understanding", "triage", intent=intent if intent in INTENTS else "other",
-                  slots=parsed.get("slots", {}),
-                  intent_confidence=float(confidence) if confidence is not None else None,
-                  reason="clarify_intent" if confidence is None or confidence < policy.intent_confidence else "")
+        u = services.triage_understand(s["message"])
+        u = u if isinstance(u, Understanding) else Understanding.model_validate(u)
+        decision = decide(s["message"], u)
+        intent = decision.intent.value if decision.intent else "other"
+        common = {"slots": search_slots(u.slots), "intent_confidence": u.confidence}
+        if decision.route == Route.ESCALATION:
+            return {**escalate("requested_human", "general", "P2" if intent in {"not_me", "emergency"} else "P3"),
+                    "intent": intent, **common}
+        if decision.route == Route.EMERGENCY:
+            return go("card_emergency_agent", intent="emergency", **common)
+        if decision.route == Route.CLARIFY_INTENT:
+            return go("understanding", "triage", intent="other", reason="clarify_intent", **common)
+        if decision.route == Route.OUT_OF_SCOPE:
+            return go("understanding", "out_of_scope", intent="other", **common)
+        return go("understanding", "find", intent=intent, **common)
     if phase == "triage":
         intent = s["intent"]
         if s.get("reason") == "clarify_intent":
