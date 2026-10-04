@@ -4,18 +4,19 @@ from datetime import date, datetime, timedelta, timezone
 import pytest
 
 from bank_agent.nodes.validator_agent.language import detect_language
-from bank_agent.clients.repository import (CustomerRecord, InMemoryCustomerRepository, Product)
-from bank_agent.nodes.validator_agent.validator import IdentityValidator, Status, parse_dob
+from bank_agent.clients.identity import (CustomerRecord, IdentityResult, InMemoryIdentityChecker, Product)
+from bank_agent.nodes.validator_agent.validator import IdentityValidator, Status, normalize_document, parse_dob
 
+# document_number -> registro con el customer_id interno (trazabilidad)
 CUSTOMERS = {
-    "1020304050": CustomerRecord("1020304050", date(1990, 4, 3), (
+    "1020304050": CustomerRecord("CLI-0001", date(1990, 4, 3), (
         Product("4111222233334444", "credit_card", "active"),
         Product("00987654321", "savings", "active"),
     )),
-    "99887766": CustomerRecord("99887766", date(1985, 12, 1), (
+    "99887766": CustomerRecord("CLI-0002", date(1985, 12, 1), (
         Product("5500111122223333", "debit_card", "active"),
     )),
-    "55555555": CustomerRecord("55555555", None, ()),   # registro incompleto
+    "55555555": CustomerRecord("CLI-0003", None, ()),   # registro incompleto
 }
 
 
@@ -30,7 +31,7 @@ class Clock:
 @pytest.fixture
 def env():
     clock = Clock()
-    repo = InMemoryCustomerRepository(CUSTOMERS)
+    repo = InMemoryIdentityChecker(CUSTOMERS, clock=clock)
     v = IdentityValidator(repo, clock=clock)
     return v, v.new_session().session_id, clock, repo
 
@@ -58,10 +59,11 @@ def test_missing_fields(env):
 
 
 def test_invalid_format_does_not_consume_attempt(env):
-    v, sid, *_ = env
+    v, sid, _, repo = env
     r = v.verify(sid, "1020304050", "31/02/1990", "4111222233334444")
     assert r.status == Status.INVALID_FORMAT
-    assert v.get_session(sid).failed_attempts == 0
+    # The server counts attempts; a typo never reaches it.
+    assert repo.calls == 0 and v.get_session(sid).failed_attempts == 0
 
 
 def test_future_dob_rejected():
@@ -117,8 +119,8 @@ def test_unauthenticated_has_no_access(env):
 
 
 # --- fallo de herramienta ---
-def test_bigquery_down_fails_safe():
-    v = IdentityValidator(InMemoryCustomerRepository(CUSTOMERS, fail=True))
+def test_identity_service_down_fails_safe():
+    v = IdentityValidator(InMemoryIdentityChecker(CUSTOMERS, fail=True))
     sid = v.new_session().session_id
     r = v.verify(sid, "1020304050", "03/04/1990", "4111222233334444")
     assert r.status == Status.SERVICE_UNAVAILABLE and r.next_step == "handoff_human"
@@ -153,3 +155,71 @@ def test_short_text_keeps_previous_language():
 
 def test_short_text_without_history_is_ambiguous():
     assert detect_language("ok").ambiguous
+
+
+# --- verificación en el servidor MCP ---
+class LockedByServer:
+    """El servidor ya bloqueó al cliente (p. ej. intentos desde otra conversación)."""
+    def verify(self, document_number, date_of_birth, product_number):
+        return IdentityResult("locked")
+
+
+def test_server_lockout_locks_this_conversation_too():
+    v = IdentityValidator(LockedByServer())
+    sid = v.new_session().session_id
+    r = v.verify(sid, "1020304050", "03/04/1990", "4111222233334444")
+    assert r.status == Status.LOCKED and r.next_step == "handoff_human"
+
+
+def test_session_keeps_server_token_and_products():
+    v = IdentityValidator(InMemoryIdentityChecker(CUSTOMERS))
+    sid = v.new_session().session_id
+    v.verify(sid, "1020304050", "03/04/1990", "4111222233334444")
+    s = v.get_session(sid)
+    assert s.customer_id == "CLI-0001"           # el cliente escribió su documento; se guarda su ID interno
+    assert s.session_token == "test-token:CLI-0001"
+    assert s.authorized_products == ("4111222233334444", "00987654321")
+
+
+@pytest.mark.parametrize("raw,expected", [("1.020.304.050", "1020304050"), ("1020-304-050", "1020304050"),
+                                          (" 99887766 ", "99887766"), ("gomp800101hdfrrn09", "GOMP800101HDFRRN09"),
+                                          ("AB", None), ("1020_304", None), ("1" * 21, None)])
+def test_normalize_document(raw, expected):
+    assert normalize_document(raw) == expected
+
+
+# --- los límites son del servidor ---
+def test_attempts_and_lockout_come_from_the_server():
+    clock = Clock()
+    server = InMemoryIdentityChecker(CUSTOMERS, clock=clock, max_attempts=5, lockout=timedelta(minutes=40))
+    v = IdentityValidator(server, clock=clock)
+    sid = v.new_session().session_id
+    lefts = [v.verify(sid, "1020304050", "01/01/1991", "4111222233334444").attempts_left for _ in range(4)]
+    assert lefts == [4, 3, 2, 1]
+    assert v.verify(sid, "1020304050", "01/01/1991", "4111222233334444").status == Status.LOCKED
+    assert v.get_session(sid).locked_until == clock.now + timedelta(minutes=40)
+
+
+def test_session_lifetime_comes_from_the_server():
+    clock = Clock()
+    v = IdentityValidator(InMemoryIdentityChecker(CUSTOMERS, clock=clock, ttl=timedelta(minutes=5)), clock=clock)
+    sid = v.new_session().session_id
+    v.verify(sid, "1020304050", "03/04/1990", "4111222233334444")
+    clock.now += timedelta(minutes=4, seconds=59)
+    assert v.is_authenticated(sid)
+    clock.now += timedelta(seconds=1)
+    assert not v.is_authenticated(sid)
+
+
+def test_lockout_is_per_customer_across_conversations():
+    clock = Clock()
+    v = IdentityValidator(InMemoryIdentityChecker(CUSTOMERS, clock=clock), clock=clock)
+    first = v.new_session().session_id
+    for _ in range(3):
+        v.verify(first, "1020304050", "01/01/1991", "4111222233334444")
+    # A new conversation for the same customer is locked too, even with the right answer.
+    second = v.new_session().session_id
+    assert v.verify(second, "1020304050", "03/04/1990", "4111222233334444").status == Status.LOCKED
+    # Another customer is not affected.
+    third = v.new_session().session_id
+    assert v.verify(third, "99887766", "01/12/1985", "5500111122223333").status == Status.VERIFIED

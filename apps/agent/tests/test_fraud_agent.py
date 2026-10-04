@@ -13,7 +13,7 @@ from bank_agent.clients.fraud_repository import (
     Transaction,
     TransactionStatus,
 )
-from bank_agent.clients.repository import CustomerRecord, InMemoryCustomerRepository, Product
+from bank_agent.clients.identity import CustomerRecord, InMemoryIdentityChecker, Product
 from bank_agent.config.settings import FraudPolicy
 from bank_agent.nodes.fraud_agent.agent import FraudAgent
 from bank_agent.nodes.validator_agent.validator import IdentityValidator
@@ -55,7 +55,7 @@ def _tx(transaction_id, product_number=CARD_1, amount_usd=40.0, status=Transacti
 @pytest.fixture
 def authenticated_session():
     """IdentityValidator con una sesión YA autenticada (agente 1 ya hizo su trabajo)."""
-    validator = IdentityValidator(InMemoryCustomerRepository(CUSTOMERS), clock=Clock())
+    validator = IdentityValidator(InMemoryIdentityChecker(CUSTOMERS, clock=(clock := Clock())), clock=clock)
     session = validator.new_session()
     result = validator.verify(session.session_id, CUSTOMER_ID, "1990-04-03", CARD_1)
     assert result.status.value == "VERIFIED"
@@ -75,7 +75,7 @@ def make_fraud_agent(validator, cards=None, accounts=None, transactions=None, di
 # ---------- autorización ----------
 
 def test_evaluate_transaction_requires_authenticated_session():
-    validator = IdentityValidator(InMemoryCustomerRepository(CUSTOMERS), clock=Clock())
+    validator = IdentityValidator(InMemoryIdentityChecker(CUSTOMERS, clock=(clock := Clock())), clock=clock)
     session = validator.new_session()   # nunca verificada
     tx = _tx("TX-1")
     fraud = make_fraud_agent(validator, transactions=InMemoryTransactionRepository({"TX-1": tx}))

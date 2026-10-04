@@ -67,7 +67,8 @@ Tests run per app, each in its own environment; there is no repository-wide `pyt
 | Data pipeline checks | `data/ingestion`, `data/dataform/tests` | Dataform only | `python scripts/verify/check_local.py` (see below) |
 
 Unit tests need no network, GCP or model. Integration tests need ADC and
-`DEV_SESSIONS=dev=<customer_id>`. Layout and conventions:
+`SESSION_SIGNING_KEY` plus `DEV_SESSIONS=dev=<token>`, with the token from
+`uv run --project apps/mcp-server bank-mcp-token <customer_id>`. Layout and conventions:
 [apps/agent/tests](apps/agent/tests/README.md), [apps/mcp-server/tests](apps/mcp-server/tests/README.md).
 
 ## Data and source files

@@ -1,12 +1,12 @@
 {
   "name": "verify_identity",
-  "description": "Compare three submitted factors; return no personal data on mismatch.\n\n    For the trusted local validator only. Attempts/TTL belong to IdentityValidator.\n    Never expose this server publicly without authenticated transport and durable attempt limits.\n    ",
+  "description": "Check the customer's identity: document number, date of birth and one of their product numbers.\n\nOn success returns the customer_id, a session_token for the other tools and the\ncustomer's product numbers. Returns status \"failed\" without saying which value was\nwrong, and \"locked\" after too many failures. Never returns the customer's data.\n",
   "input_schema": {
     "properties": {
-      "customer_id": {
-        "description": "Submitted customer_id (CLI-...) or document number; not yet authenticated.",
-        "pattern": "^[A-Z0-9-]{4,20}$",
-        "title": "Customer Id",
+      "document_number": {
+        "description": "Identity document number the customer gave (cédula, CURP, DNI...).",
+        "pattern": "^[A-Za-z0-9 .-]{4,40}$",
+        "title": "Document Number",
         "type": "string"
       },
       "date_of_birth": {
@@ -21,7 +21,7 @@
       }
     },
     "required": [
-      "customer_id",
+      "document_number",
       "date_of_birth",
       "product_number"
     ],
@@ -29,50 +29,15 @@
     "type": "object"
   },
   "output_schema": {
-    "$defs": {
-      "VerifiedProduct": {
-        "properties": {
-          "product_number": {
-            "title": "Product Number",
-            "type": "string"
-          },
-          "product_type": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Product Type"
-          },
-          "status": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Status"
-          }
-        },
-        "required": [
-          "product_number"
-        ],
-        "title": "VerifiedProduct",
-        "type": "object"
-      }
-    },
     "properties": {
-      "verified": {
-        "default": false,
-        "title": "Verified",
-        "type": "boolean"
+      "status": {
+        "enum": [
+          "verified",
+          "failed",
+          "locked"
+        ],
+        "title": "Status",
+        "type": "string"
       },
       "customer_id": {
         "anyOf": [
@@ -86,15 +51,67 @@
         "default": null,
         "title": "Customer Id"
       },
-      "products": {
+      "session_token": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Session Token"
+      },
+      "product_numbers": {
+        "default": [],
         "items": {
-          "$ref": "#/$defs/VerifiedProduct"
+          "type": "string"
         },
-        "title": "Products",
+        "title": "Product Numbers",
         "type": "array"
+      },
+      "attempts_left": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Attempts Left"
+      },
+      "locked_until": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Locked Until"
+      },
+      "expires_at": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Expires At"
       }
     },
-    "title": "IdentityVerification",
+    "required": [
+      "status"
+    ],
+    "title": "IdentityResult",
     "type": "object"
   }
 }

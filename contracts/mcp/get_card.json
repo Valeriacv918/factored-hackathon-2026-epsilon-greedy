@@ -3,10 +3,11 @@
   "description": "Get one of the customer's cards. Fails if the card does not belong to the customer.",
   "input_schema": {
     "properties": {
-      "customer_id": {
-        "description": "Authenticated customer (customer_id).",
-        "pattern": "^[A-Za-z0-9_-]{1,64}$",
-        "title": "Customer Id",
+      "session_token": {
+        "description": "session_token from verify_identity.",
+        "maxLength": 512,
+        "minLength": 1,
+        "title": "Session Token",
         "type": "string"
       },
       "card_id": {
@@ -17,7 +18,7 @@
       }
     },
     "required": [
-      "customer_id",
+      "session_token",
       "card_id"
     ],
     "title": "get_cardArguments",

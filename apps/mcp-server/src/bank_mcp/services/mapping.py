@@ -8,7 +8,7 @@ Missing values stay null: the agent's policy escalates instead of imputing.
 """
 import datetime as dt
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel
 
@@ -43,6 +43,18 @@ class Card(BaseModel):
 
 class CardList(BaseModel):
     cards: list[Card]
+
+
+class IdentityResult(BaseModel):
+    # Same "failed" for an unknown customer and a wrong answer: no enumeration oracle.
+    status: Literal["verified", "failed", "locked"]
+    customer_id: str | None = None        # on "verified": internal ID, for the agent's traceability
+    session_token: str | None = None
+    product_numbers: list[str] = []
+    # The server owns these limits; the agent shows them instead of keeping its own copies.
+    attempts_left: int | None = None      # on "failed"
+    locked_until: str | None = None       # ISO 8601 UTC, on "locked"
+    expires_at: str | None = None         # ISO 8601 UTC token expiry, on "verified"
 
 
 def decimal_str(value: Any) -> str | None:

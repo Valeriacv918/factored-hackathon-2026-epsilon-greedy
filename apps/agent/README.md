@@ -96,7 +96,8 @@ Usar un checkpointer persistente y protegido al desplegar; `InMemorySaver` es lo
 `understand` y lingua para el idioma. Bloqueos, disputas, `dispute_context` y
 derivaciones aún no existen: fallan con `ServiceFailure` y el grafo termina de forma
 segura (escalación o "servicio no disponible"), nunca anunciando un éxito.
-`customer_id` sale siempre de la sesión; `reference_date` del reloj de escenario.
+El servidor obtiene `customer_id` del token de sesión, nunca de un argumento;
+`reference_date` sale del reloj de escenario.
 
 ```bash
 # .env en la raíz: SCENARIO_NOW, DEV_SESSIONS (solo desarrollo), LLM_MODEL, GROQ_API_KEY.
@@ -106,10 +107,9 @@ uv run --project apps/agent scripts/run_disputes.py --session dev --debug
 ```
 
 Chat del validador de identidad (`scripts/chat_validator.py`): datos sintéticos con
-`uv run --project apps/agent scripts/chat_validator.py`. Con `--bq` consulta
-BigQuery directamente, sin pasar por MCP (límite conocido); la dependencia se
-añade solo para esa ejecución:
-`uv run --project apps/agent --with google-cloud-bigquery scripts/chat_validator.py --bq`.
+`uv run --project apps/agent scripts/chat_validator.py`. Con `--mcp` verifica
+clientes reales con el tool `verify_identity` del servidor MCP; el agente nunca
+consulta BigQuery.
 
 `DEV_SESSIONS` se conserva para herramientas y flujo legacy. El flujo por defecto
 valida los tres factores por MCP, conserva los guiones de CLI-... y crea su propia

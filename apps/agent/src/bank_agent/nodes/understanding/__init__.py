@@ -27,15 +27,22 @@ def run(s, services, policy):
                          "¿Cargo desconocido, error en un cargo o tarjeta perdida?",
                          "Compra não reconhecida, erro na cobrança ou cartão perdido?")
         if intent == "emergency":
-            return go("lost_card", intent=intent)
+            return go("card_emergency_agent", intent=intent)
         if intent == "other":
             return go("understanding", "out_of_scope", intent=intent)
         return go("understanding", "find", intent=intent)
     if phase == "out_of_scope":
-        answer = ask(s, services, "out_of_scope", ["human", "close"],
-                     "Atiendo disputas y emergencias de tarjetas. Puedes solicitar una persona.",
-                     "Atendo contestações e emergências de cartões. Você pode solicitar uma pessoa.")
-        return finish(s, "out_of_scope", "Solicitud fuera de alcance.", "Solicitação fora do escopo.")
+        # The classifier said "other". Offer the intents as buttons so the customer can correct
+        # a misclassification instead of being stuck. ask() adds "human" (HandoffRequested).
+        choice = ask(s, services, "out_of_scope", ["not_me", "charge_error", "emergency", "close"],
+                     "Atiendo cargos que no reconoces, cobros equivocados y emergencias de tus productos "
+                     "(tarjeta perdida o robada). ¿Es alguno de estos? También puedes solicitar una persona.",
+                     "Atendo cobranças que você não reconhece, cobranças erradas e emergências dos seus produtos "
+                     "(cartão perdido ou roubado). É algum destes? Você também pode solicitar uma pessoa.")
+        if choice == "close":
+            return finish(s, "out_of_scope", "Para otros temas, usa los canales de atención del banco.",
+                          "Para outros assuntos, use os canais de atendimento do banco.")
+        return go("understanding", "triage", intent=choice, reason="")   # route as if the classifier had said it
     if phase == "clarify":
         reply = interrupt({"kind": "transaction_details", "language": s["language"],
                            "message": say(s, "Indica fecha, monto o comercio.",
@@ -47,14 +54,15 @@ def run(s, services, policy):
         if parsed.get("wants_human") is True:
             return escalate("requested_human")
         if parsed.get("intent") == "emergency":
-            return go("lost_card", intent="emergency")
+            return go("card_emergency_agent", intent="emergency")
         if not isinstance(parsed.get("slots", {}), dict):
             raise ServiceFailure("Invalid clarification schema")
         return go("understanding", "find", slots={**s.get("slots", {}), **parsed.get("slots", {})},
                   turns=s["turns"] + 1, clarification_attempts=s["clarification_attempts"] + 1)
 
     # Ownership is checked by the service before returning any candidates.
-    result = tool(s, services, "find_transactions", slots=s.get("slots", {}), limit=3)
+    result = tool(s, services, "find_transactions", slots=s.get("slots", {}), limit=3,
+                  window_days=policy.window_days)
     candidates = result.get("transactions", [])
     if any(t.get("customer_id") != s["customer_id"] for t in candidates):
         raise ServiceFailure("Cross-customer result rejected")
@@ -79,5 +87,5 @@ def run(s, services, policy):
     risks = {t["id"]: t for t in s.get("risk_transactions", [])}
     if fraud:
         risks[tx["id"]] = tx
-    return go("fraud" if fraud else "charge_error", transaction=tx,
+    return go("fraud_agent" if fraud else "charge_error", transaction=tx,
               denied_transactions=denied, risk_transactions=list(risks.values()), clarification_attempts=0)

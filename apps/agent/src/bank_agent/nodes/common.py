@@ -84,7 +84,18 @@ def finish(s, outcome, es, pt):
 
 
 def block(s, services, route):
-    """A separate checkpointed phase; confirmation occurs before mutation."""
+    """A separate checkpointed phase; confirmation occurs before mutation.
+
+    Not every disputed transaction sits on a card: it may be on a savings or
+    checking account. A card gets blocked outright; an account only has its
+    ability to transact suspended -- the product itself is never blocked.
+    """
+    if s.get("account_id"):
+        return _suspend_account(s, services, route)
+    return _block_card(s, services, route)
+
+
+def _block_card(s, services, route):
     card = s["card_id"]
     result = tool(s, services, "get_card", card_id=card)
     if result.get("id") != card or result.get("customer_id") != s["customer_id"]:
@@ -103,13 +114,35 @@ def block(s, services, route):
               block_verified_at=times)
 
 
+def _suspend_account(s, services, route):
+    account = s["account_id"]
+    result = tool(s, services, "get_account", account_id=account)
+    if result.get("id") != account or result.get("customer_id") != s["customer_id"]:
+        raise ServiceFailure("Account ownership mismatch")
+    if result.get("status") != "TransactionsSuspended":
+        answer = ask(s, services, "confirm_suspend", ["yes", "no"],
+                     "¿Confirmas suspender las transacciones de esta cuenta?",
+                     "Confirma a suspensão das transações desta conta?",
+                     account_id=account)
+        if answer == "no":
+            return escalate("block_declined", "fraud", "P1")
+        result = verified_action(s, services, "suspend_account_transactions", "read_suspension",
+                                 account, account_id=account)
+        if result.get("account_id") != account or result.get("status") != "TransactionsSuspended":
+            raise ServiceFailure("Unexpected suspension result")
+    times = {**s.get("block_verified_at", {}), account: services.now().isoformat()}
+    return go(route, "after_block",
+              suspended_accounts=list(dict.fromkeys(s["suspended_accounts"] + [account])),
+              block_verified_at=times)
+
+
 def file_case(s, services, route):
     tx = s["transaction"]
     answer = ask(s, services, "confirm_dispute", ["yes", "no"],
                  "¿Confirmas registrar la disputa?", "Confirma o registro da contestação?",
                  transaction={k: tx[k] for k in ("id", "amount", "currency", "date")})
     if answer == "no":
-        return go("fraud", "more") if route == "fraud" else finish(s, "cancelled", "No se registró una disputa.", "Nenhuma contestação foi registrada.")
+        return go("fraud_agent", "more") if route == "fraud_agent" else finish(s, "cancelled", "No se registró una disputa.", "Nenhuma contestação foi registrada.")
     record = verified_action(s, services, "file_dispute", "read_dispute", tx["id"],
                              transaction_id=tx["id"])
     if record.get("transaction_id") != tx["id"] or record.get("customer_id") != s["customer_id"]:
@@ -117,7 +150,7 @@ def file_case(s, services, route):
     cases = list(dict.fromkeys(s["case_ids"] + [record["id"]]))
     updates = {"case_ids": cases, "case_verified_at": {
         **s["case_verified_at"], record["id"]: services.now().isoformat()}}
-    if route == "fraud":
-        return go("fraud", "more", **updates)
+    if route == "fraud_agent":
+        return go("fraud_agent", "more", **updates)
     return {**finish(s, "dispute_filed", f"Disputa registrada: {record['id']}.",
                      f"Contestação registrada: {record['id']}."), **updates}

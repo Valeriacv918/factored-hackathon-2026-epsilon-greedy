@@ -5,18 +5,19 @@ Uso:
   python scripts/chat_fraud_demo.py            # datos de prueba sintéticos
   python scripts/chat_fraud_demo.py --debug    # muestra next_step/estado en cada turno
 
-Necesita GROQ_API_KEY en un .env en la raíz del repo (Agente 1 y Agente 2
-conversan con un LLM; Agente 3 es 100% código, sin LLM).
+Necesita GROQ_API_KEY en un .env en la raíz del repo (solo el Agente 1 conversa
+con un LLM; los Agentes 2 y 3 son 100% código, sin LLM: todas sus confirmaciones
+son botones sí/no, nunca texto libre interpretado).
 
 Flujo:
   1) Validación de identidad (Agente 1, igual que scripts/chat_validator.py).
-  2) Elegís si querés reportar una emergencia de tarjeta (Agente 2, LLM) o ir
+  2) Elegís si querés reportar una emergencia de tarjeta (Agente 2) o ir
      directo a disputar un cargo puntual (Agente 3, sin pasar por el 2).
-  3) Agente 2 conversa en lenguaje libre. Si reconocés un cargo, el script te
-     deja elegir una transacción de la demo (simula FIND_TRANSACTION, que
-     todavía no existe) y continúa con el Agente 3.
-  4) Agente 3 no conversa: solo pregunta sí/no por cada paso fijo
-     (CONFIRM_BLOCK, CONFIRM_DISPUTE, ASK_MORE_CHARGES).
+  3) Agentes 2 y 3 preguntan sí/no por cada paso fijo (CONFIRM_BLOCK,
+     ASK_CHARGE, CONFIRM_DISPUTE, ASK_MORE_CHARGES). Cuando el Agente 2
+     reconoce un cargo, el script te deja elegir una transacción de la demo
+     (simula FIND_TRANSACTION, que todavía no existe) y continúa con el
+     Agente 3.
 
 Comandos: /salir en cualquier momento.
 """
@@ -31,9 +32,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "apps" / "agent" / 
 from dotenv import load_dotenv
 
 load_dotenv()  # lee el .env de la raíz del repo si existe
-from bank_agent.nodes.card_emergency_agent.service import CardEmergencyService
-
-from bank_agent.nodes.card_emergency_agent.agent import CardEmergencyAgent
+from bank_agent.nodes.card_emergency_agent import CardEmergencyService
 from bank_agent.clients.fraud_repository import (
     Account,
     Card,
@@ -44,7 +43,7 @@ from bank_agent.clients.fraud_repository import (
     Transaction,
     TransactionStatus,
 )
-from bank_agent.clients.repository import CustomerRecord, InMemoryCustomerRepository, Product
+from bank_agent.clients.identity import CustomerRecord, InMemoryIdentityChecker, Product
 from bank_agent.nodes.fraud_agent import FraudAgent
 from bank_agent.nodes.validator_agent.validator import IdentityValidator
 from bank_agent.nodes.validator_agent.agent import ValidationAgent
@@ -94,6 +93,51 @@ def print_escalation(result):
             "cola": result.escalation.queue, "prioridad": result.escalation.priority,
             "motivo": result.escalation.reason, "contexto": result.escalation.context,
         }, indent=2, ensure_ascii=False), "\n")
+
+
+def run_card_emergency(service: CardEmergencyService, session_id: str, debug: bool) -> "str | None":
+    """Agente 2: 100% botones, sin LLM. Devuelve el transaction_id a seguir
+    en el Agente 3 (simulando FIND_TRANSACTION), o None si no corresponde."""
+    try:
+        r = service.start(session_id)
+    except Exception as e:
+        print(f"[error] {type(e).__name__}: {e}\n")
+        return None
+
+    while True:
+        if debug:
+            print(f"  [card_emergency next_step={r.next_step}]")
+
+        try:
+            if r.next_step == "select_card":
+                print("Agente 2: tenés varias tarjetas:")
+                for c in r.cards:
+                    print(f"  - {c['product_number']} ({c['masked']})")
+                product_number = input("  ¿Cuál es? (número completo): ").strip()
+                r = service.select_card(session_id, product_number)
+
+            elif r.next_step == "confirm_block":
+                confirmed = yes_no(f"Agente 2: ¿Confirmás bloquear la tarjeta {r.card['product_number']}?")
+                r = service.confirm_block(session_id, confirmed)
+
+            elif r.next_step == "ask_charge":
+                has_charge = yes_no("Agente 2: ¿Hay un cargo puntual que no reconocés?")
+                r = service.ask_charge(session_id, has_charge)
+
+            elif r.next_step == "escalate":
+                print_escalation(r)
+                return None
+
+            elif r.next_step == "find_transaction":
+                print(">>> Agente 2 terminó. Simulá FIND_TRANSACTION eligiendo la transacción.")
+                return input("ID de transacción (TX-100 / TX-200 / TX-300): ").strip()
+
+            else:
+                print(f"[card_emergency next_step desconocido: {r.next_step}]")
+                return None
+        except Exception as e:
+            print(f"[error] {type(e).__name__}: {e}\n")
+            continue
 
 
 def run_fraud_agent(fraud: FraudAgent, session_id: str, transaction_id: str, debug: bool):
@@ -153,13 +197,13 @@ def main():
     ap.add_argument("--debug", action="store_true", help="mostrar next_step/estado por turno")
     args = ap.parse_args()
 
-    customers_repo = InMemoryCustomerRepository(DEMO_CUSTOMERS)
+    identity = InMemoryIdentityChecker(DEMO_CUSTOMERS)
     cards_repo = InMemoryCardRepository({CUSTOMER_ID: [Card(CARD_1, "active")]})
     accounts_repo = InMemoryAccountRepository({CUSTOMER_ID: [Account(SAVINGS_1, "active")]})
     transactions_repo = InMemoryTransactionRepository(DEMO_TRANSACTIONS)
     disputes_repo = InMemoryDisputeRepository()
 
-    validator = IdentityValidator(customers_repo)
+    validator = IdentityValidator(identity)
     fraud = FraudAgent(validator, cards_repo, accounts_repo, transactions_repo, disputes_repo,
                         today=lambda: date(2026, 10, 1))
 
@@ -197,7 +241,7 @@ def main():
 
     # ---------- elegir camino ----------
     print("\nValidado. ¿Qué querés probar?")
-    print("  1) Reportar pérdida/robo de tarjeta (Agente 2, conversación libre)")
+    print("  1) Reportar pérdida/robo de tarjeta (Agente 2)")
     print("  2) Ir directo a disputar un cargo puntual (Agente 3, sin pasar por el 2)")
     choice = input("Elegí 1 o 2: ").strip()
 
@@ -209,35 +253,11 @@ def main():
 
     # ---------- Agente 2: card emergency ----------
     service = CardEmergencyService(validator, cards_repo)
-    agent2 = CardEmergencyAgent(service, session_id)
     print("\n-- Agente 2 (emergencia de tarjeta) --\n")
-    while True:
-        try:
-            text = input("Tú: ").strip()
-        except (EOFError, KeyboardInterrupt):
-            return
-        if not text:
-            continue
-        if text == "/salir":
-            return
-        try:
-            r2 = agent2.chat(text)
-        except Exception as e:
-            print(f"[error] {type(e).__name__}: {e}\n")
-            continue
-        print(f"Agente 2: {r2['reply']}\n")
-        if args.debug:
-            print(f"  [state={r2['state']} next_step={r2['next_step']}]\n")
-
-        if r2["next_step"] == "escalate":
-            print_escalation(r2)
-            return
-        if r2["next_step"] == "find_transaction":
-            print(">>> Agente 2 terminó. Simulá FIND_TRANSACTION eligiendo la transacción.")
-            tx_id = input("ID de transacción (TX-100 / TX-200 / TX-300): ").strip()
-            print()
-            run_fraud_agent(fraud, session_id, tx_id, args.debug)
-            return
+    tx_id = run_card_emergency(service, session_id, args.debug)
+    if tx_id:
+        print()
+        run_fraud_agent(fraud, session_id, tx_id, args.debug)
 
 
 if __name__ == "__main__":

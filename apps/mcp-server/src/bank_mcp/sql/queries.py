@@ -1,8 +1,8 @@
 """Fixed SELECT statements over bank_curated, explicit columns only.
 
-Placeholders {transactions}/{products} are fully qualified table names supplied by
-the gateway, never user input. Every value goes through a query parameter, and
-every statement filters by @customer_id: ownership is enforced here, not by the caller.
+Placeholders {transactions}/{products}/{customers} are fully qualified table names
+supplied by the gateway, never user input. Every value goes through a query parameter,
+and every statement filters by @customer_id: ownership is enforced here, not by the caller.
 """
 
 # Cards live in `products`; these are the card product types in bank_curated.
@@ -22,6 +22,26 @@ SELECT {_CARD_COLUMNS}
 FROM {{products}}
 WHERE customer_id = @customer_id AND product_id = @card_id AND product_type IN UNNEST(@card_types)
 LIMIT 1
+"""
+
+# Product numbers are compared without spaces or dashes and uppercased, the same
+# normalization the agent's validator applies to what the customer typed.
+_PRODUCT_NUMBER = r"UPPER(REGEXP_REPLACE(p.product_number, r'[\s-]', ''))"
+# Document numbers (cédula, CURP, DNI...) are compared without spaces, dots or dashes:
+# "1.020.304.050" and "1020304050" are the same document.
+_DOCUMENT_NUMBER = r"UPPER(REGEXP_REPLACE(c.document_number, r'[\s.-]', ''))"
+
+# The customer identifies with the document they know (document_number); the row
+# returns their internal customer_id. One row only if the date of birth matches AND
+# one of the customer's products matches. A missing customer and a wrong answer both
+# return no rows. The date of birth is never selected, so it never leaves the server.
+VERIFY_IDENTITY = f"""
+SELECT c.customer_id, ARRAY_AGG(DISTINCT {_PRODUCT_NUMBER} IGNORE NULLS) AS product_numbers
+FROM {{customers}} AS c
+JOIN {{products}} AS p ON p.customer_id = c.customer_id
+WHERE {_DOCUMENT_NUMBER} = @document_number AND c.date_of_birth = @date_of_birth
+GROUP BY c.customer_id
+HAVING LOGICAL_OR({_PRODUCT_NUMBER} = @product_number)
 """
 
 # The join also requires the same customer, so a transaction never exposes

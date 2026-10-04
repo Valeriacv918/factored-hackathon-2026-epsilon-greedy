@@ -23,6 +23,11 @@ def boom() -> Echo:
 
 
 @mcp.tool()
+def expired() -> Echo:
+    raise ToolError("session_invalid")
+
+
+@mcp.tool()
 def slow() -> Echo:
     time.sleep(10)
     return Echo(text="late")

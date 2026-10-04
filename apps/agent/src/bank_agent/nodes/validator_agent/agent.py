@@ -36,11 +36,11 @@ class ValidationAgent:
         sid = self.session.session_id
 
         @tool
-        def verify_identity(customer_id: str, date_of_birth: str, product_number: str) -> dict:
-            """Verifica la identidad del cliente con su número de identificación,
+        def verify_identity(document_number: str, date_of_birth: str, product_number: str) -> dict:
+            """Verifica la identidad del cliente con su número de documento (cédula, CURP, DNI),
             fecha de nacimiento y el número de uno de sus productos (cuenta o tarjeta).
             Devuelve solo un estado; nunca devuelve datos del cliente."""
-            result = validator.verify(sid, customer_id, date_of_birth, product_number)
+            result = validator.verify(sid, document_number, date_of_birth, product_number)
             self.last_result = result
             return result.for_llm()
 

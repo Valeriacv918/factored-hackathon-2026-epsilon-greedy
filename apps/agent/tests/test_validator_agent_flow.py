@@ -4,7 +4,7 @@ from langchain_core.messages import AIMessage
 
 from bank_agent.clients.demo_data import DEMO_CUSTOMERS as CUSTOMERS
 from bank_agent.nodes.validator_agent.agent import ValidationAgent
-from bank_agent.clients.repository import InMemoryCustomerRepository
+from bank_agent.clients.identity import InMemoryIdentityChecker
 from bank_agent.nodes.validator_agent.validator import IdentityValidator
 
 
@@ -14,7 +14,7 @@ class FakeLLM(GenericFakeChatModel):
 
 
 def make_agent(messages):
-    v = IdentityValidator(InMemoryCustomerRepository(CUSTOMERS))
+    v = IdentityValidator(InMemoryIdentityChecker(CUSTOMERS))
     return ValidationAgent(v, model=FakeLLM(messages=iter(messages)))
 
 
@@ -22,7 +22,7 @@ def test_after_verified_llm_is_not_called_again():
     # El LLM simulado solo tiene 2 respuestas: si se llamara una 3ª vez, fallaría.
     agent = make_agent([
         AIMessage(content="", tool_calls=[{"name": "verify_identity", "id": "1", "args": {
-            "customer_id": "1020304050", "date_of_birth": "1990-04-03",
+            "document_number": "1020304050", "date_of_birth": "1990-04-03",
             "product_number": "4111222233334444"}}]),
         AIMessage(content="Su identidad fue verificada. ¿En qué puedo ayudarle?"),
     ])

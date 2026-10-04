@@ -8,7 +8,21 @@ booleanos de botones y un `transaction_id` ya resuelto.
 ```
 policy.py   # DSP-004 (duplicado), DSP-005 (ventana), DSP-013 (umbral de riesgo)
 agent.py    # FraudAgent: máquina de estados CONFIRM_BLOCK..DONE/ESCALATED
+__init__.py # run(state, services, policy): el nodo que conecta graphs/disputes.py
 ```
+
+Dos interfaces para la misma lógica: `run()` es lo que el grafo real llama;
+`FraudAgent` (clases, en `agent.py`) es lo mismo pero para
+`scripts/chat_fraud_demo.py` y sus propios tests, fuera del grafo.
+
+### Umbrales (DSP-005/DSP-012/DSP-013): una sola fuente
+
+Los números (`fraud_score=30`, `high_amount_usd=500`, `window_days=90`,
+`max_charges=3`) viven en `graphs/policy.py:Policy` — es la fuente única.
+`config/settings.py:FraudPolicy` los deriva de ahí (`_POLICY = Policy()`), y
+tanto `agent.py` (vía `settings.fraud_policy`) como el `run()` del grafo (vía
+`policy` que le pasa `graphs/disputes.py`) acaban leyendo los mismos valores.
+Cambiar un umbral en `graphs/policy.py` alcanza para los dos.
 
 El diagrama "2. Card emergency" (perder/que roben la tarjeta) vive aparte,
 en `card_emergency_agent`, porque **ese sí necesita un LLM** para entender
@@ -16,7 +30,7 @@ lenguaje libre ("me robaron la tarjeta"). Este agente no conversa.
 
 ## Requiere una sesión ya validada
 
-Como indica `validator_agent/README_validator_agent_TBM.md`: este agente
+Como indica `validator_agent/README_validator_agent_TBM.md` (en `nodes/validator_agent/`): este agente
 llama `validator.can_access_product(session_id, producto)` antes de leer o
 actuar sobre cualquier producto o transacción.
 

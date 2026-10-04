@@ -3,15 +3,16 @@
   "description": "List the customer's credit and debit cards with status and last 4 digits.",
   "input_schema": {
     "properties": {
-      "customer_id": {
-        "description": "Authenticated customer (customer_id).",
-        "pattern": "^[A-Za-z0-9_-]{1,64}$",
-        "title": "Customer Id",
+      "session_token": {
+        "description": "session_token from verify_identity.",
+        "maxLength": 512,
+        "minLength": 1,
+        "title": "Session Token",
         "type": "string"
       }
     },
     "required": [
-      "customer_id"
+      "session_token"
     ],
     "title": "list_cardsArguments",
     "type": "object"

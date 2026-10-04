@@ -5,20 +5,21 @@ Implementa el diagrama "2. Card emergency" de `../../../../../../docs/STATE_MACH
 
 ```
 service.py   # CardEmergencyService: 100% código, decide los estados
-agent.py     # CardEmergencyAgent: LangChain create_agent, conversa con el cliente
+__init__.py  # run(state, services, policy): el nodo que conecta graphs/disputes.py
 ```
 
-## Por qué este agente SÍ usa LLM (a diferencia de `fraud_agent`)
+Dos interfaces para la misma lógica: `run()` es lo que el grafo real llama;
+`CardEmergencyService` (clases) es lo mismo pero para
+`scripts/chat_fraud_demo.py` y sus propios tests, fuera del grafo.
 
-Entender "me robaron la tarjeta" o "sí, bloquéala" es lenguaje libre del
-cliente. El LLM solo conversa, pide el dato que falte y llama a la tool del
-paso actual; **nunca decide el siguiente estado** — eso lo hace
-`CardEmergencyService`, código puro, igual que `validator_agent/validator.py`
-decide la identidad. Los pasos en sí son fijos y no los puede saltar ni
-inventar (ver `prompts/card_emergency.py`).
+## 100% código, sin LLM (igual que `fraud_agent`)
 
-`fraud_agent`, en cambio, no necesita conversar: solo recibe booleanos de
-botones y un `transaction_id` ya resuelto, así que no lleva LLM.
+Las confirmaciones del cliente llegan como booleanos de botones
+(`select_card(product_number)`, `confirm_block(confirmed: bool)`,
+`ask_charge(has_charge: bool)`) — nunca como texto libre interpretado por un
+modelo. `CardEmergencyService` decide el siguiente estado; ningún LLM
+participa en esa decisión, igual que `validator_agent/validator.py` (en
+`nodes/validator_agent/`) decide la identidad sin que el LLM intervenga.
 
 ## Requiere una sesión ya validada
 
@@ -29,10 +30,10 @@ está autenticada.
 
 ## Entrega a `fraud_agent`
 
-Cuando el cliente confirma que hay un cargo puntual (`ask_charge(True)` /
-tool `report_charge(true)`), este agente termina en `next_step =
-"find_transaction"` y su trabajo acaba ahí. El orquestador resuelve
-FIND_TRANSACTION (fuera de alcance de ambos agentes) y continúa con
+Cuando el cliente confirma que hay un cargo puntual (`ask_charge(True)`),
+este agente termina en `next_step = "find_transaction"` y su trabajo acaba
+ahí. El orquestador resuelve FIND_TRANSACTION (fuera de alcance de ambos
+agentes) y continúa con
 `fraud_agent.agent.FraudAgent.evaluate_transaction(session_id,
 transaction_id)`. Ambos comparten el mismo `CardRepository`: si este agente
 ya bloqueó la tarjeta, `fraud_agent` lo ve reflejado ahí y no vuelve a
@@ -41,10 +42,10 @@ preguntar.
 ## Uso
 
 ```python
-from bank_agent.card_emergency_agent.service import CardEmergencyService
-from bank_agent.nodes.card_emergency_agent.agent import CardEmergencyAgent
+from bank_agent.nodes.card_emergency_agent.service import CardEmergencyService
 
-service = CardEmergencyService(validator, cards_repo)  # compartido entre conversaciones
-agent = CardEmergencyAgent(service, session_id)  # uno por conversación
-print(agent.chat("Me robaron la tarjeta"))
+service = CardEmergencyService(validator, cards_repo)   # compartido entre conversaciones
+result = service.start(session_id)                      # -> select_card | confirm_block | ask_charge
+result = service.confirm_block(session_id, True)
+result = service.ask_charge(session_id, True)            # -> find_transaction
 ```
