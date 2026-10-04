@@ -28,6 +28,8 @@ from bank_mcp.services.mapping import Card, CardList, IdentityResult, Transactio
 from bank_mcp.services.ratelimit import RateLimited, TokenBucket
 from bank_mcp.services.search import MAX_SPAN_DAYS, TransactionSlots, build_find_query
 from bank_mcp.sql import queries
+from bank_mcp.sql.identity import VERIFY_IDENTITY
+from bank_mcp.services.identity import IdentityVerification
 
 logger = logging.getLogger("bank_mcp")
 
@@ -198,6 +200,34 @@ def get_card(session_token: SessionToken, card_id: CardId) -> Card:
         # Same message for "missing" and "someone else's": no ownership oracle.
         raise ToolError("Card not found.")
     return to_card(rows[0])
+
+
+@mcp.tool(annotations=READ_ONLY)
+def verify_identity(
+    customer_id: Annotated[str, Field(pattern=r"^[A-Z0-9-]{4,20}$",
+                                    description="Submitted customer_id (CLI-...) or document number; not yet authenticated.")],
+    date_of_birth: dt.date,
+    product_number: Annotated[str, Field(pattern=r"^[A-Z0-9]{4,30}$")],
+) -> IdentityVerification:
+    """Compare three submitted factors; return no personal data on mismatch.
+
+    For the trusted local validator only. Attempts/TTL belong to IdentityValidator.
+    Never expose this server publicly without authenticated transport and durable attempt limits.
+    """
+    gw = _gw()
+    params = [
+        bigquery.ScalarQueryParameter("customer_id", "STRING", customer_id),
+        bigquery.ScalarQueryParameter("date_of_birth", "DATE", date_of_birth),
+        bigquery.ScalarQueryParameter("product_number", "STRING", product_number),
+    ]
+    rows = _run(gw, VERIFY_IDENTITY.format(customers=gw.table("customers"),
+                                        products=gw.table("products")), params, "verify_identity")
+    if not rows:
+        return IdentityVerification()
+    if len(rows) != 1 or not rows[0].get("products") or len(rows[0]["products"]) > 200:
+        raise ToolError("Identity verification unavailable.")
+    return IdentityVerification(verified=True, customer_id=rows[0]["customer_id"],
+                                products=rows[0]["products"])
 
 
 def main() -> None:

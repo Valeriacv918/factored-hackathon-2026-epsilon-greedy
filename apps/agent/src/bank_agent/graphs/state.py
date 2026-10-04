@@ -2,13 +2,18 @@
 
 from typing import Any, Literal, TypedDict
 
-Route = Literal["security_language", "understanding", "card_emergency_agent", "fraud_agent", "charge_error", "escalation", "end"]
+Route = Literal["validator_agent", "validation_wait", "request_wait", "triage_agent", "triage_wait", "fraud_agent", "card_emergency_agent", "end"]
 
 
 class ConversationState(TypedDict, total=False):
     conversation_id: str
     session_ref: str  # Opaque reference; do not checkpoint bearer tokens.
     message: str
+    validation_input: str
+    validation_status: str | None
+    authenticated: bool
+    triage_choice: str
+    triage_route: str
     language: Literal["es", "pt"]
     customer_id: str
     route: Route

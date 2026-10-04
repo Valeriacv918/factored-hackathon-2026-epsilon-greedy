@@ -15,8 +15,7 @@
         "type": "string"
       },
       "product_number": {
-        "description": "Number of one of the customer's products (card or account).",
-        "pattern": "^[A-Za-z0-9 -]{4,40}$",
+        "pattern": "^[A-Z0-9]{4,30}$",
         "title": "Product Number",
         "type": "string"
       }
