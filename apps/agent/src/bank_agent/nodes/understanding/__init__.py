@@ -32,10 +32,17 @@ def run(s, services, policy):
             return go("understanding", "out_of_scope", intent=intent)
         return go("understanding", "find", intent=intent)
     if phase == "out_of_scope":
-        answer = ask(s, services, "out_of_scope", ["human", "close"],
-                     "Atiendo disputas y emergencias de tarjetas. Puedes solicitar una persona.",
-                     "Atendo contestações e emergências de cartões. Você pode solicitar uma pessoa.")
-        return finish(s, "out_of_scope", "Solicitud fuera de alcance.", "Solicitação fora do escopo.")
+        # The classifier said "other". Offer the intents as buttons so the customer can correct
+        # a misclassification instead of being stuck. ask() adds "human" (HandoffRequested).
+        choice = ask(s, services, "out_of_scope", ["not_me", "charge_error", "emergency", "close"],
+                     "Atiendo cargos que no reconoces, cobros equivocados y emergencias de tus productos "
+                     "(tarjeta perdida o robada). ¿Es alguno de estos? También puedes solicitar una persona.",
+                     "Atendo cobranças que você não reconhece, cobranças erradas e emergências dos seus produtos "
+                     "(cartão perdido ou roubado). É algum destes? Você também pode solicitar uma pessoa.")
+        if choice == "close":
+            return finish(s, "out_of_scope", "Para otros temas, usa los canales de atención del banco.",
+                          "Para outros assuntos, use os canais de atendimento do banco.")
+        return go("understanding", "triage", intent=choice, reason="")   # route as if the classifier had said it
     if phase == "clarify":
         reply = interrupt({"kind": "transaction_details", "language": s["language"],
                            "message": say(s, "Indica fecha, monto o comercio.",
