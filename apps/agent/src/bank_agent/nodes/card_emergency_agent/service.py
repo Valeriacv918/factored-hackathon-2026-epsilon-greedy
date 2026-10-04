@@ -15,7 +15,7 @@ from enum import Enum
 from typing import Callable, Optional
 
 from bank_agent.clients.fraud_repository import CardRepository, RepositoryUnavailable
-from bank_agent.validator_agent.validator import IdentityValidator
+from bank_agent.nodes.validator_agent.validator import IdentityValidator
 
 
 class EmergencyState(str, Enum):
