@@ -1,6 +1,6 @@
 # card_emergency_agent
 
-Implementa el diagrama "2. Card emergency" de `docs/STATE_MACHINE2.md`:
+Implementa el diagrama "2. Card emergency" de `../../../../../../docs/STATE_MACHINE2.md`:
 `SELECT_CARD -> CONFIRM_BLOCK -> BLOCK_AND_VERIFY -> ASK_CHARGE`.
 
 ```
@@ -42,9 +42,9 @@ preguntar.
 
 ```python
 from bank_agent.card_emergency_agent.service import CardEmergencyService
-from bank_agent.card_emergency_agent.agent import CardEmergencyAgent
+from bank_agent.nodes.card_emergency_agent.agent import CardEmergencyAgent
 
-service = CardEmergencyService(validator, cards_repo)   # compartido entre conversaciones
-agent = CardEmergencyAgent(service, session_id)         # uno por conversación
+service = CardEmergencyService(validator, cards_repo)  # compartido entre conversaciones
+agent = CardEmergencyAgent(service, session_id)  # uno por conversación
 print(agent.chat("Me robaron la tarjeta"))
 ```

@@ -1,6 +1,6 @@
 # fraud_agent
 
-Implementa el diagrama "3. Fraud path" de `docs/STATE_MACHINE2.md`. 100%
+Implementa el diagrama "3. Fraud path" de `../../../../../../docs/STATE_MACHINE2.md`. 100%
 código: ninguno de sus estados está marcado con LLM en la tabla de ese
 documento, así que `agent.py` no llama a ningún modelo — solo recibe
 booleanos de botones y un `transaction_id` ya resuelto.
@@ -60,11 +60,11 @@ de ahorros, cuenta corriente. Antes de seguir con la disputa, el agente
 ## Uso
 
 ```python
-from bank_agent.fraud_agent.agent import FraudAgent
+from bank_agent.nodes.fraud_agent import FraudAgent
 
 fraud = FraudAgent(validator, cards_repo, accounts_repo, transactions_repo, disputes_repo)
-result = fraud.evaluate_transaction(session_id, "TX-1")   # -> confirm_block | confirm_dispute | escalate
-result = fraud.confirm_block(session_id, True)            # solo si hacía falta; bloquea o suspende según el tipo
+result = fraud.evaluate_transaction(session_id, "TX-1")  # -> confirm_block | confirm_dispute | escalate
+result = fraud.confirm_block(session_id, True)  # solo si hacía falta; bloquea o suspende según el tipo
 result = fraud.confirm_dispute(session_id, True)
-result = fraud.ask_more_charges(session_id, False)        # -> done, o escalate si DSP-013
+result = fraud.ask_more_charges(session_id, False)  # -> done, o escalate si DSP-013
 ```

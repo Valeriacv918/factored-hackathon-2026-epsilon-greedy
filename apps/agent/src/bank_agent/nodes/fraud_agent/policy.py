@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Optional
 
-from ..config.settings import FraudPolicy
+from bank_agent.config.settings import FraudPolicy
 
 
 @dataclass(frozen=True)

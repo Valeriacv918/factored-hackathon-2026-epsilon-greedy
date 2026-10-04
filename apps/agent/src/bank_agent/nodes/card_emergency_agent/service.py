@@ -14,8 +14,8 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Callable, Optional
 
-from ..clients.fraud_repository import CardRepository, RepositoryUnavailable
-from ..validator_agent.validator import IdentityValidator
+from bank_agent.clients.fraud_repository import CardRepository, RepositoryUnavailable
+from bank_agent.validator_agent.validator import IdentityValidator
 
 
 class EmergencyState(str, Enum):

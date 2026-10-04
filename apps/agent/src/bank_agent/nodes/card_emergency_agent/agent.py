@@ -24,9 +24,9 @@ from langchain.agents.middleware import ModelRequest, dynamic_prompt
 from langchain_core.tools import tool
 from langgraph.checkpoint.memory import InMemorySaver
 
-from ..config.settings import settings
-from ..prompts.card_emergency import BASE_PROMPT
-from ..prompts.validation import LANG_NAMES
+from bank_agent.config.settings import settings
+from bank_agent.prompts.card_emergency import BASE_PROMPT
+from bank_agent.prompts.validation import LANG_NAMES
 from .service import CardEmergencyService, EmergencyResult
 
 

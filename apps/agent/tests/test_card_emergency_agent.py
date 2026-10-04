@@ -4,7 +4,7 @@ from datetime import date
 from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
 from langchain_core.messages import AIMessage
 
-from bank_agent.card_emergency_agent.agent import CardEmergencyAgent
+from bank_agent.nodes.card_emergency_agent.agent import CardEmergencyAgent
 from bank_agent.card_emergency_agent.service import CardEmergencyService
 from bank_agent.clients.fraud_repository import Card, InMemoryCardRepository
 from bank_agent.clients.repository import CustomerRecord, InMemoryCustomerRepository, Product

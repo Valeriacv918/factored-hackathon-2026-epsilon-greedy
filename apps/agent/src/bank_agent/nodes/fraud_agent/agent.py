@@ -46,7 +46,7 @@ from datetime import date, datetime, timezone
 from enum import Enum
 from typing import Callable, Optional
 
-from ..clients.fraud_repository import (
+from bank_agent.clients.fraud_repository import (
     AccountRepository,
     CardRepository,
     DisputeRepository,
@@ -55,8 +55,8 @@ from ..clients.fraud_repository import (
     TransactionRepository,
     TransactionStatus,
 )
-from ..config.settings import FraudPolicy, settings
-from ..validator_agent.validator import IdentityValidator
+from bank_agent.config.settings import FraudPolicy, settings
+from bank_agent.validator_agent.validator import IdentityValidator
 from . import policy as policy_rules
 
 

@@ -32,7 +32,7 @@ from dotenv import load_dotenv
 
 load_dotenv()  # lee el .env de la raíz del repo si existe
 
-from bank_agent.card_emergency_agent.agent import CardEmergencyAgent
+from bank_agent.nodes.card_emergency_agent.agent import CardEmergencyAgent
 from bank_agent.card_emergency_agent.service import CardEmergencyService
 from bank_agent.clients.fraud_repository import (
     Account,
@@ -45,7 +45,7 @@ from bank_agent.clients.fraud_repository import (
     TransactionStatus,
 )
 from bank_agent.clients.repository import CustomerRecord, InMemoryCustomerRepository, Product
-from bank_agent.fraud_agent.agent import FraudAgent
+from bank_agent.nodes.fraud_agent import FraudAgent
 from bank_agent.validator_agent.agent import ValidationAgent
 from bank_agent.validator_agent.validator import IdentityValidator
 
