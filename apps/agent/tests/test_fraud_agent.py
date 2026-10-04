@@ -15,8 +15,9 @@ from bank_agent.clients.fraud_repository import (
 )
 from bank_agent.clients.repository import CustomerRecord, InMemoryCustomerRepository, Product
 from bank_agent.config.settings import FraudPolicy
-from bank_agent.nodes.fraud_agent import FraudAgent
-from bank_agent.validator_agent.validator import IdentityValidator
+from bank_agent.nodes.fraud_agent.agent import FraudAgent
+from bank_agent.nodes.validator_agent.validator import IdentityValidator
+
 
 CUSTOMER_ID = "1020304050"
 CARD_1 = "4111222233334444"

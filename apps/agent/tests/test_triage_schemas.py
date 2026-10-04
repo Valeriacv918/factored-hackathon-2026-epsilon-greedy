@@ -6,16 +6,16 @@ from bank_agent.nodes.triage_agent.schemas import Intent, Route, Slots, TriageDe
 
 def test_understanding_minimal():
     u = Understanding(intent=Intent.NOT_ME, confidence=0.9, wants_human=False)
-    assert u.slots.merchant_name is None          # los datos vienen vacíos por defecto
+    assert u.slots.merchant is None          # los datos vienen vacíos por defecto
 
 
 def test_understanding_from_text_values():
     # Así llegará del LLM: texto, no objetos de Python
     u = Understanding.model_validate({
         "intent": "charge_error", "confidence": 0.8, "wants_human": True,
-        "slots": {"merchant_name": "Amazon", "amount": 85},
+         "slots": {"merchant": "Amazon", "amount": "85"},
     })
-    assert u.intent == Intent.CHARGE_ERROR and u.slots.amount == 85.0
+    assert u.intent == Intent.CHARGE_ERROR and u.slots.amount == "85"
 
 
 def test_invalid_intent_is_rejected():

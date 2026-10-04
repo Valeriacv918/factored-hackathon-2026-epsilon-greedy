@@ -31,9 +31,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "apps" / "agent" / 
 from dotenv import load_dotenv
 
 load_dotenv()  # lee el .env de la raíz del repo si existe
+from bank_agent.nodes.card_emergency_agent.service import CardEmergencyService
 
 from bank_agent.nodes.card_emergency_agent.agent import CardEmergencyAgent
-from bank_agent.card_emergency_agent.service import CardEmergencyService
 from bank_agent.clients.fraud_repository import (
     Account,
     Card,
@@ -46,8 +46,8 @@ from bank_agent.clients.fraud_repository import (
 )
 from bank_agent.clients.repository import CustomerRecord, InMemoryCustomerRepository, Product
 from bank_agent.nodes.fraud_agent import FraudAgent
-from bank_agent.validator_agent.agent import ValidationAgent
-from bank_agent.validator_agent.validator import IdentityValidator
+from bank_agent.nodes.validator_agent.validator import IdentityValidator
+from bank_agent.nodes.validator_agent.agent import ValidationAgent
 
 CARD_1 = "4111222233334444"
 SAVINGS_1 = "00987654321"

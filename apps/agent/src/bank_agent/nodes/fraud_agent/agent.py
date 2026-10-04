@@ -56,7 +56,7 @@ from bank_agent.clients.fraud_repository import (
     TransactionStatus,
 )
 from bank_agent.config.settings import FraudPolicy, settings
-from bank_agent.validator_agent.validator import IdentityValidator
+from bank_agent.nodes.validator_agent.validator import IdentityValidator
 from . import policy as policy_rules
 
 
