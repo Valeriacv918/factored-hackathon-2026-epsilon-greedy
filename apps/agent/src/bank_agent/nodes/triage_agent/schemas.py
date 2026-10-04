@@ -22,8 +22,8 @@ class Slots(BaseModel):
     """Datos que el cliente mencionó. Todos opcionales: si no los dijo, None.
     Los nombres siguen las columnas de la tabla `transactions`, para que
     FIND_TRANSACTION pueda buscar con ellos."""
-    merchant_name: str | None = Field(None, description="Comercio mencionado, p. ej. 'Amazon', 'iFood'")
-    amount: float | None = Field(None, description="Monto mencionado, solo el número")
+    merchant: str | None = Field(None, description="Comercio mencionado, p. ej. 'Amazon', 'iFood'")
+    amount: str | None = Field(None, description="Monto mencionado, solo el número")
     currency: str | None = Field(None, description="Moneda si la dijo: COP, BRL, USD...")
     date_mentioned: str | None = Field(None, description="Fecha tal como la dijo: 'ayer', '3 de marzo'")
     product_hint: str | None = Field(None, description="Producto mencionado: 'tarjeta de crédito', 'termina en 1234'")
