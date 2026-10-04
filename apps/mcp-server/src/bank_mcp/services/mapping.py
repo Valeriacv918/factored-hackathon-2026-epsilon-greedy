@@ -48,6 +48,7 @@ class CardList(BaseModel):
 class IdentityResult(BaseModel):
     # Same "failed" for an unknown customer and a wrong answer: no enumeration oracle.
     status: Literal["verified", "failed", "locked"]
+    customer_id: str | None = None        # on "verified": internal ID, for the agent's traceability
     session_token: str | None = None
     product_numbers: list[str] = []
     # The server owns these limits; the agent shows them instead of keeping its own copies.

@@ -52,8 +52,8 @@ def main():
     else:
         identity = InMemoryIdentityChecker(DEMO_CUSTOMERS)
         print("Modo demo con clientes de prueba:")
-        print("  ID 1020304050 | nacimiento 03/04/1990 | productos 4111222233334444 o 00987654321")
-        print("  ID 99887766   | nacimiento 01/12/1985 | producto 5500111122223333")
+        print("  Documento 1020304050 | nacimiento 03/04/1990 | productos 4111222233334444 o 00987654321")
+        print("  Documento 99887766   | nacimiento 01/12/1985 | producto 5500111122223333")
 
     validator = IdentityValidator(identity)
     agent = ValidationAgent(validator)

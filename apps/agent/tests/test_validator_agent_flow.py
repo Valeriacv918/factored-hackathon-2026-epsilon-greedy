@@ -22,7 +22,7 @@ def test_after_verified_llm_is_not_called_again():
     # El LLM simulado solo tiene 2 respuestas: si se llamara una 3ª vez, fallaría.
     agent = make_agent([
         AIMessage(content="", tool_calls=[{"name": "verify_identity", "id": "1", "args": {
-            "customer_id": "1020304050", "date_of_birth": "1990-04-03",
+            "document_number": "1020304050", "date_of_birth": "1990-04-03",
             "product_number": "4111222233334444"}}]),
         AIMessage(content="Su identidad fue verificada. ¿En qué puedo ayudarle?"),
     ])

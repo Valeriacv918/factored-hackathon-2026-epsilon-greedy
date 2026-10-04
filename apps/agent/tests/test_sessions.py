@@ -45,13 +45,14 @@ class Clock:
 
 def test_validator_sessions_follow_authentication_and_ttl():
     clock = Clock()
-    customers = {"CLI-0001": CustomerRecord("CLI-0001", date(1990, 4, 3), (Product("4111222233334444"),))}
+    # The customer types their document; the session keeps the internal customer_id.
+    customers = {"1020304050": CustomerRecord("CLI-0001", date(1990, 4, 3), (Product("4111222233334444"),))}
     validator = IdentityValidator(InMemoryIdentityChecker(customers, clock=clock), clock=clock)
     sessions = ValidatorSessions(validator)
     sid = validator.new_session().session_id
     assert sessions.resolve(sid) is None and sessions.resolve("unknown") is None
 
-    validator.verify(sid, "cli-0001", "03/04/1990", "4111 2222 3333 4444")
+    validator.verify(sid, "1.020.304.050", "03/04/1990", "4111 2222 3333 4444")
     grant = sessions.resolve(sid)
     assert (grant.customer_id, grant.token) == ("CLI-0001", "test-token:CLI-0001")
 

@@ -1,8 +1,10 @@
-"""Identity check for the validator: customer_id + date of birth + product number.
+"""Identity check for the validator: document_number + date of birth + product number.
 
-The agent never reads customer records. The MCP server compares the values in SQL
-and answers only verified / failed / locked, plus a signed session token and the
-customer's product numbers on success. The date of birth never leaves the server.
+The customer identifies with the document they know (cédula, CURP, DNI...). The agent
+never reads customer records. The MCP server compares the values in SQL and answers
+only verified / failed / locked, plus, on success, the customer's internal customer_id
+(for traceability), a signed session token and their product numbers. The date of
+birth never leaves the server.
 
 The server also owns the limits (attempts, lockout, session lifetime) and reports
 them in each answer, so the agent never keeps its own copy of those numbers.
@@ -32,7 +34,7 @@ class IdentityResult:
 
 
 class IdentityChecker(Protocol):
-    def verify(self, customer_id: str, date_of_birth: date, product_number: str) -> IdentityResult:
+    def verify(self, document_number: str, date_of_birth: date, product_number: str) -> IdentityResult:
         """Raise ServiceFailure if the check could not be made (outage, timeout)."""
         ...
 
@@ -41,16 +43,16 @@ class McpIdentityChecker:
     def __init__(self, client):
         self._client = client   # McpToolClient
 
-    def verify(self, customer_id: str, date_of_birth: date, product_number: str) -> IdentityResult:
-        result = self._client.call("verify_identity", {"customer_id": customer_id,
+    def verify(self, document_number: str, date_of_birth: date, product_number: str) -> IdentityResult:
+        result = self._client.call("verify_identity", {"document_number": document_number,
                                                        "date_of_birth": date_of_birth.isoformat(),
                                                        "product_number": product_number})
         try:
             status = result.get("status")
             if status == "verified":
-                if not result.get("session_token"):
-                    raise ServiceFailure("verify_identity returned no session token")
-                return IdentityResult("verified", customer_id, tuple(result.get("product_numbers") or ()),
+                if not result.get("session_token") or not result.get("customer_id"):
+                    raise ServiceFailure("verify_identity returned no session token or customer_id")
+                return IdentityResult("verified", result["customer_id"], tuple(result.get("product_numbers") or ()),
                                       result["session_token"], expires_at=_utc(result["expires_at"]))
             if status == "failed":
                 return IdentityResult("failed", attempts_left=int(result["attempts_left"]))
@@ -91,7 +93,8 @@ def _utc_now() -> datetime:
 class InMemoryIdentityChecker:
     """SYNTHETIC data only. Never put real customers here.
 
-    Behaves like the server's verify_identity: counts failures per customer_id
+    `records` is keyed by document_number; each record carries the internal customer_id.
+    Behaves like the server's verify_identity: counts failures per document
     (any string, known or not), locks after `max_attempts`, and issues sessions
     that expire after `ttl`. These defaults belong to this fake, not to the agent.
     """
@@ -106,25 +109,25 @@ class InMemoryIdentityChecker:
         self._failures: dict[str, int] = {}
         self._locked_until: dict[str, datetime] = {}
 
-    def verify(self, customer_id: str, date_of_birth: date, product_number: str) -> IdentityResult:
+    def verify(self, document_number: str, date_of_birth: date, product_number: str) -> IdentityResult:
         self.calls += 1
         if self.fail:
             raise ServiceFailure("simulated outage")
         now = self.clock()
-        until = self._locked_until.get(customer_id)
+        until = self._locked_until.get(document_number)
         if until and now < until:
             return IdentityResult("locked", locked_until=until)
-        record = self.records.get(customer_id)
+        record = self.records.get(document_number)
         numbers = tuple(p.product_number.upper() for p in record.products) if record else ()
         if record is None or record.date_of_birth != date_of_birth or product_number.upper() not in numbers:
-            self._failures[customer_id] = self._failures.get(customer_id, 0) + 1
-            left = self.max_attempts - self._failures[customer_id]
+            self._failures[document_number] = self._failures.get(document_number, 0) + 1
+            left = self.max_attempts - self._failures[document_number]
             if left > 0:
                 return IdentityResult("failed", attempts_left=left)
-            del self._failures[customer_id]
-            self._locked_until[customer_id] = now + self.lockout
+            del self._failures[document_number]
+            self._locked_until[document_number] = now + self.lockout
             return IdentityResult("locked", locked_until=now + self.lockout)
-        self._failures.pop(customer_id, None)
-        self._locked_until.pop(customer_id, None)
+        self._failures.pop(document_number, None)
+        self._locked_until.pop(document_number, None)
         return IdentityResult("verified", record.customer_id, numbers, f"test-token:{record.customer_id}",
                               expires_at=now + self.ttl)

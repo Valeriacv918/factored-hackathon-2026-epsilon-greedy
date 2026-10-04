@@ -1,12 +1,12 @@
 {
   "name": "verify_identity",
-  "description": "Check the customer's identity: customer_id, date of birth and one of their product numbers.\n\nOn success returns a session_token for the other tools and the customer's product\nnumbers. Returns status \"failed\" without saying which value was wrong, and \"locked\"\nafter too many failures. Never returns the customer's data.\n",
+  "description": "Check the customer's identity: document number, date of birth and one of their product numbers.\n\nOn success returns the customer_id, a session_token for the other tools and the\ncustomer's product numbers. Returns status \"failed\" without saying which value was\nwrong, and \"locked\" after too many failures. Never returns the customer's data.\n",
   "input_schema": {
     "properties": {
-      "customer_id": {
-        "description": "customer_id the customer gave.",
-        "pattern": "^[A-Za-z0-9_-]{1,64}$",
-        "title": "Customer Id",
+      "document_number": {
+        "description": "Identity document number the customer gave (cédula, CURP, DNI...).",
+        "pattern": "^[A-Za-z0-9 .-]{4,40}$",
+        "title": "Document Number",
         "type": "string"
       },
       "date_of_birth": {
@@ -22,7 +22,7 @@
       }
     },
     "required": [
-      "customer_id",
+      "document_number",
       "date_of_birth",
       "product_number"
     ],
@@ -39,6 +39,18 @@
         ],
         "title": "Status",
         "type": "string"
+      },
+      "customer_id": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Customer Id"
       },
       "session_token": {
         "anyOf": [
