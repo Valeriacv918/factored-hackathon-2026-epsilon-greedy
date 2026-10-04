@@ -1,6 +1,6 @@
 {
   "name": "verify_identity",
-  "description": "Check the customer's identity: document number, date of birth and one of their product numbers.\n\nOn success returns the customer_id, a session_token for the other tools and the\ncustomer's product numbers. Returns status \"failed\" without saying which value was\nwrong, and \"locked\" after too many failures. Never returns the customer's data.\n",
+  "description": "Check the customer's identity: document number, date of birth and one of their product numbers.\n\n    On success returns the customer_id, a session_token for the other tools and the\n    customer's product numbers. Returns status \"failed\" without saying which value was\n    wrong, and \"locked\" after too many failures. Never returns the customer's data.\n    ",
   "input_schema": {
     "properties": {
       "document_number": {
@@ -15,7 +15,8 @@
         "type": "string"
       },
       "product_number": {
-        "pattern": "^[A-Z0-9]{4,30}$",
+        "description": "Number of one of the customer's products (card or account).",
+        "pattern": "^[A-Za-z0-9 -]{4,40}$",
         "title": "Product Number",
         "type": "string"
       }

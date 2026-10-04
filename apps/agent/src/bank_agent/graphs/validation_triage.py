@@ -41,11 +41,12 @@ def build_graph(services, *, checkpointer, policy=None):
             elif result.get("next_step") == "handoff_human":
                 s.update(route="end", authenticated=False, outcome="human_required",
                          reason=result.get("status") or "validation_failed",
+                         validation_status=result.get("status"),
                          response="No fue posible validar tu identidad. Se requiere revisión humana; no se ha creado una derivación.")
             else:
                 s.update(route="validation_wait", authenticated=False,
                          validation_status=result.get("status"),
-                         response=result.get("reply") or "Indica tu ID, fecha de nacimiento y número de producto.")
+                         response=result.get("reply") or "Indica tu número de documento, fecha de nacimiento y número de producto.")
         except Exception as exc:
             logger.warning("Validation failed (%s)", type(exc).__name__)
             fail(s, "validation_unavailable", "La validación no está disponible. No se consultarán tus productos.")
