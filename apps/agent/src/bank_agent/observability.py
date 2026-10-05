@@ -4,8 +4,9 @@ One JSON object per line with `ts, level, service, event, conversation_id, node`
 event's fields. The MCP server emits the same shape (bank_mcp/observability.py), and the
 agent sends conversation_id/node in each tool call's _meta so both sides share the id.
 
-Events: step, llm.call, llm.result, mcp.call, conversation.summary (a future HTTP
-endpoint adds http.request through log_event).
+Events: step, llm.call, llm.result, mcp.call, conversation.summary (the web app adds
+http.request through log_event). The summary carries the conversation's outcome and
+routing (OUTCOME_FIELDS) and counts, never customer, card or ticket identifiers.
 
 Never logged: the identity factors and the session token (SENSITIVE). LLM prompts and
 raw outputs only with LOG_LLM_CONTENT=1, for local debugging: validator prompts contain
@@ -83,9 +84,22 @@ _totals: dict[str, dict[str, float]] = {}
 _totals_lock = threading.Lock()
 
 
+# Routing labels the summary may carry; identifiers (customer, cards, cases, tickets) are only counted.
+OUTCOME_FIELDS = ("outcome", "reason", "intent", "language", "triage_route", "queue", "priority",
+                  "validation_status")
+
+
 def _empty() -> dict[str, float]:
-    return dict(steps=0, llm_calls=0, input_tokens=0, output_tokens=0, llm_ms=0.0, mcp_calls=0, mcp_ms=0.0,
-                errors=0)
+    return dict(steps=0, step_ms=0.0, llm_calls=0, input_tokens=0, output_tokens=0, llm_ms=0.0, mcp_calls=0,
+                mcp_ms=0.0, errors=0, started=time.time())
+
+
+def outcome_fields(state: dict[str, Any]) -> dict[str, Any]:
+    """What the conversation.summary records about how a conversation ended."""
+    return {**{key: state.get(key) for key in OUTCOME_FIELDS},
+            "authenticated": bool(state.get("authenticated")), "turns": state.get("turns"),
+            "ticket_created": bool(state.get("ticket_id")), "cases_filed": len(state.get("case_ids") or []),
+            "cards_blocked": len(state.get("blocked_cards") or [])}
 
 
 def _accumulate(payload: dict[str, Any]) -> None:
@@ -96,6 +110,7 @@ def _accumulate(payload: dict[str, Any]) -> None:
         t = _totals.setdefault(cid, _empty())
         if event == "step":
             t["steps"] += 1
+            t["step_ms"] += payload.get("ms") or 0
         elif event == "llm.call":
             t["llm_calls"] += 1
             t["input_tokens"] += payload.get("input_tokens") or 0
@@ -108,13 +123,18 @@ def _accumulate(payload: dict[str, Any]) -> None:
             t["errors"] += 1
 
 
-def log_summary(conversation_id: str) -> None:
-    """Emit conversation.summary with the totals so far, then start over."""
+def log_summary(conversation_id: str, **outcome: Any) -> None:
+    """Emit conversation.summary with the totals so far (plus outcome_fields), then start over.
+
+    duration_ms is wall time since the first event, customer pauses included; step_ms is
+    the time the graph spent working."""
     with _totals_lock:
         totals = _totals.pop(conversation_id, None) or _empty()
-    totals["llm_ms"], totals["mcp_ms"] = round(totals["llm_ms"], 1), round(totals["mcp_ms"], 1)
+    totals["duration_ms"] = round((time.time() - totals.pop("started")) * 1000, 1)
+    for key in ("step_ms", "llm_ms", "mcp_ms"):
+        totals[key] = round(totals[key], 1)
     with bind(conversation_id=conversation_id, node=None):
-        log_event("conversation.summary", **totals)
+        log_event("conversation.summary", **totals, **outcome)
 
 
 def reset() -> None:
@@ -126,12 +146,13 @@ def reset() -> None:
 
 @contextlib.contextmanager
 def logged_step(conversation_id: str | None, node: str, phase: str | None):
-    """Log one `step` per node run. The caller sets info["next"] (and info["phase"]).
+    """Log one `step` per node run. The caller sets info["next"] (and info["phase"]), and
+    info["state"] (the state after the step) so the summary can record the outcome.
 
     A pause for the customer (interrupt) is logged as waiting, not as an error; the
     summary is emitted when a node routes to "end".
     """
-    info: dict[str, Any] = {"next": None, "phase": phase}
+    info: dict[str, Any] = {"next": None, "phase": phase, "state": None}
     started = time.perf_counter()
     with bind(conversation_id=conversation_id, node=node):
         try:
@@ -144,7 +165,7 @@ def logged_step(conversation_id: str | None, node: str, phase: str | None):
             raise
         log_event("step", phase=info["phase"], next=info["next"], ms=elapsed_ms(started))
     if info["next"] == "end" and conversation_id:
-        log_summary(conversation_id)
+        log_summary(conversation_id, **outcome_fields(info["state"] or {}))
 
 
 # --- LLM ------------------------------------------------------------------------------------

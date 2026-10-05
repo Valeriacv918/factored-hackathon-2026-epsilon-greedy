@@ -188,6 +188,11 @@ def test_graph_logs_each_step_and_one_summary(fake_services, caplog):
     assert {"node", "phase", "next"} <= set(steps[0])
     [summary] = events(caplog, "conversation.summary")
     assert summary["conversation_id"] == "conv-7" and summary["steps"] == len(steps)
+    assert summary["outcome"] == "fraud_intake_complete" and summary["intent"] == state["intent"]
+    assert summary["language"] == state["language"] and summary["authenticated"] == bool(state.get("authenticated"))
+    assert summary["cases_filed"] == len(state["case_ids"]) and summary["cards_blocked"] == len(state["blocked_cards"])
+    assert summary["duration_ms"] >= summary["step_ms"] >= 0
+    assert state["customer_id"] not in json.dumps(summary)   # counts only, no identifiers
 
 
 def test_step_is_logged_when_a_node_raises(fake_services, caplog):
