@@ -111,10 +111,15 @@ El servidor obtiene `customer_id` del token de sesión, nunca de un argumento;
 uv run --project apps/agent scripts/run_disputes.py --session dev --debug
 ```
 
-Chat del validador de identidad (`scripts/chat_validator.py`): datos sintéticos con
+Login: los grafos (`disputes` y `validation_triage`) piden la identidad con un
+formulario (pausa `identity_form`: `document_number`, `date_of_birth`,
+`product_number`) y la verifican con el tool `verify_identity` del servidor MCP.
+Ningún LLM recibe esos datos; el agente nunca consulta BigQuery.
+
+Demo del validador conversacional (`scripts/chat_validator.py`, usa
+`ValidationAgent` con LLM; ningún grafo lo usa): datos sintéticos con
 `uv run --project apps/agent scripts/chat_validator.py`. Con `--mcp` verifica
-clientes reales con el tool `verify_identity` del servidor MCP; el agente nunca
-consulta BigQuery.
+clientes reales por MCP.
 
 `DEV_SESSIONS` se conserva para herramientas y flujo legacy. El flujo por defecto
 valida los tres factores por MCP, conserva los guiones de CLI-... y crea su propia
@@ -145,8 +150,8 @@ Referencia: [interrupciones de LangGraph](https://docs.langchain.com/oss/python/
 
 ## Flujo acotado de validación y triage
 
-La CLI usa ahora `graphs/validation_triage.py`: ejecuta ValidationAgent real,
-verifica identidad a través de MCP y clasifica con LLMClassifier/decide.
+La CLI usa ahora `graphs/validation_triage.py`: pide la identidad con el
+formulario (sin LLM), la verifica a través de MCP y clasifica con LLMClassifier/decide.
 Se detiene con un destino pendiente antes de emergency/fraud.
 Ver [configuración, pruebas y límites](../../docs/validation-triage-local.md).
 `DEV_SESSIONS` no salta la validación en este flujo.
