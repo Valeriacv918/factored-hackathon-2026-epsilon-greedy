@@ -10,6 +10,7 @@ import logging
 from typing import Callable
 
 from bank_agent.config.settings import settings
+from bank_agent.observability import llm_config, log_event
 from bank_agent.prompts.triage import TRIAGE_SYSTEM_PROMPT
 from bank_agent.nodes.triage_agent.schemas import Intent, Understanding
 
@@ -47,7 +48,8 @@ class LLMClassifier:
             llm = init_chat_model(settings.llm_model, temperature=0)   # temperature 0: respuestas estables
             # json_schema: Groq obliga al modelo a responder con el formato de Understanding.
             # (Con "function_calling", gpt-oss a veces inventa el nombre de la herramienta.)
-            structured_llm = llm.with_structured_output(Understanding, method="json_schema")
+            structured_llm = (llm.with_structured_output(Understanding, method="json_schema")
+                              .with_config(llm_config("triage")))
         self.llm = structured_llm
         self.max_attempts = max_attempts    # regla global 3: reintentar una vez
         self.today = today
@@ -62,10 +64,13 @@ class LLMClassifier:
             self.calls += 1
             try:
                 result = self.llm.invoke(messages)
-                if isinstance(result, Understanding):
-                    return result
-                return Understanding.model_validate(result)   # por si llega como dict
+                if not isinstance(result, Understanding):
+                    result = Understanding.model_validate(result)   # por si llega como dict
+                log_event("llm.result", step="triage", intent=result.intent.value, confidence=result.confidence,
+                          wants_human=result.wants_human, attempt=attempt)
+                return result
             except Exception as exc:
                 logger.warning("Fallo del clasificador (intento %s): %s", attempt, exc)
+        log_event("llm.result", step="triage", fallback=True, attempt=self.max_attempts)
         return FALLBACK
     

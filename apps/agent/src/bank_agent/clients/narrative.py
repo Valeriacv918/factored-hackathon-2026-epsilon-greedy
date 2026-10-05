@@ -9,6 +9,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from bank_agent.clients.contracts import ServiceFailure
+from bank_agent.observability import llm_config, log_event
 from bank_agent.prompts.handoff import HANDOFF_PROMPT, LANGUAGE_NAMES
 
 
@@ -26,7 +27,8 @@ class LlmNarrator:
     def from_model_id(cls, model_id: str) -> "LlmNarrator":
         from langchain.chat_models import init_chat_model
         # json_schema: same reason as the triage classifier (gpt-oss on Groq).
-        return cls(init_chat_model(model_id, temperature=0).with_structured_output(Narrative, method="json_schema"))
+        return cls(init_chat_model(model_id, temperature=0).with_structured_output(Narrative, method="json_schema")
+                   .with_config(llm_config("narrative")))
 
     def write(self, facts: dict[str, Any], language: str) -> str:
         system = HANDOFF_PROMPT.format(language=LANGUAGE_NAMES.get(language, LANGUAGE_NAMES["es"]))
@@ -34,6 +36,9 @@ class LlmNarrator:
         self.calls += 1
         try:
             out = self._model.invoke([("system", system), ("user", user)])
-            return (out if isinstance(out, Narrative) else Narrative.model_validate(out)).text
+            text = (out if isinstance(out, Narrative) else Narrative.model_validate(out)).text
         except Exception as exc:  # provider, network, rate limit, invalid schema
             raise ServiceFailure("Narrative unavailable") from exc
+        # Length only: the narrative may quote the customer (full text with LOG_LLM_CONTENT=1).
+        log_event("llm.result", step="narrative", chars=len(text))
+        return text

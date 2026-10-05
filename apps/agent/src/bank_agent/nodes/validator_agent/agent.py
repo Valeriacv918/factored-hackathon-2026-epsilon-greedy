@@ -21,6 +21,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 from ...config.settings import settings
 from .language import detect_language
 from .validator import IdentityValidator, Status
+from bank_agent.observability import llm_config, log_event
 from bank_agent.prompts.validation import ALREADY_DONE, BASE_PROMPT, LANG_NAMES
 
 
@@ -82,7 +83,8 @@ class ValidationAgent:
         self.last_result = None
         out = self.agent.invoke(
             {"messages": [{"role": "user", "content": user_text}]},
-            config={"configurable": {"thread_id": self.session.session_id},
+            config={**llm_config("validator"),
+                    "configurable": {"thread_id": self.session.session_id},
                     "recursion_limit": 8},   # límite de pasos del loop
         )
         reply = out["messages"][-1].content
@@ -95,6 +97,9 @@ class ValidationAgent:
         else:
             next_step = "triage" if authenticated else "ask_user"
             status = None
+        # Never the reply: it may repeat identity factors (it is in llm.call with LOG_LLM_CONTENT=1).
+        log_event("llm.result", step="validator", status=status, next_step=next_step,
+                  authenticated=authenticated)
 
         return {
             "reply": reply,
