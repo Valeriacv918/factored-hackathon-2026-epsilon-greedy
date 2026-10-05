@@ -35,11 +35,38 @@ def test_one_card_block_verified_then_replacement(language):
     assert s.calls.index("block_card") < s.calls.index("read_block")      # BLOCK_AND_VERIFY
 
 
-def test_several_cards_customer_chooses_which_to_block():
+def test_lost_wallet_offers_to_block_the_other_cards_too():
     s = FakeServices(intent="emergency"); s.cards.append(dict(SECOND_CARD))
-    graph_state, kinds = run(s, [{"choice": "card-2"}, YES, NO])
+    state, kinds = run(s, [{"choice": "card-2"}, YES, YES, NO], message="perdí mi billetera")
+    assert kinds == ["select_card", "confirm_block", "confirm_block", "unrecognized_charge"]
+    assert state["blocked_cards"] == ["card-2", "card-1"] and s.calls.count("block_card") == 2
+    assert set(state["block_verified_at"]) == {"card-1", "card-2"}
+
+
+def test_declining_an_extra_card_continues_without_escalating():
+    """Rechazar la tarjeta EXTRA es decisión del cliente, no señal de riesgo: no es block_declined P1."""
+    s = FakeServices(intent="emergency"); s.cards.append(dict(SECOND_CARD))
+    state, kinds = run(s, [{"choice": "card-2"}, YES, NO, NO])
+    assert kinds == ["select_card", "confirm_block", "confirm_block", "unrecognized_charge"]
+    assert state["blocked_cards"] == ["card-2"] and state["skipped_cards"] == ["card-1"]
+    assert (state["reason"], state["priority"]) == ("card_replacement", "P3")
+
+
+def test_extra_card_question_is_different_and_shows_last4():
+    s = FakeServices(intent="emergency"); s.cards.append(dict(SECOND_CARD))
+    graph = build_graph(s, checkpointer=InMemorySaver()); config = {"configurable": {"thread_id": "e"}}
+    graph.invoke(initial_state("e", "trusted-session", "perdí mi billetera"), config)
+    first = graph.invoke(Command(resume={"choice": "card-2"}), config)["__interrupt__"][0].value
+    extra = graph.invoke(Command(resume=YES), config)["__interrupt__"][0].value
+    assert first["card_id"] == "card-2" and first["last4"] == "5678" and "Confirmas" in first["message"]
+    assert extra["card_id"] == "card-1" and extra["last4"] == "1234" and "También" in extra["message"]
+
+
+def test_already_blocked_cards_are_not_offered_again():
+    s = FakeServices(intent="emergency"); s.cards.append({**SECOND_CARD, "status": "Blocked"})
+    state, kinds = run(s, [{"choice": "card-1"}, YES, NO])
     assert kinds == ["select_card", "confirm_block", "unrecognized_charge"]
-    assert graph_state["blocked_cards"] == ["card-2"]
+    assert s.calls.count("block_card") == 1
 
 
 def test_select_card_shows_only_last4_never_full_number():
@@ -93,4 +120,4 @@ def test_mentioning_the_theft_while_describing_the_charge_does_not_restart_the_e
     graph.invoke(Command(resume=YES), config)
     state = graph.invoke(Command(resume={"text": "el cargo que hicieron con la tarjeta que me robaron"}), config)
     assert state["__interrupt__"][0].value["kind"] == "confirm_dispute"
-    assert s.calls.count("list_cards") == 1
+    assert s.calls.count("block_card") == 1

@@ -141,8 +141,10 @@ def test_graph_lost_card_blocks_and_verifies_through_the_server():
     state = graph.invoke(Command(resume={"choice": "yes"}), config)
     assert state["__interrupt__"][0].value["kind"] == "unrecognized_charge"
     assert state["blocked_cards"] == ["PRD-1"] and set(state["block_verified_at"]) == {"PRD-1"}
-    # get_card runs again because LangGraph re-executes the node on resume.
-    assert [name for name, _ in s._client.calls] == ["list_cards", "get_card", "get_card", "block_card", "read_block"]
+    # get_card runs again because LangGraph re-executes the node on resume; the last
+    # list_cards checks for other active cards to offer (lost wallet).
+    assert [name for name, _ in s._client.calls] == ["list_cards", "get_card", "get_card", "block_card", "read_block",
+                                                     "list_cards"]
     assert s._client.calls[3][1] == {"card_id": "PRD-1", "idempotency_key": "t:block_card:PRD-1", "session_token": TOKEN}
     assert s._client.calls[4][1] == {"id": "BLK-1", "session_token": TOKEN}
 

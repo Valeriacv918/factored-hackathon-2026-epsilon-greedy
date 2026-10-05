@@ -27,6 +27,7 @@ class ConversationState(TypedDict, total=False):
     card_id: str
     account_id: str
     blocked_cards: list[str]
+    skipped_cards: list[str]  
     suspended_accounts: list[str]
     denied_transactions: list[dict[str, Any]]
     risk_transactions: list[dict[str, Any]]
