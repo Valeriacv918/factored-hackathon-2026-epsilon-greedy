@@ -54,7 +54,7 @@ Every event has these fields:
 |---|---|---|
 | `step` | every graph node run, in both graphs | `phase`, `next` (route chosen), `ms`. Plus `waiting: true` when the node paused for the customer (interrupt), or `error` (exception type) when it raised |
 | `llm.call` | every chat-model call | `step` (`understanding`, `triage`, `narrative`, `validator`), `model`, `ms`, `status` (`ok`/`error`), `input_tokens`, `output_tokens`, `error`. With `LOG_LLM_CONTENT=1` also `messages` and `output` |
-| `llm.result` | after the agent parses the LLM output | depends on `step`: **understanding** `intent`, `confidence`, `slots`, `wants_human` · **triage** `intent`, `confidence`, `wants_human`, `attempt` (or `fallback: true`) · **narrative** `chars` · **validator** `status`, `next_step`, `authenticated` |
+| `llm.result` | after the agent parses the LLM output | depends on `step`: **understanding** `intent`, `confidence`, `slots`, `wants_human` · **triage** `intent`, `confidence`, `wants_human`, `attempt` (or `fallback: true`) · **narrative** `chars` · **validator** `status`, `next_step`, `authenticated`, `language`, `language_source` (`detected`, `sticky`, `default` while unclear, `choice` when the customer named one) |
 | `mcp.call` | every MCP tool call | `tool`, `args` (sensitive keys `<redacted>`), `ms`, `status`, `error` (the server's error text) |
 | `conversation.summary` | when a node routes to `end` | `steps`, `llm_calls`, `input_tokens`, `output_tokens`, `llm_ms`, `mcp_calls`, `mcp_ms`, `errors` |
 | `log` | any other log record from `bank_agent.*` | `logger`, `message` |

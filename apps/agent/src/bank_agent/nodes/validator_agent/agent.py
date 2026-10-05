@@ -22,8 +22,15 @@ from ...config.settings import settings
 from .language import detect_language
 from .validator import IdentityValidator, Status
 from bank_agent.observability import llm_config, log_event
-from bank_agent.prompts.validation import ALREADY_DONE, BASE_PROMPT, LANG_NAMES
+from bank_agent.prompts.validation import (ALREADY_DONE, AMBIGUOUS_LANG_NOTE, BASE_PROMPT, BOTH_LANGUAGES,
+                                           LANG_NAMES)
 
+
+def system_prompt(language: str, ambiguous: bool) -> str:
+    """Prompt del agente 1. Con el idioma aún no claro, escribe y pregunta en ambos idiomas."""
+    if ambiguous:
+        return BASE_PROMPT.format(lang_name=BOTH_LANGUAGES, lang_note=AMBIGUOUS_LANG_NOTE)
+    return BASE_PROMPT.format(lang_name=LANG_NAMES[language], lang_note="")
 
 
 class ValidationAgent:
@@ -47,10 +54,8 @@ class ValidationAgent:
 
         @dynamic_prompt
         def prompt_with_language(request: ModelRequest) -> str:
-            lang = self.session.language or settings.policy.default_language
-            note = ("- No estás seguro del idioma del cliente: pregúntale brevemente si "
-                    "prefiere español o portugués.") if self.lang_ambiguous else ""
-            return BASE_PROMPT.format(lang_name=LANG_NAMES[lang], lang_note=note)
+            return system_prompt(self.session.language or settings.policy.default_language,
+                                 self.lang_ambiguous)
 
         self.agent = create_agent(
             model=model or settings.llm_model,
@@ -61,7 +66,9 @@ class ValidationAgent:
 
     def chat(self, user_text: str) -> dict:
         # 1) idioma (determinístico)
-        lr = detect_language(user_text, previous=self.session.language)
+        # While the language question is pending there is no language to keep: an answer
+        # that is neither a choice nor clear Spanish/Portuguese ("dansk") keeps asking.
+        lr = detect_language(user_text, previous=None if self.lang_ambiguous else self.session.language)
         self.session.language = lr.language
         self.lang_ambiguous = lr.ambiguous
 
@@ -99,7 +106,7 @@ class ValidationAgent:
             status = None
         # Never the reply: it may repeat identity factors (it is in llm.call with LOG_LLM_CONTENT=1).
         log_event("llm.result", step="validator", status=status, next_step=next_step,
-                  authenticated=authenticated)
+                  authenticated=authenticated, language=lr.language, language_source=lr.source)
 
         return {
             "reply": reply,
