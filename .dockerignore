@@ -1,0 +1,14 @@
+# Only what the Dockerfile copies; never secrets or local environments.
+*
+!apps/agent/pyproject.toml
+!apps/agent/uv.lock
+!apps/agent/src/
+!apps/mcp-server/pyproject.toml
+!apps/mcp-server/uv.lock
+!apps/mcp-server/src/
+!evals/cases/results/
+**/.venv
+**/__pycache__
+**/*.egg-info
+**/.env
+**/.env.*

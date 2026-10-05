@@ -30,7 +30,8 @@ def build_graph(services, *, checkpointer, policy=None):
         def node(state):
             with logged_step(state.get("conversation_id"), name, state.get("phase")) as step:
                 result = run(state)
-                step.update(next=result["route"], phase=result.get("phase", state.get("phase")))
+                step.update(next=result["route"], phase=result.get("phase", state.get("phase")),
+                            state={**state, **result})
                 return result
 
         def run(state):

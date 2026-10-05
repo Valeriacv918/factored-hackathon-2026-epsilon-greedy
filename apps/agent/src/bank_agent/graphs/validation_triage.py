@@ -171,7 +171,8 @@ def build_graph(services, *, checkpointer, policy=None, test_charge_error=False,
         def run(state):
             with logged_step(state.get("conversation_id"), name, state.get("phase")) as step:
                 result = fn(deepcopy(state))
-                step.update(next=result["route"], phase=result.get("phase", state.get("phase")))
+                step.update(next=result["route"], phase=result.get("phase", state.get("phase")),
+                            state={**state, **result})
             result["trace"] = state.get("trace", []) + [{
                 "node": name, "phase": result.get("phase", state.get("phase")), "next": result["route"],
                 "at": services.now().isoformat(),

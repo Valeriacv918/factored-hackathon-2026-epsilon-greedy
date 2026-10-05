@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Epsilon Bank Asistente</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234B2A84'/%3E%3Ctext x='16' y='22' font-size='17' text-anchor='middle' fill='%23C6F432' font-family='sans-serif' font-weight='700'%3E%CE%B5%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">ε</span>
+      <div>
+        <strong>Epsilon Bank</strong>
+        <span class="sub">Asistente de tarjetas y disputas</span>
+      </div>
+    </div>
+    <div class="topbar-meta">
+      <span class="pill sandbox" title="Bloqueos, disputas y tickets se escriben en un sandbox simulado">Sandbox simulado</span>
+      <span class="pill" id="scenario-date" hidden></span>
+      <button class="ghost" id="new-chat" type="button">Nueva conversación</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="chat" aria-label="Conversación con el asistente">
+      <ol class="messages" id="messages" aria-live="polite">
+        <li class="msg agent intro">
+          <p>Hola. Puedo ayudarte con una <b>tarjeta perdida o robada</b>, un <b>cargo que no reconoces</b> o un <b>cobro equivocado</b>. Escríbeme en español o portugués.</p>
+          <p class="hint">Antes de ver tus productos verificaremos tu identidad con un formulario seguro. No escribas tus datos personales en el chat.</p>
+        </li>
+      </ol>
+      <div class="trace" id="trace" hidden>
+        <span class="trace-label">Recorrido</span>
+        <ol id="trace-steps"></ol>
+      </div>
+      <form class="composer" id="composer" autocomplete="off">
+        <label class="sr-only" for="composer-input">Mensaje</label>
+        <textarea id="composer-input" rows="1" maxlength="1000" placeholder="Me robaron la billetera…"></textarea>
+        <button class="primary" id="composer-send" type="submit">Enviar</button>
+      </form>
+    </section>
+
+    <aside class="stats" aria-label="Estadísticas">
+      <div class="tabs" role="tablist">
+        <button role="tab" id="tab-live" aria-selected="true" aria-controls="panel-live">En vivo</button>
+        <button role="tab" id="tab-offline" aria-selected="false" aria-controls="panel-offline">Evaluación offline</button>
+      </div>
+
+      <div class="panel" id="panel-live" role="tabpanel" aria-labelledby="tab-live">
+        <p class="note">Conversaciones atendidas por este servicio desde su último arranque. Las acciones son simuladas en el sandbox.</p>
+        <div class="kpis">
+          <div class="kpi"><span class="label">Conversaciones</span><span class="value" id="k-conversations">0</span><span class="foot" id="k-active"></span></div>
+          <div class="kpi"><span class="label">Tickets a humano</span><span class="value" id="k-tickets">0</span><span class="foot">verificados</span></div>
+          <div class="kpi"><span class="label">Tiempo de atención p50</span><span class="value" id="k-attention">—</span><span class="foot" id="k-attention-p95"></span></div>
+          <div class="kpi"><span class="label">Latencia del sistema p50</span><span class="value" id="k-system">—</span><span class="foot" id="k-system-p95"></span></div>
+        </div>
+
+        <h3>Cómo terminaron</h3>
+        <div class="stack" id="outcome-bar" aria-hidden="true"></div>
+        <ul class="legend" id="outcome-legend"></ul>
+        <p class="note small" id="containment"></p>
+
+        <h3>Acciones verificadas</h3>
+        <ul class="facts">
+          <li><span>Tarjetas bloqueadas</span><b id="a-cards">0</b></li>
+          <li><span>Disputas registradas</span><b id="a-cases">0</b></li>
+          <li><span>Errores de herramientas</span><b id="a-errors">0</b></li>
+        </ul>
+
+        <h3>Tickets por cola y prioridad</h3>
+        <div class="chips" id="tickets-queue"></div>
+        <div class="chips" id="tickets-priority"></div>
+
+        <h3>Intención e idioma</h3>
+        <div class="bars" id="intents"></div>
+        <div class="chips" id="languages"></div>
+
+        <h3>Costo estimado del LLM</h3>
+        <ul class="facts">
+          <li><span>Por conversación</span><b id="c-conv">—</b></li>
+          <li><span>Por resolución automática</span><b id="c-resolved">—</b></li>
+        </ul>
+        <p class="note small" id="c-assumption"></p>
+
+        <h3>Últimas conversaciones</h3>
+        <ol class="recent" id="recent"></ol>
+      </div>
+
+      <div class="panel" id="panel-offline" role="tabpanel" aria-labelledby="tab-offline" hidden>
+        <p class="note">Medición offline sobre mensajes sintéticos etiquetados (held-out). No es una medición en producción.</p>
+        <h3>Triage: baseline vs LLM</h3>
+        <div id="offline-table"></div>
+        <p class="note small" id="offline-run"></p>
+        <h3>Qué significa</h3>
+        <ul class="defs">
+          <li><b>Exactitud</b>: la ruta elegida coincide con la etiqueta del caso.</li>
+          <li><b>Errores críticos</b>: fallos que pueden costarle dinero al cliente, como una tarjeta robada que no va a emergencia o un reclamo de dinero marcado como fuera de alcance.</li>
+          <li><b>Baseline</b>: reglas por palabras clave. <b>LLM</b>: clasificador con reglas deterministas encima.</li>
+        </ul>
+      </div>
+    </aside>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
