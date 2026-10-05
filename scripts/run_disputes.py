@@ -8,10 +8,14 @@ Use (from the repository root, in the agent's uv env):
   uv run --project apps/agent scripts/run_disputes.py --session dev
   uv run --project apps/agent scripts/run_disputes.py --session dev --debug
 
+JSON events (steps, LLM calls, MCP calls) go to logs/agent.jsonl, or LOG_FILE.
+--debug also logs LLM prompts and outputs (LOG_LLM_CONTENT=1): local use only.
+
 Inside: answer buttons by number or value, /new restarts, /quit exits.
 """
 import argparse
 import json
+import os
 import sys
 import uuid
 from pathlib import Path
@@ -29,6 +33,7 @@ from langgraph.types import Command  # noqa: E402
 from bank_agent.clients.mcp_services import McpServices  # noqa: E402
 from bank_agent.graphs.disputes import build_graph  # noqa: E402
 from bank_agent.graphs.state import initial_state  # noqa: E402
+from bank_agent.observability import configure_logging  # noqa: E402
 
 
 class Quit(Exception):
@@ -91,20 +96,31 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--session", default="dev", help="Session reference from DEV_SESSIONS")
     parser.add_argument("--debug", action="store_true", help="Print state and trace after each conversation")
-    parser.add_argument("--flow", choices=["validation-triage", "charge-error", "fraud", "legacy"],
+    parser.add_argument("--flow", choices=["validation-triage", "charge-error", "fraud", "fraud-escalation", "legacy"],
                         default="validation-triage",
-                        help="validation-triage: classify only; charge-error: charge search, explanation and sandbox result; legacy: general graph.")
+                        help="validation-triage: classify only; charge-error: explain a charge; fraud: simulate fraud actions; fraud-escalation: include verified sandbox handoff and notification; legacy: general graph.")
     args = parser.parse_args()
 
+    # JSON events go to a file so they don't interleave with the chat; --debug adds LLM prompts/outputs.
+    os.environ["LOG_FILE"] = os.environ.get("LOG_FILE") or str(ROOT / "logs" / "agent.jsonl")
+    if args.debug:
+        os.environ["LOG_LLM_CONTENT"] = "1"
+    configure_logging()
+
     services = McpServices.from_env()
-    if args.flow in {"validation-triage", "charge-error", "fraud"}:
+    if args.flow in {"validation-triage", "charge-error", "fraud", "fraud-escalation"}:
         from bank_agent.graphs.validation_triage import build_graph as build_scoped_graph
-        graph = build_scoped_graph(services, checkpointer=InMemorySaver(), test_charge_error=args.flow in {"charge-error", "fraud"}, test_fraud=args.flow == "fraud")
+        graph = build_scoped_graph(services, checkpointer=InMemorySaver(),
+            test_charge_error=args.flow in {"charge-error", "fraud", "fraud-escalation"},
+            test_fraud=args.flow in {"fraud", "fraud-escalation"}, test_escalation=args.flow == "fraud-escalation")
     else:
         graph = build_graph(services, checkpointer=InMemorySaver())
-    if args.flow == "fraud":
-        print("Prueba de fraude: bloqueos y disputas SIMULATED en sandbox; escalamiento termina sin crear ticket.")
-    print(f"Scenario date {services.now():%Y-%m-%d}. Session '{args.session}'. /new restarts, /quit exits.\n")
+    if args.flow in {"fraud", "fraud-escalation"}:
+        escalation_note = ("; escalamiento crea y verifica handoff/notificación SIMULATED" if args.flow == "fraud-escalation"
+                           else "; escalamiento termina sin crear ticket")
+        print(f"Prueba de fraude: bloqueos y disputas SIMULATED en sandbox{escalation_note}.")
+    print(f"Scenario date {services.now():%Y-%m-%d}. Session '{args.session}'. /new restarts, /quit exits.")
+    print(f"Logs: {os.environ['LOG_FILE']}\n")
     try:
         while True:
             try:

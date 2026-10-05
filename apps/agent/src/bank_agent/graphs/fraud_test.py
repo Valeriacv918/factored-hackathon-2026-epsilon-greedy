@@ -4,7 +4,7 @@ from bank_agent.nodes import fraud_agent
 from bank_agent.nodes.common import HandoffRequested, require_session
 from bank_agent.graphs.charge_test import terminal
 
-def build_node(services, policy):
+def build_node(services, policy, *, connect_escalation=False):
     def run(s):
         try:
             require_session(s, services)
@@ -17,7 +17,7 @@ def build_node(services, policy):
                 return {**result, "route":"charge_details", "phase":"clarify",
                         "charge_candidates":[], "charge_input":"", "reason":"",
                         "clarification_attempts":0, "transaction":{}, "card_id":None, "account_id":None}
-            if result["route"] == "escalation":
+            if result["route"] == "escalation" and not connect_escalation:
                 return {**result, **terminal("human_required",
                     "Se requiere revisión humana. No se creó una derivación en esta prueba.",
                     reason=result.get("reason"), queue=result.get("queue"), priority=result.get("priority"))}
@@ -28,10 +28,31 @@ def build_node(services, policy):
             return terminal("authentication_required", "La sesión expiró. Inicia una nueva conversación.",
                             authenticated=False, customer_id="")
         except HandoffRequested as exc:
+            if connect_escalation:
+                return {"route": "escalation", "phase": "start", "reason": exc.reason,
+                        "queue": "general", "priority": "P2" if s.get("intent") in {"not_me", "emergency"} else "P3"}
             return terminal("human_requested", "Solicitud de atención humana identificada; no se creó una derivación.",
                             reason=exc.reason)
         except ServiceFailure:
             return terminal("service_unavailable",
                 "No se pudo completar y verificar la operación. Revisa los recibos antes de reintentar.",
                 reason="fraud_tool_failure")
+    return run
+
+
+def build_escalation_node(services, policy):
+    from bank_agent.nodes import escalation
+
+    def run(s):
+        try:
+            require_session(s, services)
+            return escalation.run(s, services, policy)
+        except SessionExpired:
+            return terminal("authentication_required", "La sesión expiró. Inicia una nueva conversación.",
+                            authenticated=False, customer_id="")
+        except ServiceFailure:
+            return terminal("service_unavailable",
+                            "No se pudo completar y verificar la derivación. Revisa los recibos antes de reintentar.",
+                            reason="escalation_tool_failure")
+
     return run

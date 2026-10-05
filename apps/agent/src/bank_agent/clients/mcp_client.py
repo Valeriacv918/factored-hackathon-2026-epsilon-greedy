@@ -9,10 +9,12 @@ import asyncio
 import concurrent.futures
 import logging
 import threading
+import time
 from pathlib import Path
 from typing import Any
 
 from bank_agent.clients.contracts import ServiceFailure, SessionExpired
+from bank_agent.observability import current, elapsed_ms, log_event, safe_args
 
 logger = logging.getLogger(__name__)
 
@@ -88,9 +90,24 @@ class McpToolClient:
                 raise ServiceFailure("MCP server unavailable") from exc
 
     def call(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
-        """Call a tool and return its structured result; any problem is a ServiceFailure."""
+        """Call a tool and return its structured result; any problem is a ServiceFailure.
+
+        Logs one mcp.call event (identity factors and token redacted) and sends the
+        conversation_id/node in the request _meta so the server's logs carry them too."""
+        started, error = time.perf_counter(), None
+        try:
+            return self._call(name, arguments)
+        except Exception as exc:
+            error = getattr(exc, "detail", None) or str(exc) or type(exc).__name__
+            raise
+        finally:
+            log_event("mcp.call", tool=name, args=safe_args(arguments), ms=elapsed_ms(started),
+                      status="error" if error else "ok", **({"error": error} if error else {}))
+
+    def _call(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+        meta = {key: value for key, value in current().items() if value is not None} or None
         self.start()
-        future = asyncio.run_coroutine_threadsafe(self._session.call_tool(name, arguments), self._loop)
+        future = asyncio.run_coroutine_threadsafe(self._session.call_tool(name, arguments, meta=meta), self._loop)
         try:
             result = future.result(timeout=self.timeout_s)
         except concurrent.futures.TimeoutError as exc:
@@ -99,11 +116,12 @@ class McpToolClient:
         except Exception as exc:
             raise ServiceFailure(f"{name} failed") from exc
         if result.is_error:
-            # Server error text stays in logs; it is not shown to the customer.
-            logger.info("MCP tool %s returned an error", name)
-            if _error_code(result) == SESSION_INVALID:
-                raise SessionExpired()
-            raise ServiceFailure(f"{name} returned an error")
+            # Server error text goes to the log (mcp.call), never to the customer.
+            text = " ".join(getattr(c, "text", "") for c in result.content or []).strip()
+            failure = SessionExpired() if _error_code(result) == SESSION_INVALID else ServiceFailure(
+                f"{name} returned an error")
+            failure.detail = text
+            raise failure
         if not isinstance(result.structured_content, dict):
             raise ServiceFailure(f"{name} returned no structured content")
         return result.structured_content

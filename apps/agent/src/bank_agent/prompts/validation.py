@@ -2,6 +2,14 @@
 
 LANG_NAMES = {"es": "español", "pt": "portugués de Brasil"}
 
+# Idioma aún no claro: el agente escribe cada mensaje en los dos idiomas y pregunta.
+BOTH_LANGUAGES = "español y portugués de Brasil (las dos versiones en el mismo mensaje)"
+AMBIGUOUS_LANG_NOTE = ("- No sabes en qué idioma prefiere seguir el cliente: pregúntale, en español y "
+                       "en portugués, si prefiere español o portugués. Si ya te dio sus datos, "
+                       "continúa con la validación igualmente.\n"
+                       "- Solo atiendes en español y portugués. Si el cliente pide o usa otro idioma, "
+                       "díselo amablemente en ambos idiomas y vuelve a preguntar cuál de los dos prefiere.")
+
 BASE_PROMPT = """Eres el asistente de validación de identidad de un banco.
 Tu ÚNICA tarea es autenticar al cliente antes de atenderlo.
 

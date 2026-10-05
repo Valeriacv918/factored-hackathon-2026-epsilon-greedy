@@ -10,6 +10,7 @@ from typing import Any, Callable, Literal
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
 from bank_agent.clients.contracts import ServiceFailure
+from bank_agent.observability import llm_config, log_event
 from bank_agent.prompts.understanding import UNDERSTANDING_PROMPT
 
 LANGUAGE_NAMES = {"es": "Spanish", "pt": "Portuguese"}
@@ -65,7 +66,8 @@ class LlmUnderstanding:
     @classmethod
     def from_model_id(cls, model_id: str, clock: Callable[[], dt.datetime]) -> "LlmUnderstanding":
         from langchain.chat_models import init_chat_model
-        return cls(init_chat_model(model_id, temperature=0).with_structured_output(Extraction), clock)
+        return cls(init_chat_model(model_id, temperature=0).with_structured_output(Extraction)
+                   .with_config(llm_config("understanding")), clock)
 
     def understand(self, text: str, language: str) -> dict[str, Any]:
         system = UNDERSTANDING_PROMPT.format(language=LANGUAGE_NAMES.get(language, "unknown"),
@@ -77,6 +79,8 @@ class LlmUnderstanding:
             raise ServiceFailure("Invalid extraction schema") from exc
         except Exception as exc:  # provider, network, rate limit
             raise ServiceFailure("Understanding unavailable") from exc
-        return {"intent": extraction.intent, "confidence": extraction.confidence,
-                "slots": extraction.slots.model_dump(mode="json", exclude_none=True),
-                "wants_human": extraction.wants_human}
+        result = {"intent": extraction.intent, "confidence": extraction.confidence,
+                  "slots": extraction.slots.model_dump(mode="json", exclude_none=True),
+                  "wants_human": extraction.wants_human}
+        log_event("llm.result", step="understanding", **result)
+        return result
