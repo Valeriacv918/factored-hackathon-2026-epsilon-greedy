@@ -74,7 +74,7 @@ def run(s, services, policy):
         decision = decide(reply["text"], u)          # same rules: "me robaron" or "quiero un humano" win
         if decision.route == Route.ESCALATION:
             return escalate("requested_human")
-        if decision.route == Route.EMERGENCY:
+        if decision.route == Route.EMERGENCY and not s.get("blocked_cards"):   # emergency already handled: keep the charge
             return go("card_emergency_agent", intent="emergency")
         return go("triage_agent", "find", slots={**s.get("slots", {}), **search_slots(u.slots)},
                   turns=s["turns"] + 1, clarification_attempts=s["clarification_attempts"] + 1)
