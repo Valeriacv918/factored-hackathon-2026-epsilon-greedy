@@ -7,12 +7,24 @@ from bank_agent.nodes.common import HandoffRequested, require_session, number
 def terminal(outcome, response, **extra):
     return dict(route="end", phase="end", outcome=outcome, response=response, **extra)
 
-def build_nodes(services, policy, *, test_fraud=False, test_escalation=False):
+def build_nodes(services, policy, *, test_fraud=False, test_escalation=False, test_card_emergency=False):
+    def handoff(s, reason):
+        if test_escalation:
+            return dict(route="escalation", phase="start", reason=reason,
+                        queue="fraud" if s.get("intent") == "not_me" else "general", priority="P2")
+        return terminal("human_requested", "Solicitud de atención humana identificada; no se creó un ticket.")
+
     def extract(s):
         parsed = services.understand(s.get("charge_input") or s["message"], s["language"])
         if parsed.get("wants_human"):
-            return terminal("human_requested", "Solicitud de atención humana identificada; no se creó un ticket.")
-        if parsed.get("intent") == "emergency" or (parsed.get("intent") == "not_me" and not test_fraud):
+            return handoff(s, "requested_human")
+        protected_search = test_fraud and s.get("intent") == "not_me" and bool(s.get("blocked_cards"))
+        if parsed.get("intent") == "emergency" and not protected_search:
+            if test_card_emergency:
+                return dict(route="card_emergency_agent", phase="start", intent="emergency",
+                            card_id=None, account_id=None)
+            return terminal("outside_charge_test", "La solicitud requiere la ruta de emergencia.")
+        if parsed.get("intent") == "not_me" and not test_fraud:
             return terminal("outside_charge_test", "La solicitud requiere otra ruta; termina esta prueba de error en un cargo.")
         slots = parsed.get("slots")
         if not isinstance(slots, dict):
@@ -29,13 +41,13 @@ def build_nodes(services, policy, *, test_fraud=False, test_escalation=False):
             raise ServiceFailure("Ownership mismatch")
         if not candidates or result.get("has_more"):
             if s.get("clarification_attempts",0) >= policy.max_clarifications:
-                return terminal("transaction_unresolved", "No se pudo identificar el cargo con los datos proporcionados.")
+                return handoff(s, "transaction_unresolved") if test_escalation else terminal("transaction_unresolved", "No se pudo identificar el cargo con los datos proporcionados.")
             return dict(route="charge_details", phase="clarify", charge_candidates=[],
                         reason="no_matches" if not candidates else "too_many_matches")
         return dict(route="charge_select", phase="select", charge_candidates=candidates, reason="")
 
     def details(s):
-        prefix = "No encontré coincidencias con esos filtros. " if s.get("reason") == "no_matches" else "Hay varios movimientos posibles. "
+        prefix = "No encontré coincidencias con esos filtros. " if s.get("reason") == "no_matches" else ("Hay varios movimientos posibles. " if s.get("reason") == "too_many_matches" else "")
         reply = interrupt({"kind":"transaction_details","message":prefix +
             "Indica o corrige la fecha (o un rango de fechas), el monto y la moneda si la conoces. "
             "El comercio es opcional; puedes omitirlo si no aparece."})
@@ -60,7 +72,7 @@ def build_nodes(services, policy, *, test_fraud=False, test_escalation=False):
             return terminal("human_requested","Solicitud de atención humana identificada; no se creó un ticket.")
         if choice=="none":
             if s.get("clarification_attempts",0)>=policy.max_clarifications:
-                return terminal("transaction_unresolved","No se pudo identificar el cargo.")
+                return handoff(s, "transaction_unresolved") if test_escalation else terminal("transaction_unresolved","No se pudo identificar el cargo.")
             return dict(route="charge_details",phase="clarify")
         tx=next((t for t in candidates if t["id"]==choice),None)
         if tx is None:
@@ -76,7 +88,7 @@ def build_nodes(services, policy, *, test_fraud=False, test_escalation=False):
                         denied_transactions=list(denied.values()), risk_transactions=list(risks.values()),
                         reason="not_me" if s.get("intent") == "not_me" else "fraud_score")
         if score is None:
-            return terminal("human_required","El cargo no tiene un puntaje de riesgo válido para continuar.", reason="missing_fraud_score")
+            return handoff(s, "missing_fraud_score") if test_escalation else terminal("human_required","El cargo no tiene un puntaje de riesgo válido para continuar.", reason="missing_fraud_score")
         if score>policy.fraud_score:
             return terminal("ready_for_fraud","El cargo requiere revisión de fraude; esa ruta queda fuera de esta prueba.",
                 transaction=tx, reason="fraud_score")
@@ -114,7 +126,7 @@ def build_nodes(services, policy, *, test_fraud=False, test_escalation=False):
                 return terminal("authentication_required","La sesión expiró. Inicia una nueva conversación.",
                     authenticated=False,customer_id="")
             except HandoffRequested:
-                return terminal("human_requested","Solicitud de atención humana identificada; no se creó un ticket.")
+                return handoff(s, "requested_human")
             except ServiceFailure:
                 return terminal("service_unavailable","No fue posible completar y verificar el resultado. No se confirma el guardado.")
         return run

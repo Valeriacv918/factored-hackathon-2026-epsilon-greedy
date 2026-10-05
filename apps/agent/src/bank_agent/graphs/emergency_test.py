@@ -11,6 +11,8 @@ def build_node(services, policy, *, connect_fraud=False, connect_escalation=Fals
         try:
             require_session(s, services)
             if s.get("turns", 1) >= policy.max_turns:
+                if connect_escalation:
+                    return dict(route="escalation", phase="start", reason="turn_limit", queue="cards", priority="P2")
                 return terminal("human_required", "Se alcanzó el límite de esta prueba. Se requiere revisión humana.",
                                 reason="turn_limit", queue="cards", priority="P2")
             result = card_emergency_agent.run(s, services, policy)
