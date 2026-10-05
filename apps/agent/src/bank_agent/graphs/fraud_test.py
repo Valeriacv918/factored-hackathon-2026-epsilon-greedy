@@ -12,7 +12,7 @@ def build_node(services, policy):
                 return terminal("human_required", "Se alcanzó el límite de esta prueba. Se requiere revisión humana.",
                                 reason="turn_limit", queue="fraud", priority="P2")
             result = fraud_agent.run(s, services, policy)
-            if result["route"] == "understanding":
+            if result["route"] == "triage_agent":
                 # Existing fraud agent asks for the next unrecognized transaction.
                 return {**result, "route":"charge_details", "phase":"clarify",
                         "charge_candidates":[], "charge_input":"", "reason":"",
