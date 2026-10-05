@@ -7,7 +7,7 @@ from bank_agent.nodes.common import HandoffRequested, require_session, number
 def terminal(outcome, response, **extra):
     return dict(route="end", phase="end", outcome=outcome, response=response, **extra)
 
-def build_nodes(services, policy, *, test_fraud=False):
+def build_nodes(services, policy, *, test_fraud=False, test_escalation=False):
     def extract(s):
         parsed = services.understand(s.get("charge_input") or s["message"], s["language"])
         if parsed.get("wants_human"):
@@ -54,6 +54,9 @@ def build_nodes(services, policy, *, test_fraud=False):
         require_session(s,services)
         choice=reply.get("choice") if isinstance(reply,dict) else None
         if choice=="human":
+            if test_escalation:
+                return {"route":"escalation", "phase":"start", "reason":"requested_human",
+                        "queue":"fraud", "priority":"P2", "risk_transactions":candidates}
             return terminal("human_requested","Solicitud de atención humana identificada; no se creó un ticket.")
         if choice=="none":
             if s.get("clarification_attempts",0)>=policy.max_clarifications:
