@@ -164,5 +164,5 @@ def test_initial_human_request_creates_verified_sandbox_handoff():
     assert s.actions==["create_handoff","read_handoff","notify_employee","read_notification"]
 
 def test_escalation_option_requires_fraud_test_route():
-    with pytest.raises(ValueError,match="test_escalation requires test_fraud"):
+    with pytest.raises(ValueError,match="test_escalation requires test_fraud or test_card_emergency"):
         build_graph(ChargeServices(),checkpointer=InMemorySaver(),test_escalation=True)

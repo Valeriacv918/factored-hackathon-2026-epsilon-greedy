@@ -96,7 +96,8 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--session", default="dev", help="Session reference from DEV_SESSIONS")
     parser.add_argument("--debug", action="store_true", help="Print state and trace after each conversation")
-    parser.add_argument("--flow", choices=["validation-triage", "charge-error", "fraud", "fraud-escalation", "legacy"],
+    parser.add_argument("--flow", choices=["validation-triage", "charge-error", "fraud", "fraud-escalation",
+                                           "card-emergency", "card-emergency-escalation", "legacy"],
                         default="validation-triage",
                         help="validation-triage: classify only; charge-error: explain a charge; fraud: simulate fraud actions; fraud-escalation: include verified sandbox handoff and notification; legacy: general graph.")
     args = parser.parse_args()
@@ -108,11 +109,14 @@ def main() -> None:
     configure_logging()
 
     services = McpServices.from_env()
-    if args.flow in {"validation-triage", "charge-error", "fraud", "fraud-escalation"}:
+    if args.flow in {"validation-triage", "charge-error", "fraud", "fraud-escalation",
+                     "card-emergency", "card-emergency-escalation"}:
         from bank_agent.graphs.validation_triage import build_graph as build_scoped_graph
         graph = build_scoped_graph(services, checkpointer=InMemorySaver(),
             test_charge_error=args.flow in {"charge-error", "fraud", "fraud-escalation"},
-            test_fraud=args.flow in {"fraud", "fraud-escalation"}, test_escalation=args.flow == "fraud-escalation")
+            test_fraud=args.flow in {"fraud", "fraud-escalation"},
+            test_escalation=args.flow in {"fraud-escalation", "card-emergency-escalation"},
+            test_card_emergency=args.flow in {"card-emergency", "card-emergency-escalation"})
     else:
         graph = build_graph(services, checkpointer=InMemorySaver())
     if args.flow in {"fraud", "fraud-escalation"}:

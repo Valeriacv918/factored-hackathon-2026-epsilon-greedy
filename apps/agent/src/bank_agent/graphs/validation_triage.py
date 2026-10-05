@@ -13,13 +13,14 @@ from bank_agent.observability import logged_step
 from bank_agent.nodes.triage_agent.router import decide
 from bank_agent.nodes.triage_agent.schemas import Understanding, Intent, Route, Slots
 
+
 logger = logging.getLogger(__name__)
 CHOICES = ["emergency", "not_me", "charge_error", "other", "human"]
 
 def build_graph(services, *, checkpointer, policy=None, test_charge_error=False, test_fraud=False,
-                test_escalation=False):
-    if test_escalation and not test_fraud:
-        raise ValueError("test_escalation requires test_fraud")
+                test_escalation=False, test_card_emergency=False):
+    if test_escalation and not (test_fraud or test_card_emergency):
+        raise ValueError("test_escalation requires test_fraud or test_card_emergency")
 
     def fail(s, reason, message):
         s.update(route="end", reason=reason, outcome="service_unavailable", response=message)
@@ -96,8 +97,11 @@ def build_graph(services, *, checkpointer, policy=None, test_charge_error=False,
             if decision.route == Route.CLARIFY_INTENT:
                 s.update(route="triage_wait", response="¿Cuál de estas opciones describe tu solicitud?")
             elif decision.route == Route.EMERGENCY:
-                s.update(route="end", outcome="ready_for_card_emergency",
-                         response="Clasificación: emergencia de tarjeta. La ejecución de ese agente está pendiente; no se ha bloqueado ninguna tarjeta.")
+                if test_card_emergency:
+                    s.update(route="card_emergency_agent", phase="start", intent="emergency")
+                else:
+                    s.update(route="end", outcome="ready_for_card_emergency",
+                             response="Clasificación: emergencia de tarjeta. ...")
             elif decision.route == Route.FIND_TRANSACTION and ((test_charge_error and decision.intent == Intent.CHARGE_ERROR) or (test_fraud and decision.intent in {Intent.NOT_ME, Intent.CHARGE_ERROR})):
                 s.update(route="charge_extract", phase="extract", slots={})
             elif decision.route == Route.FIND_TRANSACTION:
@@ -137,6 +141,14 @@ def build_graph(services, *, checkpointer, policy=None, test_charge_error=False,
             nodes["fraud_agent"] = build_node(services, policy or Policy(), connect_escalation=test_escalation)
             if test_escalation:
                 nodes["escalation"] = build_escalation_node(services, policy or Policy())
+    if test_card_emergency:
+        from bank_agent.graphs.emergency_test import build_node as build_card_emergency_node
+        from bank_agent.graphs.fraud_test import build_escalation_node
+        from bank_agent.graphs.policy import Policy
+        nodes["card_emergency_agent"] = build_card_emergency_node(
+            services, policy or Policy(), connect_fraud=test_fraud, connect_escalation=test_escalation)
+        if test_escalation:
+            nodes.setdefault("escalation", build_escalation_node(services, policy or Policy()))
     builder = StateGraph(ConversationState)
     def wrap(name, fn):
         def run(state):
