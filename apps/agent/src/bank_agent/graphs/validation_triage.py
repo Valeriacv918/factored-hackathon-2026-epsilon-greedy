@@ -152,7 +152,7 @@ def build_graph(services, *, checkpointer, policy=None, test_charge_error=False,
         from bank_agent.graphs.charge_test import build_nodes
         from bank_agent.graphs.policy import Policy
         nodes.update(build_nodes(services, policy or Policy(), test_fraud=test_fraud,
-                     test_escalation=test_escalation))
+                     test_escalation=test_escalation, test_card_emergency=test_card_emergency))
         if test_fraud:
             from bank_agent.graphs.fraud_test import build_escalation_node, build_node
             nodes["fraud_agent"] = build_node(services, policy or Policy(), connect_escalation=test_escalation)

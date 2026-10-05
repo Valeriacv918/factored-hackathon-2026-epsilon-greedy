@@ -178,3 +178,36 @@ del agente. La clase independiente FraudAgent conserva su API de repositorios.
 Se requiere SANDBOX_SCENARIO_ID configurado y vigente, alineado con SCENARIO_NOW.
 La CLI avisa que las acciones son SIMULATED. .env permanece fuera de Git.
 Las pruebas sin red están en test_fraud_test_graph.py y test_fraud_agent.py.
+
+
+## Recorrido completo (grafo separado)
+
+Desde Git Bash en la raíz del repositorio, con los entornos y ADC ya configurados:
+
+```bash
+apps/agent/.venv/Scripts/python.exe scripts/run_disputes.py --flow full --debug
+```
+
+El modo `full` conecta validación por documento, triage, emergencia, búsqueda de
+transacciones, error de cargo, fraude y escalamiento. Los modos anteriores siguen
+disponibles para pruebas aisladas; el modo predeterminado sigue siendo
+`validation-triage`.
+
+- Emergencia: selección y confirmación de tarjeta, bloqueo verificado y búsqueda
+  de cargos no reconocidos. Si no hay cargos, deriva para reposición.
+- Error de cargo: Pending, Reversed o Declined guarda la explicación en sandbox
+  y termina; Approved termina sin guardar una explicación.
+- Fraude: conserva las confirmaciones, las reglas y los recibos del agente.
+- Atención humana: crea y verifica el ticket y la notificación simulada.
+- La CLI muestra solo los últimos cuatro dígitos de las tarjetas. El número de
+  opción distingue tarjetas con la misma terminación. Si falta last4, muestra
+  “Tarjeta sin terminación disponible”; nunca usa el ID como alternativa.
+- El resumen de depuración muestra la cantidad de tarjetas bloqueadas. Los IDs
+  internos permanecen en el estado del grafo y en las llamadas MCP para operar
+  sobre el producto correcto; este cambio no anonimiza el estado interno.
+
+Los bloqueos, disputas y notificaciones son SIMULATED en sandbox. Un bloqueo de
+una prueba previa permanece efectivo dentro del escenario: usar /new reinicia
+la conversación, no borra los efectos persistidos. Las pruebas locales usan
+servicios simulados; el recorrido con LLM y MCP reales se verifica con el comando
+anterior.

@@ -2,7 +2,7 @@
 
 Reads the repository .env (SCENARIO_NOW, DEV_SESSIONS, MCP_SERVER_*, LLM_MODEL,
 GROQ_API_KEY). Default flow verifies identity through MCP then classifies the
-request. Downstream actions are pending. --flow legacy selects the older graph.
+request. --flow full connects emergency, charge search, fraud and escalation. --flow legacy selects the older graph.
 
 Use (from the repository root, in the agent's uv env):
   uv run --project apps/agent scripts/run_disputes.py --session dev
@@ -58,11 +58,30 @@ def read(prompt: str) -> str:
             return text
 
 
+
+def masked_card(last4):
+    # Only accept an actual last4; never fall back to the internal product ID.
+    value = str(last4 or "")
+    return "Tarjeta •••• " + value if len(value) == 4 and value.isascii() and value.isdigit() else "Tarjeta sin terminación disponible"
+
+
+def flow_flags(flow):
+    return dict(
+        test_charge_error=flow in {"full", "charge-error", "fraud", "fraud-escalation"},
+        test_fraud=flow in {"full", "fraud", "fraud-escalation"},
+        test_escalation=flow in {"full", "fraud-escalation", "card-emergency-escalation"},
+        test_card_emergency=flow in {"full", "card-emergency", "card-emergency-escalation"},
+    )
+
+
 def answer(question: dict) -> Command:
     print(f"\nAgent: {question['message']}")
-    for key in ("transactions", "cards", "transaction"):
+    for key in ("transactions", "transaction"):
         if key in question:
             print(f"  {key}: {json.dumps(question[key], ensure_ascii=False)}")
+    card_labels = {c["id"]: masked_card(c.get("last4")) for c in question.get("cards", [])}
+    if question["kind"] == "confirm_block":
+        print("  " + masked_card(question.get("last4")))
     if question["kind"] == "identity_form":   # login form: each factor in its own field, never sent to an LLM
         labels = {"document_number": "Documento", "date_of_birth": "Fecha de nacimiento (AAAA-MM-DD)",
                   "product_number": "Número de producto"}
@@ -71,7 +90,10 @@ def answer(question: dict) -> Command:
         return Command(resume={"text": read("You: ")})
     options = question["options"]
     for i, option in enumerate(options, 1):
-        print(f"  [{i}] {option}")
+        label = option
+        if question["kind"] == "select_card" and option != "human":
+            label = card_labels.get(option, "Tarjeta sin terminación disponible")
+        print(f"  [{i}] {label}")
     while True:
         choice = read("Choose: ")
         if choice.isdigit() and 1 <= int(choice) <= len(options):
@@ -89,8 +111,8 @@ def conversation(graph, session_ref: str, debug: bool) -> None:
         state = graph.invoke(answer(state["__interrupt__"][0].value), config)
     print(f"\nAgent: {state.get('response')}\n  outcome={state.get('outcome')}")
     if debug:
-        keys = ("language", "authenticated", "validation_status", "customer_id", "intent", "triage_route", "slots", "reason", "queue", "priority", "case_ids", "blocked_cards", "explanation_result_id")
-        print(json.dumps({k: state.get(k) for k in keys} | {"transaction": (state.get("transaction") or {}).get("id")},
+        keys = ("language", "authenticated", "validation_status", "customer_id", "intent", "triage_route", "slots", "reason", "queue", "priority", "case_ids", "explanation_result_id")
+        print(json.dumps({k: state.get(k) for k in keys} | {"transaction": (state.get("transaction") or {}).get("id"), "blocked_cards_count": len(state.get("blocked_cards", []))},
                          indent=2, ensure_ascii=False))
         for step in state.get("trace", []):
             print(f"  {step['node']}:{step['phase']} -> {step['next']}")
@@ -100,10 +122,10 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--session", default="dev", help="Session reference from DEV_SESSIONS")
     parser.add_argument("--debug", action="store_true", help="Print state and trace after each conversation")
-    parser.add_argument("--flow", choices=["validation-triage", "charge-error", "fraud", "fraud-escalation",
+    parser.add_argument("--flow", choices=["full", "validation-triage", "charge-error", "fraud", "fraud-escalation",
                                            "card-emergency", "card-emergency-escalation", "legacy"],
                         default="validation-triage",
-                        help="validation-triage: classify only; charge-error: explain a charge; fraud: simulate fraud actions; fraud-escalation: include verified sandbox handoff and notification; legacy: general graph.")
+                        help="full: all connected routes; validation-triage: classify only; charge-error: explain a charge; fraud: simulate fraud actions; fraud-escalation: include verified sandbox handoff and notification; legacy: general graph.")
     args = parser.parse_args()
 
     # JSON events go to a file so they don't interleave with the chat; --debug adds LLM prompts/outputs.
@@ -113,20 +135,17 @@ def main() -> None:
     configure_logging()
 
     services = McpServices.from_env()
-    if args.flow in {"validation-triage", "charge-error", "fraud", "fraud-escalation",
+    if args.flow in {"full", "validation-triage", "charge-error", "fraud", "fraud-escalation",
                      "card-emergency", "card-emergency-escalation"}:
         from bank_agent.graphs.validation_triage import build_graph as build_scoped_graph
         graph = build_scoped_graph(services, checkpointer=InMemorySaver(),
-            test_charge_error=args.flow in {"charge-error", "fraud", "fraud-escalation"},
-            test_fraud=args.flow in {"fraud", "fraud-escalation"},
-            test_escalation=args.flow in {"fraud-escalation", "card-emergency-escalation"},
-            test_card_emergency=args.flow in {"card-emergency", "card-emergency-escalation"})
+            **flow_flags(args.flow))
     else:
         graph = build_graph(services, checkpointer=InMemorySaver())
-    if args.flow in {"fraud", "fraud-escalation"}:
-        escalation_note = ("; escalamiento crea y verifica handoff/notificación SIMULATED" if args.flow == "fraud-escalation"
+    if args.flow in {"full", "fraud", "fraud-escalation", "card-emergency", "card-emergency-escalation"}:
+        escalation_note = ("; escalamiento crea y verifica handoff/notificación SIMULATED" if args.flow in {"full", "fraud-escalation", "card-emergency-escalation"}
                            else "; escalamiento termina sin crear ticket")
-        print(f"Prueba de fraude: bloqueos y disputas SIMULATED en sandbox{escalation_note}.")
+        print(f"Prueba integrada: bloqueos y disputas SIMULATED en sandbox{escalation_note}.")
     print(f"Scenario date {services.now():%Y-%m-%d}. Session '{args.session}'. /new restarts, /quit exits.")
     print(f"Logs: {os.environ['LOG_FILE']}\n")
     try:
