@@ -83,28 +83,33 @@ def finish(s, outcome, es, pt):
     return go("end", outcome=outcome, response=say(s, es, pt))
 
 
-def block(s, services, route):
+def block(s, services, route, optional=False):
     """A separate checkpointed phase; confirmation occurs before mutation.
 
     Not every disputed transaction sits on a card: it may be on a savings or
     checking account. A card gets blocked outright; an account only has its
     ability to transact suspended -- the product itself is never blocked.
+    optional=True offers an EXTRA card (e.g. a lost wallet with several cards):
+    declining it is the customer's choice, not a risk signal, so it continues
+    instead of escalating as block_declined.
     """
     if s.get("account_id"):
         return _suspend_account(s, services, route)
-    return _block_card(s, services, route)
+    return _block_card(s, services, route, optional)
 
 
-def _block_card(s, services, route):
+def _block_card(s, services, route, optional=False):
     card = s["card_id"]
     result = tool(s, services, "get_card", card_id=card)
     if result.get("id") != card or result.get("customer_id") != s["customer_id"]:
         raise ServiceFailure("Card ownership mismatch")
     if result.get("status") != "Blocked":
-        answer = ask(s, services, "confirm_block", ["yes", "no"],
-                     "¿Confirmas el bloqueo de esta tarjeta?", "Confirma o bloqueio deste cartão?",
-                     card_id=card)
+        es, pt = (("¿También quieres bloquear esta otra tarjeta?", "Também quer bloquear este outro cartão?")
+                  if optional else ("¿Confirmas el bloqueo de esta tarjeta?", "Confirma o bloqueio deste cartão?"))
+        answer = ask(s, services, "confirm_block", ["yes", "no"], es, pt, card_id=card, last4=result.get("last4"))
         if answer == "no":
+            if optional:
+                return go(route, "after_block", skipped_cards=list(dict.fromkeys(s.get("skipped_cards", []) + [card])))
             return escalate("block_declined", "fraud", "P1")
         result = verified_action(s, services, "block_card", "read_block", card, card_id=card)
         if result.get("card_id") != card or result.get("status") != "Blocked":
@@ -112,7 +117,6 @@ def _block_card(s, services, route):
     times = {**s.get("block_verified_at", {}), card: services.now().isoformat()}
     return go(route, "after_block", blocked_cards=list(dict.fromkeys(s["blocked_cards"] + [card])),
               block_verified_at=times)
-
 
 def _suspend_account(s, services, route):
     account = s["account_id"]

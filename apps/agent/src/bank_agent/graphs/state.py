@@ -11,6 +11,7 @@ class ConversationState(TypedDict, total=False):
     message: str
     validation_input: str
     validation_status: str | None
+    identity_prompts: int  # login form attempts shown (format errors do not count as failed logins)
     authenticated: bool
     triage_choice: str
     triage_route: str
@@ -27,6 +28,7 @@ class ConversationState(TypedDict, total=False):
     card_id: str
     account_id: str
     blocked_cards: list[str]
+    skipped_cards: list[str]  
     suspended_accounts: list[str]
     denied_transactions: list[dict[str, Any]]
     risk_transactions: list[dict[str, Any]]
