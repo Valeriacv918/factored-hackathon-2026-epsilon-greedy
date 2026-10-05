@@ -7,6 +7,7 @@ from bank_agent.clients.contracts import ServiceFailure, SessionExpired
 from bank_agent.graphs.policy import Policy
 from bank_agent.graphs.state import ConversationState
 from bank_agent.nodes.common import HandoffRequested, escalate, finish, require_session
+from bank_agent.observability import logged_step
 from bank_agent.nodes import (charge_error, escalation, fraud_agent, card_emergency_agent, validator_agent,
                               triage_agent)
 
@@ -27,6 +28,12 @@ def build_graph(services, *, checkpointer, policy=None):
 
     def wrap(name, function):
         def node(state):
+            with logged_step(state.get("conversation_id"), name, state.get("phase")) as step:
+                result = run(state)
+                step.update(next=result["route"], phase=result.get("phase", state.get("phase")))
+                return result
+
+        def run(state):
             s = deepcopy(state)
             try:
                 if name != "validator_agent":

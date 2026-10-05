@@ -19,6 +19,7 @@ node_modules/
 coverage/
 htmlcov/
 *.log
+logs/
 last_compilation.json
 existing_job.json
 compiled.json

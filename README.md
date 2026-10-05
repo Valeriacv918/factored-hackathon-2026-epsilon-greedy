@@ -136,6 +136,7 @@ Local tests do not replace Dataform compilation and BigQuery execution.
 
 - [Architecture](docs/architecture.md)
 - [Operations and recovery](docs/runbook.md)
+- [Logging and observability](docs/observability.md)
 - [Data quality rules and exceptions](docs/data-quality.md)
 - [Business policy research](docs/policies.md)
 - [Original profiling findings](docs/findings_tables.txt)

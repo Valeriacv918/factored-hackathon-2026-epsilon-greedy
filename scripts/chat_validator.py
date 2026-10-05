@@ -12,6 +12,7 @@ Comandos dentro del chat:
 """
 import argparse
 import json
+import os
 from datetime import date
 import sys
 from pathlib import Path
@@ -25,6 +26,7 @@ load_dotenv()  # lee el archivo .env si existe
 from bank_agent.nodes.validator_agent.agent import ValidationAgent
 from bank_agent.clients.identity import (CustomerRecord, InMemoryIdentityChecker, Product)
 from bank_agent.nodes.validator_agent.validator import IdentityValidator
+from bank_agent.observability import configure_logging
 
 # Clientes SINTÉTICOS para probar sin el servidor MCP
 DEMO_CUSTOMERS = {
@@ -43,6 +45,10 @@ def main():
     ap.add_argument("--mcp", action="store_true", help="verificar contra el servidor MCP (BigQuery real)")
     ap.add_argument("--debug", action="store_true", help="mostrar detalles por turno")
     args = ap.parse_args()
+
+    # Eventos JSON (llamadas al LLM y a MCP) en logs/agent.jsonl o LOG_FILE.
+    os.environ["LOG_FILE"] = os.environ.get("LOG_FILE") or str(Path(__file__).resolve().parents[1] / "logs" / "agent.jsonl")
+    configure_logging()
 
     if args.mcp:
         from bank_agent.clients.identity import McpIdentityChecker

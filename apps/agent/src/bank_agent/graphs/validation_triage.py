@@ -9,6 +9,7 @@ from copy import deepcopy
 from langgraph.graph import START, END, StateGraph
 from langgraph.types import interrupt
 from bank_agent.graphs.state import ConversationState
+from bank_agent.observability import logged_step
 from bank_agent.nodes.triage_agent.router import decide
 from bank_agent.nodes.triage_agent.schemas import Understanding, Intent, Route, Slots
 
@@ -127,7 +128,9 @@ def build_graph(services, *, checkpointer, policy=None, test_charge_error=False,
     builder = StateGraph(ConversationState)
     def wrap(name, fn):
         def run(state):
-            result = fn(deepcopy(state))
+            with logged_step(state.get("conversation_id"), name, state.get("phase")) as step:
+                result = fn(deepcopy(state))
+                step.update(next=result["route"], phase=result.get("phase", state.get("phase")))
             result["trace"] = state.get("trace", []) + [{
                 "node": name, "phase": result.get("phase", state.get("phase")), "next": result["route"],
                 "at": services.now().isoformat(),

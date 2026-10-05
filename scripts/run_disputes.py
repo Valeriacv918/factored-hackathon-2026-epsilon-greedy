@@ -8,10 +8,14 @@ Use (from the repository root, in the agent's uv env):
   uv run --project apps/agent scripts/run_disputes.py --session dev
   uv run --project apps/agent scripts/run_disputes.py --session dev --debug
 
+JSON events (steps, LLM calls, MCP calls) go to logs/agent.jsonl, or LOG_FILE.
+--debug also logs LLM prompts and outputs (LOG_LLM_CONTENT=1): local use only.
+
 Inside: answer buttons by number or value, /new restarts, /quit exits.
 """
 import argparse
 import json
+import os
 import sys
 import uuid
 from pathlib import Path
@@ -29,6 +33,7 @@ from langgraph.types import Command  # noqa: E402
 from bank_agent.clients.mcp_services import McpServices  # noqa: E402
 from bank_agent.graphs.disputes import build_graph  # noqa: E402
 from bank_agent.graphs.state import initial_state  # noqa: E402
+from bank_agent.observability import configure_logging  # noqa: E402
 
 
 class Quit(Exception):
@@ -96,6 +101,12 @@ def main() -> None:
                         help="validation-triage: classify only; charge-error: charge search, explanation and sandbox result; legacy: general graph.")
     args = parser.parse_args()
 
+    # JSON events go to a file so they don't interleave with the chat; --debug adds LLM prompts/outputs.
+    os.environ["LOG_FILE"] = os.environ.get("LOG_FILE") or str(ROOT / "logs" / "agent.jsonl")
+    if args.debug:
+        os.environ["LOG_LLM_CONTENT"] = "1"
+    configure_logging()
+
     services = McpServices.from_env()
     if args.flow in {"validation-triage", "charge-error", "fraud"}:
         from bank_agent.graphs.validation_triage import build_graph as build_scoped_graph
@@ -104,7 +115,8 @@ def main() -> None:
         graph = build_graph(services, checkpointer=InMemorySaver())
     if args.flow == "fraud":
         print("Prueba de fraude: bloqueos y disputas SIMULATED en sandbox; escalamiento termina sin crear ticket.")
-    print(f"Scenario date {services.now():%Y-%m-%d}. Session '{args.session}'. /new restarts, /quit exits.\n")
+    print(f"Scenario date {services.now():%Y-%m-%d}. Session '{args.session}'. /new restarts, /quit exits.")
+    print(f"Logs: {os.environ['LOG_FILE']}\n")
     try:
         while True:
             try:
