@@ -426,7 +426,7 @@ def save_charge_explanation(
         ["charge_error_v1", customer_id, conversation_id, transaction_id, observed_status],
         separators=(",", ":")).encode()).hexdigest()
     gw = _gw()
-    results = f"`{gw.settings.bq_project}.bank_sandbox.agent_results`"
+    results = gw.sandbox_table("agent_results")
     values = dict(result_id=result_id, conversation_id=conversation_id,
                   customer_id=customer_id, transaction_id=transaction_id,
                   observed_status=observed_status, rule_id=rule_id, explanation=explanation)

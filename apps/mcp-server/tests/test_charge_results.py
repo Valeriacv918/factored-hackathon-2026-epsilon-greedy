@@ -8,6 +8,7 @@ class Gateway:
     settings=SimpleNamespace(bq_project="test")
     def __init__(self): self.calls=[]; self.rows=1
     def table(self,name): return name
+    def sandbox_table(self,name): return name
     def query(self,sql,params,**kwargs):
         self.calls.append((sql,{p.name:p.value for p in params},kwargs))
         return [] if "MERGE" in sql else [{}]*self.rows

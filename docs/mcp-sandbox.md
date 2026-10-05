@@ -63,6 +63,7 @@ resumen para el empleado a partir de hechos ya verificados.
 | `read_handoff` | Sandbox, comprobado contra `customers` curado |
 | `notify_employee` | Escribe en `bank_sandbox.notifications` |
 | `read_notification` | Sandbox, comprobado contra la derivación |
+| `save_charge_explanation` | Escribe en `bank_sandbox.agent_results` (sin escenario); comprueba titularidad y estado contra curado y relee la fila. Ver [validation-triage-local.md](validation-triage-local.md) |
 
 Estado efectivo: una tarjeta `Active` en curado con un bloqueo en el escenario se
 devuelve como `Blocked`. Curado nunca cambia.
