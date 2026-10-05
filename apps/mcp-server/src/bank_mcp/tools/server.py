@@ -271,7 +271,19 @@ def find_transactions(
             transactions=gw.table("transactions"), products=gw.table("products"), customer_timezone=zone)
     except (ValueError, ValidationError) as e:
         raise ToolError(f"Invalid slots: {e}") from None
-    return to_search(_run(gw, sql, params, "find_transactions"), limit)
+    rows = _run(gw, sql, params, "find_transactions")
+    from bank_mcp.services.fx import enrich_usd
+    missing = [r for r in rows[:limit] if r.get("amount_usd") is None and r.get("currency") != "USD"]
+    rates = []
+    if missing:
+        dates = sorted({r["local_date"] for r in missing})
+        currencies = sorted({r["currency"] for r in missing})
+        rates = _run(gw, "SELECT date,source_currency,target_currency,exchange_rate,_curation_run_id FROM " +
+                     gw.table("daily_exchange_rates") +
+                     " WHERE date IN UNNEST(@dates) AND source_currency IN UNNEST(@currencies) AND target_currency='USD'",
+                     [bigquery.ArrayQueryParameter("dates","DATE",dates),
+                      bigquery.ArrayQueryParameter("currencies","STRING",currencies)], "transaction_fx")
+    return to_search(enrich_usd(rows, rates), limit)
 
 
 @mcp.tool(annotations=READ_ONLY)

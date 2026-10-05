@@ -23,6 +23,11 @@ class Transaction(BaseModel):
     fraud_score: str | None
     amount: str
     amount_usd: str | None
+    amount_usd_original: str | None = None
+    amount_usd_source: str | None = None
+    fx_rate: str | None = None
+    fx_date: str | None = None
+    fx_run_id: str | None = None
     currency: str
     date: str
     local_date: str | None = None
@@ -153,6 +158,9 @@ def to_transaction(row: dict[str, Any]) -> Transaction:
         fraud_score=decimal_str(row["fraud_score"]),
         amount=decimal_str(row["amount"]),
         amount_usd=decimal_str(row["amount_usd"]),
+        amount_usd_original=decimal_str(row.get("amount_usd_original", row["amount_usd"])),
+        amount_usd_source=row.get("amount_usd_source", "curated" if row["amount_usd"] is not None else "unavailable"),
+        fx_rate=decimal_str(row.get("fx_rate")), fx_date=row.get("fx_date"), fx_run_id=row.get("fx_run_id"),
         currency=row["currency"],
         date=iso_utc(row["transaction_date"]),
         local_date=str(row["local_date"]) if row.get("local_date") else None,

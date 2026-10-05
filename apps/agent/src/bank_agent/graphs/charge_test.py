@@ -5,19 +5,20 @@ from bank_agent.nodes import charge_error
 from bank_agent.nodes.common import HandoffRequested, require_session, number
 
 def terminal(outcome, response, **extra):
-    return dict(route="end", outcome=outcome, response=response, **extra)
+    return dict(route="end", phase="end", outcome=outcome, response=response, **extra)
 
-def build_nodes(services, policy):
+def build_nodes(services, policy, *, test_fraud=False):
     def extract(s):
         parsed = services.understand(s.get("charge_input") or s["message"], s["language"])
         if parsed.get("wants_human"):
             return terminal("human_requested", "Solicitud de atención humana identificada; no se creó un ticket.")
-        if parsed.get("intent") in {"not_me", "emergency"}:
+        if parsed.get("intent") == "emergency" or (parsed.get("intent") == "not_me" and not test_fraud):
             return terminal("outside_charge_test", "La solicitud requiere otra ruta; termina esta prueba de error en un cargo.")
         slots = parsed.get("slots")
         if not isinstance(slots, dict):
             raise ServiceFailure("Invalid slots")
-        return dict(route="charge_find", phase="find", slots={**s.get("slots", {}), **slots}, charge_input="")
+        return dict(route="charge_find", phase="find", slots={**s.get("slots", {}), **slots}, charge_input="",
+                    intent="not_me" if parsed.get("intent") == "not_me" else s["intent"])
 
     def find(s):
         result = services.tool("find_transactions", session_ref=s["session_ref"],
@@ -31,7 +32,7 @@ def build_nodes(services, policy):
                 return terminal("transaction_unresolved", "No se pudo identificar el cargo con los datos proporcionados.")
             return dict(route="charge_details", phase="clarify", charge_candidates=[],
                         reason="no_matches" if not candidates else "too_many_matches")
-        return dict(route="charge_select", phase="select", charge_candidates=candidates)
+        return dict(route="charge_select", phase="select", charge_candidates=candidates, reason="")
 
     def details(s):
         prefix = "No encontré coincidencias con esos filtros. " if s.get("reason") == "no_matches" else "Hay varios movimientos posibles. "
@@ -62,6 +63,15 @@ def build_nodes(services, policy):
         if tx is None:
             raise ValueError("Select an offered transaction")
         score=number(tx.get("fraud_score"))
+        if test_fraud and (s.get("intent") == "not_me" or (score is not None and score > policy.fraud_score)):
+            denied = {t["id"]:t for t in s.get("denied_transactions", [])}
+            if s.get("intent") == "not_me":
+                denied[tx["id"]] = tx
+            risks = {t["id"]:t for t in s.get("risk_transactions", [])}
+            risks[tx["id"]] = tx
+            return dict(route="fraud_agent", phase="start", transaction=tx, card_id=None, account_id=None,
+                        denied_transactions=list(denied.values()), risk_transactions=list(risks.values()),
+                        reason="not_me" if s.get("intent") == "not_me" else "fraud_score")
         if score is None:
             return terminal("human_required","El cargo no tiene un puntaje de riesgo válido para continuar.", reason="missing_fraud_score")
         if score>policy.fraud_score:

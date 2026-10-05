@@ -91,17 +91,19 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--session", default="dev", help="Session reference from DEV_SESSIONS")
     parser.add_argument("--debug", action="store_true", help="Print state and trace after each conversation")
-    parser.add_argument("--flow", choices=["validation-triage", "charge-error", "legacy"],
+    parser.add_argument("--flow", choices=["validation-triage", "charge-error", "fraud", "legacy"],
                         default="validation-triage",
                         help="validation-triage: classify only; charge-error: charge search, explanation and sandbox result; legacy: general graph.")
     args = parser.parse_args()
 
     services = McpServices.from_env()
-    if args.flow in {"validation-triage", "charge-error"}:
+    if args.flow in {"validation-triage", "charge-error", "fraud"}:
         from bank_agent.graphs.validation_triage import build_graph as build_scoped_graph
-        graph = build_scoped_graph(services, checkpointer=InMemorySaver(), test_charge_error=args.flow == "charge-error")
+        graph = build_scoped_graph(services, checkpointer=InMemorySaver(), test_charge_error=args.flow in {"charge-error", "fraud"}, test_fraud=args.flow == "fraud")
     else:
         graph = build_graph(services, checkpointer=InMemorySaver())
+    if args.flow == "fraud":
+        print("Prueba de fraude: bloqueos y disputas SIMULATED en sandbox; escalamiento termina sin crear ticket.")
     print(f"Scenario date {services.now():%Y-%m-%d}. Session '{args.session}'. /new restarts, /quit exits.\n")
     try:
         while True:

@@ -175,11 +175,11 @@ def test_cards_show_effective_status_and_scenario_is_cached_for_reads(use, token
 
 
 def test_find_transactions_uses_the_scenario_clock(use, token):
-    gw = use()
+    gw = use(customer_timezone=[{"country":"Colombia","state":"Cundinamarca","city":"Bogotá"}])
     server.find_transactions(token(), dt.date(2020, 1, 1), 30)
     params = gw.sent("find_transactions")[0][1]
-    assert params["end_ts"] == dt.datetime(2026, 6, 18, tzinfo=dt.timezone.utc)
-    assert params["start_ts"] == dt.datetime(2026, 5, 18, tzinfo=dt.timezone.utc)
+    assert params["end_date"] == dt.date(2026, 6, 18)
+    assert params["start_date"] == dt.date(2026, 5, 18)
 
 
 @pytest.fixture

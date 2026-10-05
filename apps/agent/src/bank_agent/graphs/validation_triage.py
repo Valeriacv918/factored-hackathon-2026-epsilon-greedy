@@ -15,7 +15,7 @@ from bank_agent.nodes.triage_agent.schemas import Understanding, Intent, Route, 
 logger = logging.getLogger(__name__)
 CHOICES = ["emergency", "not_me", "charge_error", "other", "human"]
 
-def build_graph(services, *, checkpointer, policy=None, test_charge_error=False):
+def build_graph(services, *, checkpointer, policy=None, test_charge_error=False, test_fraud=False):
     def fail(s, reason, message):
         s.update(route="end", reason=reason, outcome="service_unavailable", response=message)
         return s
@@ -93,7 +93,7 @@ def build_graph(services, *, checkpointer, policy=None, test_charge_error=False)
             elif decision.route == Route.EMERGENCY:
                 s.update(route="end", outcome="ready_for_card_emergency",
                          response="Clasificación: emergencia de tarjeta. La ejecución de ese agente está pendiente; no se ha bloqueado ninguna tarjeta.")
-            elif decision.route == Route.FIND_TRANSACTION and test_charge_error and decision.intent == Intent.CHARGE_ERROR:
+            elif decision.route == Route.FIND_TRANSACTION and ((test_charge_error and decision.intent == Intent.CHARGE_ERROR) or (test_fraud and decision.intent in {Intent.NOT_ME, Intent.CHARGE_ERROR})):
                 s.update(route="charge_extract", phase="extract", slots={})
             elif decision.route == Route.FIND_TRANSACTION:
                 s.update(route="end", outcome="ready_for_transaction_search",
@@ -117,16 +117,19 @@ def build_graph(services, *, checkpointer, policy=None, test_charge_error=False)
 
     nodes = {"validator_agent": validator, "validation_wait": validation_wait,
              "request_wait": request_wait, "triage_agent": triage, "triage_wait": triage_wait}
-    if test_charge_error:
+    if test_charge_error or test_fraud:
         from bank_agent.graphs.charge_test import build_nodes
         from bank_agent.graphs.policy import Policy
-        nodes.update(build_nodes(services, policy or Policy()))
+        nodes.update(build_nodes(services, policy or Policy(), test_fraud=test_fraud))
+        if test_fraud:
+            from bank_agent.graphs.fraud_test import build_node
+            nodes["fraud_agent"] = build_node(services, policy or Policy())
     builder = StateGraph(ConversationState)
     def wrap(name, fn):
         def run(state):
             result = fn(deepcopy(state))
             result["trace"] = state.get("trace", []) + [{
-                "node": name, "phase": result.get("phase"), "next": result["route"],
+                "node": name, "phase": result.get("phase", state.get("phase")), "next": result["route"],
                 "at": services.now().isoformat(),
             }]
             return result
