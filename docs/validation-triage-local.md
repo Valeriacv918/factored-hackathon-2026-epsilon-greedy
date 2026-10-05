@@ -147,3 +147,30 @@ en la selección. date conserva el timestamp original para trazabilidad.
 
 Verificación real: la búsqueda 2024-11-19, 416.73 encontró una coincidencia
 sin comercio para el cliente de prueba, en America/Mexico_City.
+
+## Ruta de fraude en el grafo separado
+
+Ejecutar desde la raíz:
+
+```bash
+apps/agent/.venv/Scripts/python.exe scripts/run_disputes.py --flow fraud --debug
+```
+
+Incluye validación, triage, la búsqueda compartida, charge_error y la entrada
+fraud_agent.run de nodes/fraud_agent. No modifica disputes.py ni usa una copia
+del agente. La clase independiente FraudAgent conserva su API de repositorios.
+
+- not_me lleva a fraude, incluso sin fraud_score. charge_error con score alto
+  también lleva a fraude. El resto conserva la ruta de explicación probada.
+- La selección de un movimiento no confirma un bloqueo ni una disputa.
+- Cada acción pide su confirmación y se verifica con read_block/read_dispute.
+- "Otro cargo" vuelve a la búsqueda; conserva recibos y limpia producto/filtros
+  anteriores. Se aplican los límites del agente de fraude.
+- Una solicitud de escalamiento termina en human_required con reason/queue/priority;
+  no se invoca todavía al agente de escalamiento ni se crea un ticket.
+- Las cuentas sin tarjeta no pueden suspenderse con las herramientas MCP actuales:
+  esta limitación produce revisión humana, nunca un bloqueo ficticio.
+
+Se requiere SANDBOX_SCENARIO_ID configurado y vigente, alineado con SCENARIO_NOW.
+La CLI avisa que las acciones son SIMULATED. .env permanece fuera de Git.
+Las pruebas sin red están en test_fraud_test_graph.py y test_fraud_agent.py.

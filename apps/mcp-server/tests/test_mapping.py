@@ -19,7 +19,9 @@ def test_transaction_uses_agent_field_names():
     assert t == {"id": "TX1", "customer_id": "C1", "card_id": "P1", "status": "Approved", "fraud_score": "12.5",
                  "amount": "40.00", "amount_usd": "40.00", "currency": "USD",
                  "date": "2026-06-01T12:00:00+00:00", "merchant": "Shop",
-                 "local_date": None, "customer_timezone": None}
+                 "local_date": None, "customer_timezone": None,
+                 "amount_usd_original":"40.00", "amount_usd_source":"curated",
+                 "fx_rate":None, "fx_date":None, "fx_run_id":None}
 
 
 def test_non_card_product_has_no_card_id():
