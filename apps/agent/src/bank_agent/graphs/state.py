@@ -2,7 +2,7 @@
 
 from typing import Any, Literal, TypedDict
 
-Route = Literal["validator_agent", "validation_wait", "request_wait", "triage_agent", "triage_wait", "charge_extract", "charge_find", "charge_details", "charge_select", "charge_error", "charge_save", "fraud_agent", "card_emergency_agent", "end"]
+Route = Literal["validator_agent", "validation_wait", "request_wait", "triage_agent", "triage_wait", "charge_extract", "charge_find", "charge_details", "charge_select", "charge_error", "charge_save", "fraud_agent", "escalation", "card_emergency_agent", "end"]
 
 
 class ConversationState(TypedDict, total=False):

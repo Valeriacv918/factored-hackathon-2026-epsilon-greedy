@@ -15,7 +15,11 @@ from bank_agent.nodes.triage_agent.schemas import Understanding, Intent, Route, 
 logger = logging.getLogger(__name__)
 CHOICES = ["emergency", "not_me", "charge_error", "other", "human"]
 
-def build_graph(services, *, checkpointer, policy=None, test_charge_error=False, test_fraud=False):
+def build_graph(services, *, checkpointer, policy=None, test_charge_error=False, test_fraud=False,
+                test_escalation=False):
+    if test_escalation and not test_fraud:
+        raise ValueError("test_escalation requires test_fraud")
+
     def fail(s, reason, message):
         s.update(route="end", reason=reason, outcome="service_unavailable", response=message)
         return s
@@ -99,8 +103,13 @@ def build_graph(services, *, checkpointer, policy=None, test_charge_error=False,
                 s.update(route="end", outcome="ready_for_transaction_search",
                          response="Clasificación: revisar un cargo. El siguiente paso es buscar la transacción; esta prueba termina antes de esa búsqueda.")
             elif decision.route == Route.ESCALATION:
-                s.update(route="end", outcome="human_requested",
-                         response="Solicitud de atención humana identificada. No se ha creado un ticket.")
+                if test_escalation:
+                    priority = "P2" if decision.intent in {Intent.NOT_ME, Intent.EMERGENCY} else "P3"
+                    s.update(route="escalation", phase="start", reason="requested_human",
+                             queue="general", priority=priority)
+                else:
+                    s.update(route="end", outcome="human_requested",
+                             response="Solicitud de atención humana identificada. No se ha creado un ticket.")
             else:
                 s.update(route="end", outcome="out_of_scope",
                          response="La solicitud está fuera del alcance de tarjetas y revisión de cargos.")
@@ -120,10 +129,13 @@ def build_graph(services, *, checkpointer, policy=None, test_charge_error=False,
     if test_charge_error or test_fraud:
         from bank_agent.graphs.charge_test import build_nodes
         from bank_agent.graphs.policy import Policy
-        nodes.update(build_nodes(services, policy or Policy(), test_fraud=test_fraud))
+        nodes.update(build_nodes(services, policy or Policy(), test_fraud=test_fraud,
+                     test_escalation=test_escalation))
         if test_fraud:
-            from bank_agent.graphs.fraud_test import build_node
-            nodes["fraud_agent"] = build_node(services, policy or Policy())
+            from bank_agent.graphs.fraud_test import build_escalation_node, build_node
+            nodes["fraud_agent"] = build_node(services, policy or Policy(), connect_escalation=test_escalation)
+            if test_escalation:
+                nodes["escalation"] = build_escalation_node(services, policy or Policy())
     builder = StateGraph(ConversationState)
     def wrap(name, fn):
         def run(state):
