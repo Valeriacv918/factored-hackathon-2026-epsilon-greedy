@@ -43,7 +43,7 @@ def run(s, services, policy):
         if answer == "yes":
             if len(s["denied_transactions"]) >= policy.max_charges:
                 return escalate("charge_limit", "fraud", "P1")
-            return go("understanding", "clarify", intent="not_me", slots={})
+            return go("triage_agent", "clarify", intent="not_me", slots={})
         return go("fraud_agent", "risk")
     transactions = {t["id"]: t for t in s.get("risk_transactions", []) + [tx]}.values()
     scores = [number(t.get("fraud_score")) for t in transactions]
