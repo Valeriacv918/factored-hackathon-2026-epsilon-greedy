@@ -3,6 +3,7 @@ from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
+from bank_agent.nodes.validator_agent.agent import system_prompt
 from bank_agent.nodes.validator_agent.language import detect_language
 from bank_agent.clients.identity import (CustomerRecord, IdentityResult, InMemoryIdentityChecker, Product)
 from bank_agent.nodes.validator_agent.validator import IdentityValidator, Status, normalize_document, parse_dob
@@ -155,6 +156,50 @@ def test_short_text_keeps_previous_language():
 
 def test_short_text_without_history_is_ambiguous():
     assert detect_language("ok").ambiguous
+
+
+# El cliente contesta "¿español o portugués?" con una palabra: esa elección manda,
+# aunque sea un texto corto que el detector no puede juzgar.
+@pytest.mark.parametrize("text,previous,lang", [
+    ("español", "pt", "es"),
+    ("Español", None, "es"),
+    ("espanol", "pt", "es"),
+    ("en español", "pt", "es"),
+    ("castellano", "pt", "es"),
+    ("espanhol", "pt", "es"),
+    ("portugués", "es", "pt"),
+    ("português", "es", "pt"),
+    ("Portugues", None, "pt"),
+    ("em português", "es", "pt"),
+    ("pt", "es", "pt"),
+])
+def test_explicit_short_choice_wins(text, previous, lang):
+    r = detect_language(text, previous=previous)
+    assert (r.language, r.ambiguous, r.source) == (lang, False, "choice")
+
+
+def test_naming_both_languages_is_not_a_choice():
+    assert detect_language("español o portugués", previous="pt").source != "choice"
+    assert detect_language("es o pt").ambiguous
+
+
+def test_low_confidence_guess_is_not_stored_as_the_language():
+    # Primer mensaje real de un log: lingua lo creía portugués con baja confianza.
+    r = detect_language("uv run --project apps/agent scripts/run_disputes.py --session dev --flow fraud --debug")
+    assert r.ambiguous and r.language == "es"
+
+
+def test_ambiguous_prompt_asks_in_both_languages():
+    prompt = system_prompt("es", ambiguous=True)
+    assert "español" in prompt and "portugués" in prompt and "prefiere" in prompt
+    assert "otro idioma" in prompt          # explains that only es/pt are supported
+    assert "Responde SIEMPRE en español." not in prompt
+
+
+def test_known_language_prompt_uses_only_that_language():
+    prompt = system_prompt("pt", ambiguous=False)
+    assert "Responde SIEMPRE en portugués de Brasil." in prompt
+    assert "prefiere" not in prompt
 
 
 # --- verificación en el servidor MCP ---
