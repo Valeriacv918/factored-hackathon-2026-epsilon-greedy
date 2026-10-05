@@ -14,7 +14,7 @@ RUN uv sync --project apps/agent --frozen --no-dev --no-install-project \
 
 COPY apps/agent apps/agent
 COPY apps/mcp-server apps/mcp-server
-COPY evals/cases/results evals/cases/results
+# Offline evaluation artifacts are optional and are not present in a fresh checkout.
 RUN uv sync --project apps/agent --frozen --no-dev \
  && uv sync --project apps/mcp-server --frozen --no-dev
 

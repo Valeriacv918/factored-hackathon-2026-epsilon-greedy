@@ -33,17 +33,17 @@ Abre http://localhost:8080. Los logs JSON salen por stdout, o a `LOG_FILE` si es
 1. Guarda los secretos en Secret Manager (una sola vez):
 
 ```bash
-printf '%s' "$GROQ_API_KEY" | gcloud secrets create groq-api-key --data-file=-
+printf '%s' "$GROQ_API_KEY" | gcloud secrets create bank-web-groq-api-key --data-file=-
 ```
 
 ```bash
-python -c "import secrets; print(secrets.token_urlsafe(48), end='')" | gcloud secrets create session-signing-key --data-file=-
+python -c "import secrets; print(secrets.token_urlsafe(48), end='')" | gcloud secrets create bank-web-session-signing-key --data-file=-
 ```
 
 2. Despliega desde la raíz del repo (Cloud Build construye el `Dockerfile`):
 
 ```bash
-gcloud run deploy bank-agent-web --source . --region us-central1 --service-account bank-mcp@hackaton-509923.iam.gserviceaccount.com --max-instances 1 --memory 1Gi --timeout 300 --allow-unauthenticated --set-env-vars BQ_PROJECT=hackaton-509923,BQ_DATASET=bank_curated,BQ_LOCATION=us-central1,BQ_SANDBOX_DATASET=bank_sandbox,SANDBOX_SCENARIO_ID=<escenario>,SCENARIO_NOW=<scenario_clock>,LLM_MODEL=groq:openai/gpt-oss-120b --set-secrets GROQ_API_KEY=groq-api-key:latest,SESSION_SIGNING_KEY=session-signing-key:latest
+gcloud run deploy bank-agent-web --source . --region us-central1 --service-account bank-mcp@hackaton-509923.iam.gserviceaccount.com --max-instances 1 --min-instances 0 --concurrency 8 --session-affinity --memory 1Gi --cpu 1 --timeout 300 --allow-unauthenticated --set-env-vars BQ_PROJECT=hackaton-509923,BQ_DATASET=bank_curated,BQ_LOCATION=us-central1,BQ_SANDBOX_DATASET=bank_sandbox,SANDBOX_SCENARIO_ID=<escenario>,SCENARIO_NOW=<scenario_clock>,LLM_MODEL=groq:openai/gpt-oss-120b --set-secrets GROQ_API_KEY=bank-web-groq-api-key:latest,SESSION_SIGNING_KEY=bank-web-session-signing-key:latest
 ```
 
 La cuenta de servicio en tiempo de ejecución necesita `roles/secretmanager.secretAccessor`
@@ -65,3 +65,42 @@ sobre los dos secretos, además de los permisos de BigQuery que ya tiene `bank-m
   de tokens; por defecto 0.15 y 0.75). Confirmar la tarifa vigente del modelo antes de reportarla.
 - **`--allow-unauthenticated`**: necesario para que el jurado abra la URL. La identidad del cliente
   la da el formulario; las acciones son simuladas en el sandbox.
+
+
+## Preparación del contexto de build
+
+Cloud Build utiliza `.gcloudignore` y Docker utiliza `.dockerignore`. Se incluyen
+solo los proyectos de agente y MCP; no se envían `.env`, entornos virtuales ni
+credenciales locales. Los resultados offline de evaluaciones son opcionales:
+una copia limpia del repositorio no los contiene y el panel los muestra como
+no disponibles. Las métricas de las conversaciones sí se recopilan en ejecución.
+
+La cuenta de ejecución usa su identidad de Cloud Run para BigQuery; no se
+incluyen archivos JSON de cuentas de servicio ni ADC personales en la imagen.
+Los secretos de esta aplicación se llaman `bank-web-groq-api-key` y
+`bank-web-session-signing-key`. Su acceso se concede a `bank-mcp` por secreto.
+
+La configuración inicial limita a una instancia y ocho peticiones simultáneas.
+La afinidad es de mejor esfuerzo: un reinicio o despliegue pierde las conversaciones
+en memoria y requiere iniciar otra. No elimina los efectos ya escritos en sandbox.
+
+### Configuración del subproceso MCP
+
+El SDK MCP no hereda automáticamente todas las variables del proceso web.
+El cliente transmite una lista explícita de configuración de BigQuery, escenario,
+límites y firma de sesiones. La clave del LLM permanece en el proceso del agente.
+El contenedor no depende de archivos .env.
+
+La web inicializa la conexión MCP durante el arranque. Si falta configuración o
+el subproceso no arranca, falla el inicio de la revisión en lugar de esperar al
+primer formulario del usuario para descubrir el problema.
+
+### Idioma de la conversación
+
+El grafo completo llama al detector de validator_agent/language.py antes del
+formulario. Si el detector no decide entre español y portugués, muestra botones
+para elegir. La elección queda en el estado de la conversación y se transmite
+a los formularios y botones de la web. Los factores de identidad no se usan
+para detectar idioma ni se envían al modelo.
+
+El idioma de conversación no traduce el panel estático de estadísticas.

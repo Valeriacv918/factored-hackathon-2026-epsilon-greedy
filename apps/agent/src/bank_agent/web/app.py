@@ -168,6 +168,12 @@ class AgentApp:
         from bank_agent.clients.mcp_services import McpServices
         from bank_agent.graphs.validation_triage import build_graph
         services = McpServices.from_env()
+        # Check MCP configuration before Cloud Run marks the app ready.
+        try:
+            services._client.start()
+        except Exception:
+            services.close()
+            raise
         graph = build_graph(services, checkpointer=InMemorySaver(), test_charge_error=True, test_fraud=True,
                             test_escalation=True, test_card_emergency=True)   # = run_disputes.py --flow full
         return cls(services, graph)
@@ -212,7 +218,7 @@ class AgentApp:
         state = self.graph.invoke(payload, config)
         trace = [{"node": t.get("node"), "next": t.get("next")} for t in state.get("trace", [])]
         if "__interrupt__" in state:
-            view, conversation.pending = present(state["__interrupt__"][0].value)
+            view, conversation.pending = present({**state["__interrupt__"][0].value, "language": state.get("language")})
             return {"thread_id": conversation.thread_id, "status": "waiting", "question": view, "trace": trace}
         conversation.pending, conversation.done = None, True
         return {"thread_id": conversation.thread_id, "status": "done", "trace": trace,
