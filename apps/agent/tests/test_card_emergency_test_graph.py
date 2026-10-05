@@ -6,6 +6,7 @@ from bank_agent.graphs.state import initial_state
 from bank_agent.graphs.validation_triage import build_graph
 from bank_agent.nodes.triage_agent.schemas import Intent, Understanding
 from test_fraud_test_graph import FraudServices
+from test_validation_triage_graph import VALID_FORM
 
 YES, NO = {"choice": "yes"}, {"choice": "no"}
 
@@ -35,7 +36,7 @@ def start(s, message="Perdí mi tarjeta", **flags):
     g = build_graph(s, checkpointer=InMemorySaver(), test_card_emergency=True, **flags)
     c = {"configurable": {"thread_id": "one"}}
     g.invoke(initial_state("one", "", "Hola"), c)
-    g.invoke(Command(resume={"text": "valid factors"}), c)
+    g.invoke(Command(resume=VALID_FORM), c)
     return g, c, g.invoke(Command(resume={"text": message}), c)
 
 
@@ -115,6 +116,6 @@ def test_without_the_flag_the_graph_still_stops_at_classification():
     g = build_graph(s, checkpointer=InMemorySaver())
     c = {"configurable": {"thread_id": "one"}}
     g.invoke(initial_state("one", "", "Hola"), c)
-    g.invoke(Command(resume={"text": "valid factors"}), c)
+    g.invoke(Command(resume=VALID_FORM), c)
     r = g.invoke(Command(resume={"text": "Perdí mi tarjeta"}), c)
     assert r["outcome"] == "ready_for_card_emergency" and "list_cards" not in s.actions

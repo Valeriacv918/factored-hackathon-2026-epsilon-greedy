@@ -32,11 +32,14 @@ independiente para cada conversación.
 
 ## Recorrido esperado
 
-1. Saludar o describir el problema. ValidationAgent pide número de documento, fecha de
-   nacimiento y número de un producto. No usar product_id PRD-... como número
+1. Saludar o describir el problema. Ese primer mensaje no se clasifica (puede traer
+   datos de identidad). Aparece un FORMULARIO con tres campos: número de documento,
+   fecha de nacimiento y número de un producto. No usar product_id PRD-... como número
    de producto: ese campo es products.product_number.
-2. La tool del agente llama a IdentityValidator. Su repositorio de confianza
-   invoca la herramienta MCP verify_identity; el agente no abre BigQuery.
+2. Los tres campos van directo a IdentityValidator, sin LLM: ningún modelo ve los
+   datos de identidad. Su repositorio de confianza invoca la herramienta MCP
+   verify_identity; el agente no abre BigQuery. Si no coinciden, el formulario vuelve
+   con los intentos restantes, sin decir qué dato falló.
 3. MCP compara los tres factores y la titularidad con parámetros de BigQuery.
    Usa exclusivamente document_number; customer_id se obtiene de la coincidencia.
    Una discordancia devuelve status=failed sin identificar qué factor falló.
@@ -56,8 +59,9 @@ independiente para cada conversación.
 
 La sesión se revalida antes de triage y después de la pausa de aclaración.
 Los errores terminan en service_unavailable, sin resultado de negocio inventado.
-La llamada del agente y la pausa están en nodos diferentes: reanudar no repite
-un intento de validación ni una llamada al modelo ya realizada.
+La verificación ocurre después de la pausa del formulario: reanudar no repite un
+intento de validación. La clasificación y su pausa están en nodos diferentes: reanudar
+no repite una llamada al modelo ya realizada.
 
 ## Pruebas locales sin red
 

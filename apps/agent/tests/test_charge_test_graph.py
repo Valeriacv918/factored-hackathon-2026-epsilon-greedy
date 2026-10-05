@@ -2,7 +2,7 @@ from copy import deepcopy
 import pytest
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
-from test_validation_triage_graph import Services
+from test_validation_triage_graph import Services, VALID_FORM
 from bank_agent.graphs.validation_triage import build_graph
 from bank_agent.graphs.state import initial_state
 from bank_agent.nodes.triage_agent.schemas import Understanding, Intent
@@ -33,7 +33,7 @@ def start(s):
     g=build_graph(s,checkpointer=InMemorySaver(),test_charge_error=True)
     c={"configurable":{"thread_id":"one"}}
     g.invoke(initial_state("one","","Hola"),c)
-    g.invoke(Command(resume={"text":"valid factors"}),c)
+    g.invoke(Command(resume=VALID_FORM),c)
     r=g.invoke(Command(resume={"text":"Me cobraron dos veces una compra."}),c)
     return g,c,r
 

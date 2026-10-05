@@ -31,13 +31,13 @@ def _text(reply):
     return reply[TEXT].strip()
 
 
-def _form(reply):
+def identity_form_values(reply):
     if not isinstance(reply, dict) or set(reply) != set(FIELDS) or not all(isinstance(reply[f], str) for f in FIELDS):
         raise ValueError(f"Expected exactly {{{', '.join(FIELDS)}}} as strings.")
     return {f: reply[f].strip() for f in FIELDS}
 
 
-def _retry_message(s, result):
+def identity_retry_message(s, result):
     status = result.get("status")
     if status == "FAILED":
         left = result.get("attempts_left")
@@ -83,7 +83,7 @@ def run(s, services, policy):
         reply = interrupt({"kind": "identity_form", "language": s.get("language"),
                            "message": s.get("response"), "fields": list(FIELDS),
                            "hints": {"date_of_birth": "AAAA-MM-DD / DD/MM/AAAA"}})
-        fields = _form(reply)
+        fields = identity_form_values(reply)
         try:
             result = services.verify_identity(s["conversation_id"], **fields)
             status = result.get("status")
@@ -99,7 +99,7 @@ def run(s, services, policy):
                              "Por segurança, bloqueamos a verificação por alguns minutos. Entre em contato com a central de atendimento."),
                     "validation_status": status}
         if status in {"FAILED", "INVALID_FORMAT", "MISSING_FIELDS"}:
-            return go("validator_agent", "identify", validation_status=status, response=_retry_message(s, result),
+            return go("validator_agent", "identify", validation_status=status, response=identity_retry_message(s, result),
                       identity_prompts=prompts + 1)
         return {**finish(s, "service_unavailable", "La validación no está disponible. No se consultarán tus productos.",
                          "A validação não está disponível. Seus produtos não serão consultados."),

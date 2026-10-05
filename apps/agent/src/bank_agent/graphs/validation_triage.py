@@ -3,6 +3,10 @@
 Keep the model call and the interrupt in separate nodes: resuming an interrupt
 must not replay a verification attempt or a model call. Agent sessions live in
 McpServices for this local process, not in serializable graph state.
+
+Login is a FORM with no LLM (same pieces as nodes/validator_agent in the disputes graph):
+document, date of birth and product number go to services.verify_identity -> MCP, so no
+model ever sees identity data. The first message is dropped for the same reason.
 """
 import logging
 from copy import deepcopy
@@ -11,6 +15,8 @@ from langgraph.types import interrupt
 from bank_agent.graphs.state import ConversationState
 from bank_agent.observability import logged_step
 from bank_agent.nodes.triage_agent.router import decide
+from bank_agent.nodes.common import say
+from bank_agent.nodes.validator_agent import FIELDS, MAX_FORM_PROMPTS, identity_form_values, identity_retry_message
 from bank_agent.nodes.triage_agent.schemas import Understanding, Intent, Route, Slots
 
 
@@ -27,45 +33,56 @@ def build_graph(services, *, checkpointer, policy=None, test_charge_error=False,
         return s
 
     def validated(s):
-        agent = services.validation_agent(s["conversation_id"])
-        cid = services.validate_session(agent.session.session_id)
-        return agent, cid
+        return services.validate_session(s.get("session_ref"))
 
     def validator(s):
+        """No LLM and no pause: detect the language and show the login form.
+        The first message is dropped because it may contain identity factors."""
         s = deepcopy(s)
         s["phase"] = "validate"
-        try:
-            agent = services.validation_agent(s["conversation_id"])
-            result = agent.chat(s.get("validation_input", s["message"]))
-            s["language"] = result.get("language") or agent.session.language or "es"
-            cid = services.validate_session(agent.session.session_id)
-            if cid:
-                s.update(customer_id=cid, session_ref=agent.session.session_id,
-                         authenticated=True, route="request_wait",
-                         response="Identidad verificada. Describe la solicitud que deseas atender.",
-                         validation_status="VERIFIED")
-            elif result.get("next_step") == "handoff_human":
-                s.update(route="end", authenticated=False, outcome="human_required",
-                         reason=result.get("status") or "validation_failed",
-                         validation_status=result.get("status"),
-                         response="No fue posible validar tu identidad. Se requiere revisión humana; no se ha creado una derivación.")
-            else:
-                s.update(route="validation_wait", authenticated=False,
-                         validation_status=result.get("status"),
-                         response=result.get("reply") or "Indica tu número de documento, fecha de nacimiento y número de producto.")
-        except Exception as exc:
-            logger.warning("Validation failed (%s)", type(exc).__name__)
-            fail(s, "validation_unavailable", "La validación no está disponible. No se consultarán tus productos.")
-        # Do not carry identity factors into triage or debug output.
+        detect = getattr(services, "detect_language", None)
+        s["language"] = s.get("language") or (detect(s.get("message", "")) if detect else None) or "es"
+        s.update(route="validation_wait", authenticated=False, identity_prompts=0,
+                 response=say(s, "Para ayudarte necesito verificar tu identidad.",
+                              "Para ajudar, preciso verificar sua identidade."))
         s["message"] = ""
         s["validation_input"] = ""
         return s
 
     def validation_wait(s):
-        value = interrupt({"kind": "validation_details", "message": s["response"]})
-        if not isinstance(value, dict) or not isinstance(value.get("text"), str) or not value["text"].strip():
-            raise ValueError("Expected nonempty text")
-        return {**s, "validation_input": value["text"].strip(), "route": "validator_agent", "phase": "await_identity"}
+        """Login FORM: the three factors go to services.verify_identity (IdentityValidator -> MCP),
+        never to an LLM. Verification runs after the pause, so resuming never repeats an attempt."""
+        prompts = s.get("identity_prompts", 0)
+        if prompts >= MAX_FORM_PROMPTS:
+            return {**s, "route": "end", "outcome": "human_required", "reason": "too_many_forms",
+                    "response": "No fue posible validar tu identidad. Se requiere revisión humana; no se ha creado una derivación."}
+        value = interrupt({"kind": "identity_form", "language": s.get("language"), "message": s["response"],
+                           "fields": list(FIELDS), "hints": {"date_of_birth": "AAAA-MM-DD / DD/MM/AAAA"}})
+        fields = identity_form_values(value)
+        s = deepcopy(s)
+        s["phase"] = "await_identity"
+        try:
+            result = services.verify_identity(s["conversation_id"], **fields)
+            status = result.get("status")
+            cid = services.validate_session(result["session_ref"]) if status in {"VERIFIED", "ALREADY_VERIFIED"} else None
+        except Exception as exc:
+            logger.warning("Validation failed (%s)", type(exc).__name__)
+            status, cid = "SERVICE_UNAVAILABLE", None
+        if cid:
+            s.update(customer_id=cid, session_ref=result["session_ref"], authenticated=True, route="request_wait",
+                     response="Identidad verificada. Describe la solicitud que deseas atender.",
+                     validation_status="VERIFIED")
+        elif status == "LOCKED":
+            s.update(route="end", authenticated=False, outcome="human_required", reason="LOCKED",
+                     validation_status=status,
+                     response="No fue posible validar tu identidad. Se requiere revisión humana; no se ha creado una derivación.")
+        elif status in {"FAILED", "INVALID_FORMAT", "MISSING_FIELDS"}:
+            s.update(route="validation_wait", authenticated=False, validation_status=status,
+                     response=identity_retry_message(s, result), identity_prompts=prompts + 1)
+        else:
+            fail(s, "validation_unavailable", "La validación no está disponible. No se consultarán tus productos.")
+            s["authenticated"] = False
+        return s
 
     def request_wait(s):
         value = interrupt({"kind": "request_details",
@@ -78,7 +95,7 @@ def build_graph(services, *, checkpointer, policy=None, test_charge_error=False,
         s = deepcopy(s)
         s["phase"] = "classify"
         try:
-            _, cid = validated(s)
+            cid = validated(s)
             if not cid or cid != s.get("customer_id"):
                 s.update(route="end", authenticated=False, customer_id="",
                          outcome="authentication_required", response="La sesión expiró. Inicia una nueva conversación.")
