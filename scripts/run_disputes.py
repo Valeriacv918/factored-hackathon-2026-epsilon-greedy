@@ -63,6 +63,10 @@ def answer(question: dict) -> Command:
     for key in ("transactions", "cards", "transaction"):
         if key in question:
             print(f"  {key}: {json.dumps(question[key], ensure_ascii=False)}")
+    if question["kind"] == "identity_form":   # login form: each factor in its own field, never sent to an LLM
+        labels = {"document_number": "Documento", "date_of_birth": "Fecha de nacimiento (AAAA-MM-DD)",
+                  "product_number": "Número de producto"}
+        return Command(resume={field: read(f"  {labels.get(field, field)}: ") for field in question["fields"]})
     if question["kind"] in {"transaction_details", "validation_details", "request_details"}:
         return Command(resume={"text": read("You: ")})
     options = question["options"]
