@@ -11,6 +11,7 @@ class ConversationState(TypedDict, total=False):
     message: str
     validation_input: str
     validation_status: str | None
+    identity_prompts: int  # login form attempts shown (format errors do not count as failed logins)
     authenticated: bool
     triage_choice: str
     triage_route: str
