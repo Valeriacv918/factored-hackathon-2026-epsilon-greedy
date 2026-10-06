@@ -3,6 +3,7 @@ from langgraph.types import interrupt
 from bank_agent.clients.contracts import ServiceFailure, SessionExpired
 from bank_agent.nodes import charge_error
 from bank_agent.nodes.common import HandoffRequested, require_session, number, say
+from bank_agent.observability import log_failure
 
 def terminal(outcome, response, **extra):
     return dict(route="end", phase="end", outcome=outcome, response=response, **extra)
@@ -128,8 +129,10 @@ def build_nodes(services, policy, *, test_fraud=False, test_escalation=False, te
                     authenticated=False,customer_id="")
             except HandoffRequested:
                 return handoff(s, "requested_human")
-            except ServiceFailure:
-                return terminal("service_unavailable",say(s, "No fue posible completar y verificar el resultado. No se confirma el guardado.", "Não foi possível concluir e verificar o resultado. O registro não foi confirmado."))
+            except ServiceFailure as exc:
+                log_failure(exc, "charge_tool_failure")
+                return terminal("service_unavailable",say(s, "Lo sentimos, tuvimos un problema técnico y no pudimos completar tu solicitud. Por favor intenta de nuevo en unos minutos.", "Desculpe, tivemos um problema técnico e não conseguimos concluir sua solicitação. Tente novamente em alguns minutos."),
+                    reason="charge_tool_failure")
         return run
 
     return {name:guard(fn) for name,fn in {

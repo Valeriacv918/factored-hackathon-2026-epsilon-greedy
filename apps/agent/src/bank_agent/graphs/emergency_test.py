@@ -4,6 +4,7 @@ from bank_agent.clients.contracts import ServiceFailure, SessionExpired
 from bank_agent.graphs.charge_test import terminal
 from bank_agent.nodes import card_emergency_agent
 from bank_agent.nodes.common import HandoffRequested, require_session, say
+from bank_agent.observability import log_failure
 
 
 def build_node(services, policy, *, connect_fraud=False, connect_escalation=False):
@@ -35,8 +36,9 @@ def build_node(services, policy, *, connect_fraud=False, connect_escalation=Fals
                 return {"route": "escalation", "phase": "start", "reason": exc.reason, "queue": "general", "priority": "P2"}
             return terminal("human_requested", say(s, "Solicitud de atención humana identificada; no se creó una derivación.", "Solicitação de atendimento humano identificada; nenhum encaminhamento foi criado."),
                             reason=exc.reason)
-        except ServiceFailure:
+        except ServiceFailure as exc:
+            log_failure(exc, "card_emergency_tool_failure")
             return terminal("service_unavailable",
-                            say(s, "No se pudo completar y verificar el bloqueo. Revisa los recibos antes de reintentar.", "Não foi possível concluir e verificar o bloqueio. Verifique os comprovantes antes de tentar novamente."),
+                            say(s, "No se pudo completar y verificar el bloqueo.", "Não foi possível concluir e verificar o bloqueio."),
                             reason="card_emergency_tool_failure")
     return run

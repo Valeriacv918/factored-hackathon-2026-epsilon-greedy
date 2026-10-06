@@ -66,7 +66,7 @@ class LlmUnderstanding:
     @classmethod
     def from_model_id(cls, model_id: str, clock: Callable[[], dt.datetime]) -> "LlmUnderstanding":
         from langchain.chat_models import init_chat_model
-        return cls(init_chat_model(model_id, temperature=0).with_structured_output(Extraction)
+        return cls(init_chat_model(model_id, temperature=0).with_structured_output(Extraction, method="json_schema")
                    .with_config(llm_config("understanding")), clock)
 
     def understand(self, text: str, language: str) -> dict[str, Any]:

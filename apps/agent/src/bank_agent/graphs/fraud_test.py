@@ -3,6 +3,7 @@ from bank_agent.clients.contracts import ServiceFailure, SessionExpired
 from bank_agent.nodes import fraud_agent
 from bank_agent.nodes.common import HandoffRequested, require_session, say
 from bank_agent.graphs.charge_test import terminal
+from bank_agent.observability import log_failure
 
 def build_node(services, policy, *, connect_escalation=False):
     def run(s):
@@ -35,9 +36,10 @@ def build_node(services, policy, *, connect_escalation=False):
                         "queue": "general", "priority": "P2" if s.get("intent") in {"not_me", "emergency"} else "P3"}
             return terminal("human_requested", say(s, "Solicitud de atención humana identificada; no se creó una derivación.", "Solicitação de atendimento humano identificada; nenhum encaminhamento foi criado."),
                             reason=exc.reason)
-        except ServiceFailure:
+        except ServiceFailure as exc:
+            log_failure(exc, "fraud_tool_failure")
             return terminal("service_unavailable",
-                say(s, "No se pudo completar y verificar la operación. Revisa los recibos antes de reintentar.", "Não foi possível concluir e verificar a operação. Verifique os comprovantes antes de tentar novamente."),
+                say(s, "No se pudo completar y verificar la operación.", "Não foi possível concluir e verificar a operação."),
                 reason="fraud_tool_failure")
     return run
 
@@ -52,9 +54,10 @@ def build_escalation_node(services, policy):
         except SessionExpired:
             return terminal("authentication_required", say(s, "La sesión expiró. Inicia una nueva conversación.", "A sessão expirou. Inicie uma nova conversa."),
                             authenticated=False, customer_id="")
-        except ServiceFailure:
+        except ServiceFailure as exc:
+            log_failure(exc, "escalation_tool_failure")
             return terminal("service_unavailable",
-                            say(s, "No se pudo completar y verificar la derivación. Revisa los recibos antes de reintentar.", "Não foi possível concluir e verificar o encaminhamento. Verifique os comprovantes antes de tentar novamente."),
+                            say(s, "No se pudo completar y verificar la derivación.", "Não foi possível concluir e verificar o encaminhamento."),
                             reason="escalation_tool_failure")
 
     return run
