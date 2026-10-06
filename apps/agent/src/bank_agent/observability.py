@@ -4,7 +4,8 @@ One JSON object per line with `ts, level, service, event, conversation_id, node`
 event's fields. The MCP server emits the same shape (bank_mcp/observability.py), and the
 agent sends conversation_id/node in each tool call's _meta so both sides share the id.
 
-Events: step, llm.call, llm.result, mcp.call, conversation.summary (the web app adds
+Events: step, llm.call, llm.result, mcp.call, service.failure, narrative.fallback,
+conversation.summary (the web app adds
 http.request through log_event). The summary carries the conversation's outcome and
 routing (OUTCOME_FIELDS) and counts, never customer, card or ticket identifiers.
 
@@ -91,7 +92,7 @@ OUTCOME_FIELDS = ("outcome", "reason", "intent", "language", "triage_route", "qu
 
 def _empty() -> dict[str, float]:
     return dict(steps=0, step_ms=0.0, llm_calls=0, input_tokens=0, output_tokens=0, llm_ms=0.0, mcp_calls=0,
-                mcp_ms=0.0, errors=0, started=time.time())
+                mcp_ms=0.0, errors=0, failures=0, started=time.time())
 
 
 def outcome_fields(state: dict[str, Any]) -> dict[str, Any]:
@@ -104,7 +105,7 @@ def outcome_fields(state: dict[str, Any]) -> dict[str, Any]:
 
 def _accumulate(payload: dict[str, Any]) -> None:
     cid, event = payload.get("conversation_id"), payload["event"]
-    if cid is None or event not in {"step", "llm.call", "mcp.call"}:
+    if cid is None or event not in {"step", "llm.call", "mcp.call", "service.failure"}:
         return
     with _totals_lock:
         t = _totals.setdefault(cid, _empty())
@@ -116,11 +117,21 @@ def _accumulate(payload: dict[str, Any]) -> None:
             t["input_tokens"] += payload.get("input_tokens") or 0
             t["output_tokens"] += payload.get("output_tokens") or 0
             t["llm_ms"] += payload.get("ms") or 0
-        else:
+        elif event == "mcp.call":
             t["mcp_calls"] += 1
             t["mcp_ms"] += payload.get("ms") or 0
+        else:   # service.failure: a node gave up; its LLM/MCP error, if any, is already in `errors`
+            t["failures"] += 1
+            return
         if payload.get("status") == "error" or payload.get("error"):
             t["errors"] += 1
+
+
+def log_failure(exc: BaseException, reason: str) -> None:
+    """Why a node gave up: our own message plus the cause's type (its text may hold customer input)."""
+    cause = exc.__cause__
+    log_event("service.failure", level=logging.WARNING, reason=reason, error=type(exc).__name__,
+              detail=str(exc)[:300], cause=type(cause).__name__ if cause else None)
 
 
 def log_summary(conversation_id: str, **outcome: Any) -> None:
@@ -212,7 +223,20 @@ class LlmLogHandler(BaseCallbackHandler):
         self._finish(run_id, **fields)
 
     def on_llm_error(self, error, *, run_id, **kwargs):
-        self._finish(run_id, status="error", error=type(error).__name__)
+        self._finish(run_id, status="error", error=type(error).__name__, **_error_detail(error))
+
+
+def _error_detail(error: BaseException) -> dict[str, Any]:
+    """Provider status and message; the model's failed output (customer text) only with LOG_LLM_CONTENT."""
+    body = getattr(error, "body", None)
+    info = body.get("error", body) if isinstance(body, dict) else None
+    if not isinstance(info, dict):
+        return {"error_detail": str(error)[:500]}
+    out = {"status_code": getattr(error, "status_code", None), "error_code": info.get("code"),
+           "error_detail": str(info.get("message") or "")[:500]}
+    if content_enabled() and info.get("failed_generation"):
+        out["failed_generation"] = info["failed_generation"]
+    return out
 
 
 LLM_HANDLER = LlmLogHandler()

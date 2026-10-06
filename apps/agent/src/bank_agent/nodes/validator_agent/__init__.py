@@ -14,6 +14,7 @@ campos separados directo a IdentityValidator -> MCP verify_identity. Ningún LLM
 from langgraph.types import interrupt
 
 from bank_agent.nodes.common import ask, finish, go, say
+from bank_agent.observability import log_failure
 
 TEXT = "text"
 FIELDS = ("document_number", "date_of_birth", "product_number")
@@ -88,7 +89,8 @@ def run(s, services, policy):
             result = services.verify_identity(s["conversation_id"], **fields)
             status = result.get("status")
             customer = services.validate_session(result["session_ref"]) if status in {"VERIFIED", "ALREADY_VERIFIED"} else None
-        except Exception:   # MCP caído u otra falla: nunca autenticar por defecto
+        except Exception as exc:   # MCP caído u otra falla: nunca autenticar por defecto
+            log_failure(exc, "validation_unavailable")
             status, customer = "SERVICE_UNAVAILABLE", None
         if customer:
             return go("validator_agent", "request", session_ref=result["session_ref"], customer_id=customer,

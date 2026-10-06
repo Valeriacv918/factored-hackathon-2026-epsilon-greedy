@@ -8,19 +8,17 @@ Login is a FORM with no LLM (same pieces as nodes/validator_agent in the dispute
 document, date of birth and product number go to services.verify_identity -> MCP, so no
 model ever sees identity data. The first message is dropped for the same reason.
 """
-import logging
 from copy import deepcopy
 from langgraph.graph import START, END, StateGraph
 from langgraph.types import interrupt
 from bank_agent.graphs.state import ConversationState
-from bank_agent.observability import logged_step
+from bank_agent.observability import log_failure, logged_step
 from bank_agent.nodes.triage_agent.router import decide
 from bank_agent.nodes.common import say, ask
 from bank_agent.nodes.validator_agent import FIELDS, MAX_FORM_PROMPTS, identity_form_values, identity_retry_message
 from bank_agent.nodes.triage_agent.schemas import Understanding, Intent, Route, Slots
 
 
-logger = logging.getLogger(__name__)
 CHOICES = ["emergency", "not_me", "charge_error", "other", "human"]
 # Outcomes after which the customer is offered another request (resolved + abstained, web/metrics.py).
 FOLLOW_UP_OUTCOMES = {"dispute_filed", "explained", "fraud_intake_complete", "approved", "card_blocked",
@@ -85,7 +83,7 @@ def build_graph(services, *, checkpointer, policy=None, test_charge_error=False,
             status = result.get("status")
             cid = services.validate_session(result["session_ref"]) if status in {"VERIFIED", "ALREADY_VERIFIED"} else None
         except Exception as exc:
-            logger.warning("Validation failed (%s)", type(exc).__name__)
+            log_failure(exc, "validation_unavailable")
             status, cid = "SERVICE_UNAVAILABLE", None
         if cid:
             s.update(customer_id=cid, session_ref=result["session_ref"], authenticated=True, route="request_wait",
@@ -156,7 +154,7 @@ def build_graph(services, *, checkpointer, policy=None, test_charge_error=False,
                 s.update(route="end", outcome="out_of_scope",
                          response=say(s, "La solicitud está fuera del alcance de tarjetas y revisión de cargos.", "A solicitação está fora do escopo de cartões e revisão de cobranças."))
         except Exception as exc:
-            logger.warning("Triage failed (%s)", type(exc).__name__)
+            log_failure(exc, "triage_unavailable")
             fail(s, "triage_unavailable", say(s, "No fue posible clasificar la solicitud.", "Não foi possível classificar a solicitação."))
         return s
 
