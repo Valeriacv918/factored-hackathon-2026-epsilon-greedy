@@ -128,6 +128,10 @@ def run_card_emergency(service: CardEmergencyService, session_id: str, debug: bo
                 print_escalation(r)
                 return None
 
+            elif r.next_step == "done":
+                print("Agente 2: listo, tu tarjeta quedó bloqueada; sin necesidad de un humano.\n")
+                return None
+
             elif r.next_step == "find_transaction":
                 print(">>> Agente 2 terminó. Simulá FIND_TRANSACTION eligiendo la transacción.")
                 return input("ID de transacción (TX-100 / TX-200 / TX-300): ").strip()

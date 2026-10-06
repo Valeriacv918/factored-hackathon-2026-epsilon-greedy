@@ -1,5 +1,5 @@
 from bank_agent.clients.contracts import ServiceFailure
-from bank_agent.nodes.common import ask, block, escalate, go, tool
+from bank_agent.nodes.common import ask, block, escalate, finish, go, tool
 
 from .service import CardEmergencyService, EmergencyResult, EmergencyState, EscalationRequest
 
@@ -21,7 +21,7 @@ def run(s, services, policy):
     Fases: start (SELECT_CARD) -> block (CONFIRM_BLOCK + BLOCK_AND_VERIFY)
     -> after_block: si quedan otras tarjetas activas (p. ej. perdió la billetera),
        ofrece bloquearlas una por una (block_more); rechazar una extra no escala.
-    -> ask_charge (ASK_CHARGE).
+    -> ask_charge (ASK_CHARGE): sí -> búsqueda de cargo (not_me); no -> fin "card_blocked".
     """
     phase = s["phase"]
     if phase == "start":
@@ -47,4 +47,7 @@ def run(s, services, policy):
                  "¿Hay algún cargo que no reconoces?", "Há alguma transação que você não reconhece?")
     if answer == "yes":
         return go("triage_agent", "clarify", intent="not_me", slots={})
-    return escalate("card_replacement", "cards", "P3")
+    # Solo bloquear una tarjeta (verificado) sin cargo asociado: resuelto, sin humano.
+    return finish(s, "card_blocked",
+                  "Listo: tu tarjeta quedó bloqueada y verificada. Nadie podrá usarla.",
+                  "Pronto: seu cartão foi bloqueado e verificado. Ninguém poderá usá-lo.")
