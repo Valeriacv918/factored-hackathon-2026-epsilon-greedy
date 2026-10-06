@@ -67,6 +67,7 @@ button.primary { background: var(--primary); color: var(--on-primary); }
 button.primary:hover { background: var(--primary-hover); }
 button.ghost { background: transparent; border-color: var(--border); }
 button.ghost:hover { background: var(--surface-2); }
+button.lang-toggle { min-width: 44px; font-weight: 700; letter-spacing: .04em; }
 button:disabled { opacity: .55; cursor: not-allowed; }
 
 .layout { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 20px; padding: 20px;

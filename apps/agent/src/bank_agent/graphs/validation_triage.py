@@ -44,8 +44,8 @@ def build_graph(services, *, checkpointer, policy=None, test_charge_error=False,
         language = s.get("language") or (detect(s.get("message", "")) if detect else "es")
         if language not in {"es", "pt"}:
             language = ask(s, services, "language", ["es", "pt"],
-                           "Selecciona tu idioma / Selecione seu idioma: Español / Português.",
-                           "Selecciona tu idioma / Selecione seu idioma: Español / Português.")
+                           "Selecciona tu idioma / Selecione seu idioma.",
+                           "Selecciona tu idioma / Selecione seu idioma.")
         s["language"] = language
         s.update(route="validation_wait", authenticated=False, identity_prompts=0,
                  response=say(s, "Para ayudarte necesito verificar tu identidad.",
