@@ -4,6 +4,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
 from bank_agent.clients.contracts import ServiceFailure
 from test_charge_test_graph import ChargeServices, TX
+from test_validation_triage_graph import VALID_FORM
 from bank_agent.graphs.validation_triage import build_graph
 from bank_agent.graphs.state import initial_state
 from bank_agent.nodes.triage_agent.schemas import Understanding, Intent
@@ -42,7 +43,7 @@ def start(s,test_escalation=False,transaction_choice="TX-1"):
                   test_escalation=test_escalation)
     c={"configurable":{"thread_id":"one"}}
     g.invoke(initial_state("one","","Hola"),c)
-    g.invoke(Command(resume={"text":"valid factors"}),c)
+    g.invoke(Command(resume=VALID_FORM),c)
     r=g.invoke(Command(resume={"text":"No reconozco esta compra."}),c)
     r=g.invoke(Command(resume={"choice":transaction_choice}),c)
     if transaction_choice == "TX-1":
@@ -113,7 +114,7 @@ def test_missing_card_reaches_human_without_writes():
     g=build_graph(s,checkpointer=InMemorySaver(),test_fraud=True)
     c={"configurable":{"thread_id":"one"}}
     g.invoke(initial_state("one","","Hola"),c)
-    g.invoke(Command(resume={"text":"valid factors"}),c)
+    g.invoke(Command(resume=VALID_FORM),c)
     g.invoke(Command(resume={"text":"No reconozco esta compra."}),c)
     r=g.invoke(Command(resume={"choice":"TX-1"}),c)
     assert r["outcome"]=="human_required" and r["reason"]=="no_blockable_card"
@@ -157,7 +158,7 @@ def test_initial_human_request_creates_verified_sandbox_handoff():
     g=build_graph(s,checkpointer=InMemorySaver(),test_fraud=True,test_escalation=True)
     c={"configurable":{"thread_id":"one"}}
     g.invoke(initial_state("one","","Hola"),c)
-    g.invoke(Command(resume={"text":"valid factors"}),c)
+    g.invoke(Command(resume=VALID_FORM),c)
     r=g.invoke(Command(resume={"text":"Quiero hablar con un asesor"}),c)
     assert r["outcome"]=="escalated" and r["reason"]=="requested_human"
     assert r["ticket_id"]=="TICKET-1"
