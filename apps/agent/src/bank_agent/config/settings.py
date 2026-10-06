@@ -25,7 +25,7 @@ class ValidationPolicy:
 
 @dataclass(frozen=True)
 class FraudPolicy:
-    """Umbrales deterministicos del flujo de fraude (docs/STATE_MACHINE2.md, DSP-005/DSP-013).
+    """Umbrales deterministicos del flujo de fraude (docs/state-machine.md, DSP-005/DSP-013).
 
     Los valores salen de graphs/policy.Policy, que es la única fuente: así el
     agente de fraude y el grafo nunca aplican ventanas o umbrales distintos."""

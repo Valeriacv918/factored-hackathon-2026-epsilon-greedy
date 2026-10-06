@@ -1,4 +1,4 @@
-"""bank_curated rows -> the record shapes the agent expects (apps/agent clients/README.md).
+"""bank_curated rows -> the record shapes the agent expects (contracts/mcp, apps/agent/README.md).
 
 This is the single place where table column names are translated:
 transaction_id -> id, transaction_status -> status, transaction_date -> date,

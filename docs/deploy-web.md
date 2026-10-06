@@ -1,36 +1,29 @@
-# Front web del agente: ejecución local y despliegue
+# Web front and deployment
 
-El front es HTML, CSS y JS sin build, servido por la misma app Python que corre el grafo
-(`apps/agent/src/bank_agent/web`). Hay un solo contenedor (`Dockerfile` en la raíz) con el
-agente, el front y el servidor MCP como subproceso stdio, desplegado en Cloud Run como un solo servicio.
+The front is plain HTML, CSS and JS with no build step, served by the same Python app that
+runs the graph (`apps/agent/src/bank_agent/web`). One container (root `Dockerfile`) holds the
+agent, the front and the MCP server as a stdio subprocess, deployed on Cloud Run as a single
+service.
 
-## Qué hace
+To run it locally, see the [Quickstart](../README.md#quickstart-run-locally).
 
-| Parte | Cómo |
+## What it does
+
+| Part | How |
 |---|---|
-| Grafo | `graphs/validation_triage.build_graph` con las cuatro rutas, igual que `run_disputes.py --flow full`. |
-| Conversaciones | `thread_id` generado por el servidor (`web-<uuid>`). Cada conversación pertenece al navegador que la creó (cookie HttpOnly); otro navegador recibe 404. |
-| Interacciones | Cada `interrupt` se muestra como formulario, caja de texto o botones, y se continúa con `Command(resume=...)`. |
-| Identidad | Formulario de documento, fecha de nacimiento (selector de fecha) y producto. Va directo al `resume` y a MCP `verify_identity`. No se escribe en el chat ni llega al LLM, y el formulario se borra al enviarlo. |
-| Tarjetas y cargos | El navegador recibe `{index, label}` con los últimos cuatro dígitos (o fecha, monto y comercio). Responde con el índice y el servidor lo traduce al ID real. |
-| Conexiones | El cliente MCP y el grafo compilado se crean una vez al arrancar (`lifespan`). |
-| Secretos | Solo variables de entorno. El navegador no recibe configuración. CSP `default-src 'self'`. |
-| Estadísticas | `GET /api/metrics`: conversaciones de este proceso (desde `conversation.summary`) y la última evaluación offline de triage (`evals/cases/results`). |
-
-## Local
-
-Requiere el `.env` de la raíz (ver `.env.example` y `docs/mcp-sandbox.md`), con
-`SANDBOX_SCENARIO_ID`, `SCENARIO_NOW`, `SESSION_SIGNING_KEY` y `GROQ_API_KEY`.
-
-```bash
-uv run --project apps/agent bank-web
-```
-
-Abre http://localhost:8080. Los logs JSON salen por stdout, o a `LOG_FILE` si está definido.
+| Graph | `graphs/validation_triage.build_graph` with all four routes, same as `run_disputes.py --flow full`. |
+| Conversations | Server-generated `thread_id` (`web-<uuid>`). Each conversation belongs to the browser that created it (HttpOnly cookie); another browser gets 404. |
+| Interactions | Each `interrupt` is shown as a form, text box or buttons, and resumed with `Command(resume=...)`. |
+| Identity | Form with document, date of birth (date picker) and product. Goes straight to `resume` and MCP `verify_identity`. Never written to the chat or sent to the LLM; the form is cleared on submit. |
+| Cards and charges | The browser receives `{index, label}` with the last four digits (or date, amount and merchant). It answers with the index and the server maps it to the real ID. |
+| Connections | The MCP client and the compiled graph are created once at startup (`lifespan`). If configuration is missing or the subprocess fails, the revision fails to start instead of failing on the first form. |
+| Secrets | Environment variables only. The browser receives no configuration. CSP `default-src 'self'`. |
+| Language | The language detector runs before the form; if it cannot choose between Spanish and Portuguese, the customer picks with buttons (also an es/pt toggle in the UI). The choice is kept in the conversation state and used by forms, buttons and replies. The stats panel is not translated. |
+| Stats | `GET /api/metrics`: conversations of this process (from `conversation.summary`) and the latest offline triage evaluation (`evals/cases/results`, optional; shown as unavailable in a fresh checkout). |
 
 ## Cloud Run
 
-1. Guarda los secretos en Secret Manager (una sola vez):
+1. Store the secrets in Secret Manager (once):
 
 ```bash
 printf '%s' "$GROQ_API_KEY" | gcloud secrets create bank-web-groq-api-key --data-file=-
@@ -40,7 +33,7 @@ printf '%s' "$GROQ_API_KEY" | gcloud secrets create bank-web-groq-api-key --data
 python -c "import secrets; print(secrets.token_urlsafe(48), end='')" | gcloud secrets create bank-web-session-signing-key --data-file=-
 ```
 
-2. Despliega desde la raíz del repo (Cloud Build construye el `Dockerfile`):
+2. Deploy from the repo root (Cloud Build builds the `Dockerfile`):
 
 ```bash
 gcloud run deploy bank-agent-demo --source . --region us-east4 --service-account bank-mcp@hackaton-509923.iam.gserviceaccount.com --max-instances 1 --min-instances 0 --concurrency 8 --session-affinity --memory 1Gi --cpu 1 --timeout 300 --allow-unauthenticated --set-env-vars BQ_PROJECT=hackaton-509923,BQ_DATASET=bank_curated,BQ_LOCATION=us-central1,BQ_SANDBOX_DATASET=bank_sandbox,SANDBOX_SCENARIO_ID=<escenario>,SCENARIO_NOW=<scenario_clock>,LLM_MODEL=groq:openai/gpt-oss-120b --set-secrets GROQ_API_KEY=bank-web-groq-api-key:latest,SESSION_SIGNING_KEY=bank-web-session-signing-key:latest

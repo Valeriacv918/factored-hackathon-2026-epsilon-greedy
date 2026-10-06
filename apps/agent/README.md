@@ -1,157 +1,152 @@
-# Agente de disputas con LangGraph
+# Dispute agent (LangGraph)
 
-Flujo local activo: validación de identidad por MCP y triage con Groq.
-Las rutas posteriores quedan pendientes mientras el equipo integra esos agentes.
-La arquitectura histórica de seis componentes se describe a continuación;
-ver el flujo acotado y sus límites al final de este documento.
+The conversation agent and its web front. It verifies the customer's identity, classifies the
+request (Spanish or Portuguese) and runs one of four routes: card emergency, charge error,
+fraud, or escalation to a human. All data comes through the MCP server (`apps/mcp-server`);
+the agent never queries BigQuery. Flow design: [state machine](../../docs/state-machine.md).
 
-## Estructura
+## Structure
 
 ```text
 src/bank_agent/
-  graphs/state.py             Estado compartido e inicialización
-  graphs/disputes.py          Grafo y controles comunes
-  graphs/policy.py            Política de demostración configurable
-  nodes/security_language/   1. Seguridad e idioma ES/PT
-  nodes/understanding/       2. Comprensión, aclaración y búsqueda
-  nodes/lost_card/           3. Tarjeta perdida o robada
-  nodes/fraud/               4. Señal de fraude
-  nodes/charge_error/        5. Error en el cargo
-  nodes/escalation/          6. Transferencia humana
-  nodes/common.py            Confirmaciones, herramientas y verificación
-  clients/contracts.py       Contrato de servicios futuros
+  graphs/
+    validation_triage.py   Main graph (web app, run_disputes.py --flow full)
+    charge_test.py         Charge search, selection and explanation nodes
+    fraud_test.py          Fraud and escalation wiring
+    emergency_test.py      Card emergency wiring
+    disputes.py            Older general graph (--flow legacy)
+    state.py, policy.py    Conversation state; demo thresholds (single source)
+  nodes/
+    validator_agent/       Identity form + language detection (lingua), no LLM on identity data
+    triage_agent/          LLM classifier + deterministic router and rules
+    card_emergency_agent/  Select card → confirm → block and verify → ask about charges
+    fraud_agent/           Protect first, then dispute; DSP-004/005/013
+    charge_error/          Explanations EXP-002/003/006 and dispute policy
+    escalation/            Handoff packet, narrative + claim check, ticket and notification
+    common.py              Confirmations, tool calls and verification shared by nodes
+  clients/                 MCP client, McpServices adapter, sessions, identity, LLM extraction
+  prompts/                 Versioned prompts (no real customer data)
+  web/                     Starlette app (bank-web) + static front
+  observability.py         JSON-line logging
 ```
 
 ```mermaid
 flowchart TD
-    START --> S[Seguridad e idioma]
-    S -->|sesión válida| U[Comprensión]
-    S -->|sesión inválida| END
-    U -->|aclarar o buscar| U
-    U -->|tarjeta perdida| C[Tarjeta perdida]
-    U -->|cargo desconocido o riesgo| F[Señal de fraude]
-    U -->|cargo reconocido con error| E[Error en el cargo]
-    C -->|cargo desconocido| U
-    F -->|otro cargo| U
-    U --> H[Escalación]
+    START --> V[validator_agent: language + identity form]
+    V -->|verified| T[triage_agent]
+    V -->|locked / failed| END
+    T -->|emergency| C[card_emergency_agent]
+    T -->|not_me / charge_error| F[find and select transaction]
+    T -->|wants human| H[escalation]
+    T -->|other| END
+    F -->|not_me or score > 30| FR[fraud_agent]
+    F -->|charge error| E[charge_error]
+    C -->|unrecognized charge| F
+    FR -->|another charge| F
     C --> H
-    F --> H
+    FR --> H
     E --> H
-    F --> END
+    C --> END
+    FR --> END
     E --> END
     H --> END
 ```
 
-Cada componente es un nodo con fases internas. Cada transición de fase crea un
-checkpoint; una espera usa `interrupt()`. No hay escrituras antes de una espera
-en la misma fase. Los adaptadores deben garantizar idempotencia ante reejecución.
+Each node has internal phases. Every phase change creates a checkpoint; a wait uses
+`interrupt()`. There are no writes before a wait in the same phase, and the model call and the
+interrupt live in separate nodes, so resuming never replays a verification or a model call.
+After a resolved request the customer can ask for something else (up to 3 requests).
 
-## Pruebas (desde la raíz del repositorio, con uv)
+## Run
+
+From the repo root, with the root `.env` filled in (see the [Quickstart](../../README.md#quickstart-run-locally)):
 
 ```bash
 uv sync --project apps/agent
-uv run --project apps/agent pytest apps/agent -q
+uv run --project apps/agent bank-web                                   # web app on :8080
+uv run --project apps/agent scripts/run_disputes.py --session dev --flow full --debug   # terminal
 ```
 
-Python 3.12+, entorno propio en `apps/agent/.venv`, independiente del entorno
-analítico raíz y del servidor MCP. `apps/agent/uv.lock` fija las versiones.
-Las pruebas no usan red ni GCP; pytest viene del grupo `dev`, que `uv sync` instala por defecto.
+`run_disputes.py --flow` also accepts `validation-triage` (default: classify only),
+`charge-error`, `fraud`, `fraud-escalation`, `card-emergency`, `card-emergency-escalation` and
+`legacy`. It needs `DEV_SESSIONS` only for `--session`; the identity form still runs. JSON events go
+to `logs/agent.jsonl` (or `LOG_FILE`); `--debug` also logs LLM prompts and outputs (local only).
 
-Pruebas de integración (`tests/integration/`, marcador `integration`): levantan el
-servidor MCP real en su propio entorno y consultan BigQuery con tus credenciales
-ADC, solo lectura. Se excluyen por defecto y en CI. Usan el cliente de la entrada
-`dev` de `DEV_SESSIONS` (entorno o `.env` raíz), el mismo de `run_disputes.py --session dev`:
+Other demos: `scripts/chat_validator.py` (conversational validator, `--mcp` for real customers),
+`scripts/chat_fraud_demo.py` (card emergency + fraud agents outside the graph),
+`scripts/try_triage.py` (classifier against the real LLM).
 
-```bash
-uv run --project apps/agent pytest apps/agent -m integration
-```
+Tests: see [tests/README.md](tests/README.md).
 
-## Integrar
+## Nodes
 
-```python
-from langgraph.checkpoint.memory import InMemorySaver
-from langgraph.types import Command
-from bank_agent.graphs.disputes import build_graph
-from bank_agent.graphs.state import initial_state
+**validator_agent.** The first message is not classified (it may contain identity data). The
+customer fills a form: document number, date of birth, and the number of one of their products
+(`products.product_number`, not `PRD-...`). The values go straight to MCP `verify_identity`; no
+model sees them. On a mismatch the form returns with the remaining attempts, without saying
+which field failed. Attempts, lockout and token lifetime are owned by the server and reported in
+each answer. The reason for contact is asked in a new turn.
 
-# services implementa clients.contracts.Services.
-graph = build_graph(services, checkpointer=InMemorySaver())
-config = {"configurable": {"thread_id": "conversation-123"}, "recursion_limit": 100}
-result = graph.invoke(initial_state("conversation-123", "trusted-session-ref", mensaje), config)
-# Presentar result['__interrupt__'][0].value en la UI.
-result = graph.invoke(Command(resume={"choice": "yes"}), config)
-# Aclaración de transacción: Command(resume={"text": "fecha, monto o comercio"}).
-```
+| Status | When | Next |
+|---|---|---|
+| VERIFIED | Document + date + a product of the customer match | triage |
+| MISSING_FIELDS / INVALID_FORMAT | A field is missing or impossible (does not use an attempt) | ask again |
+| FAILED | No match (generic message) | retry |
+| LOCKED | 3 failures → 15 min lockout | human |
+| SERVICE_UNAVAILABLE | MCP down / timeout | human |
 
-La aplicación debe vincular `thread_id`, `conversation_id` y `session_ref` al
-usuario autenticado. Nunca aceptar estado arbitrario del navegador ni exponer
-`graph.invoke` directamente. No guardar tokens en checkpoints. La sesión se
-revalida antes de nodos protegidos, al recibir confirmaciones y antes de herramientas.
-Usar un checkpointer persistente y protegido al desplegar; `InMemorySaver` es local.
+**triage_agent.** `LLMClassifier` returns intent + confidence; `router.decide` routes in code.
+Low confidence shows clarification buttons. Fraud words at any point mean `emergency`.
 
-## Ejecutar contra el servidor MCP (datos reales)
+**card_emergency_agent.** 100% code; confirmations are buttons. One active card is chosen
+automatically, several are shown by last four digits. After a verified block it offers to block
+the customer's other active cards one by one (e.g. a lost wallet). Then it asks whether
+there is an unrecognized charge: yes → transaction search with `intent = not_me`; no → ends
+without a human. Declining the block escalates to fraud P1.
 
-`clients/mcp_services.py:McpServices` implementa `Services` sobre `apps/mcp-server`
-(`find_transactions`, `list_cards`, `get_card`, y escrituras simuladas en
-`bank_sandbox`: `block_card`, `read_block`, `file_dispute`, `read_dispute`,
-`dispute_context`, `create_handoff`, `read_handoff`, `notify_employee`,
-`read_notification`), un LLM para `understand` y lingua para el idioma. Las
-herramientas del sandbox requieren `SANDBOX_SCENARIO_ID` en el servidor
-([MCP y sandbox](../../docs/mcp-sandbox.md)); el grafo por defecto
-(`validation_triage`) aún no las llama. Las herramientas de cuentas aún no existen:
-fallan con `ServiceFailure` y el grafo termina de forma segura (escalación o
-"servicio no disponible"), nunca anunciando un éxito.
-El servidor obtiene `customer_id` del token de sesión, nunca de un argumento;
-`reference_date` sale del reloj de escenario.
+**fraud_agent.** 100% code. Protects first (offers the block if the card is not blocked yet), then
+applies DSP-004 (existing case), DSP-005 (90-day window) and files the dispute after confirmation.
+Asks for another charge (max 3); DSP-013 (score > 30, amount > 500 USD, or ≥ 2 charges denied)
+escalates to the fraud team. Fraud on an account (not a card) escalates: there are no account tools.
 
-```bash
-# .env en la raíz: SCENARIO_NOW, DEV_SESSIONS (solo desarrollo), LLM_MODEL, GROQ_API_KEY.
-# El agente lanza el servidor con MCP_SERVER_COMMAND (uv run --project apps/mcp-server bank-mcp).
-# Desde la raíz:
-uv run --project apps/agent scripts/run_disputes.py --session dev --debug
-```
+**charge_error.** Pending / Reversed / Declined: saves the fixed explanation
+(`save_charge_explanation`), verifies it and ends. Approved ends without a write.
 
-Login: los grafos (`disputes` y `validation_triage`) piden la identidad con un
-formulario (pausa `identity_form`: `document_number`, `date_of_birth`,
-`product_number`) y la verifican con el tool `verify_identity` del servidor MCP.
-Ningún LLM recibe esos datos; el agente nunca consulta BigQuery.
+**escalation.** Builds the handoff packet from verified state (queue + priority by rule), writes
+a 2–3 line narrative with the LLM, checks every claim against the packet (falls back to a
+template), then `create_handoff` + `notify_employee`, each verified by a read.
 
-Demo del validador conversacional (`scripts/chat_validator.py`, usa
-`ValidationAgent` con LLM; ningún grafo lo usa): datos sintéticos con
-`uv run --project apps/agent scripts/chat_validator.py`. Con `--mcp` verifica
-clientes reales por MCP.
+Thresholds (`fraud_score=30`, `high_amount_usd=500`, `window_days=90`, `max_charges=3`) live only
+in `graphs/policy.py:Policy`; `config/settings.py` derives from it. They are demo values, not real
+bank policies.
 
-`DEV_SESSIONS` se conserva para herramientas y flujo legacy. El flujo por defecto
-valida los tres factores por MCP, conserva los guiones de CLI-... y crea su propia
-sesión; no usa esa variable para omitir autenticación.
+## Service contract
 
-## Decisiones y límites
+`clients/contracts.Services` is injected when building the graph; the real adapter is
+`clients/mcp_services.McpServices`. Every tool call gets `session_ref`, `customer_id` and
+`arguments`. `McpServices` resolves `session_ref` to the server-signed token (`sessions.py`) and
+sends only the token: the server takes `customer_id` from it, never from an argument. The token is
+not stored in the graph checkpoint. Operational errors or invalid answers raise `ServiceFailure`;
+an expired session raises `SessionExpired`. Error messages never include sensitive data.
 
-- ES/PT: detección y extracción inyectadas mediante `Services`.
-- Política demo v4: 90 días, USD 500, score 30. No son políticas bancarias reales.
-  Fecha de referencia: `services.now()`. Para históricos, inyectar un reloj de
-  simulación explícito. Fechas futuras o sin zona escalan.
-- `amount_usd` requiere conversión verificada por el servicio; datos monetarios
-  o de riesgo ausentes escalan, no se imputan.
-- Hasta 2 aclaraciones, 3 cargos desconocidos y 8 turnos, configurable. Calibrar
-  el límite de turnos con las evaluaciones de recorridos largos.
-- Bloqueos por tarjeta y disputas por transacción; claves de idempotencia para
-  mutaciones. Verificación mediante lectura posterior independiente.
-- Un reintento por herramienta. Si falla la derivación, termina sin anunciar
-  una transferencia exitosa. El trace conserva nodos, fases y tiempos.
-- Respuestas y resumen con plantillas. Pendientes: adaptadores reales, modelo
-  narrativo, claim checker, métricas de tokens/costo y detector/clasificador real.
-- Petición humana en botones autenticados y comprensión. Texto libre no confirma
-  acciones. La futura UI necesita un canal para nuevas emergencias durante
-  cualquier pausa; hoy se detectan en entrada y aclaración de transacciones.
-- No hay frontend, endpoint, Dockerfile, alertas reales ni despliegue.
+Tool arguments and fields are listed in the [MCP server README](../mcp-server/README.md) and
+`contracts/mcp/*.json`. Amounts are decimal strings (no floats); dates are ISO with timezone.
+Mutations use idempotency keys: after a timeout the same key returns the original receipt, and
+each `read_*` checks the persisted effect (`verified` is true only then). The LLM extraction
+(`understand`) returns intent, confidence, slots and `wants_human`; it never returns routes or an
+identity, and its output is schema-validated.
 
-Referencia: [interrupciones de LangGraph](https://docs.langchain.com/oss/python/langgraph/interrupts).
+## Decisions and limits
 
-## Flujo acotado de validación y triage
+- Missing money or risk data escalates; it is never imputed. Future or timezone-less dates escalate.
+- Up to 2 clarifications, 3 unrecognized charges and 8 turns (configurable).
+- One retry per tool. If a handoff fails, the agent ends without announcing a successful transfer.
+  The trace keeps nodes, phases and times.
+- Free text never confirms an action; only authenticated buttons do.
+- Sessions, conversations and the checkpointer (`InMemorySaver`) live in process memory: a restart
+  requires signing in again. Production needs a persistent checkpointer and OTP or app sessions
+  (document + date + product is knowledge, not possession).
+- Dates like `DD/MM/YYYY` are read Latin-style, never `MM/DD`. lingua is unreliable on very short
+  messages, so the previous language is kept.
 
-La CLI usa ahora `graphs/validation_triage.py`: pide la identidad con el
-formulario (sin LLM), la verifica a través de MCP y clasifica con LLMClassifier/decide.
-Se detiene con un destino pendiente antes de emergency/fraud.
-Ver [configuración, pruebas y límites](../../docs/validation-triage-local.md).
-`DEV_SESSIONS` no salta la validación en este flujo.
+Reference: [LangGraph interrupts](https://docs.langchain.com/oss/python/langgraph/interrupts).

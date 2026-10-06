@@ -1,7 +1,7 @@
 from bank_agent.graphs.policy import decide
 from bank_agent.nodes.common import ask, escalate, file_case, finish, go, tool
 
-# Status -> (rule, es, pt). STATE_MACHINE2 "Explanations".
+# Status -> (rule, es, pt). docs/state-machine.md "Explanations".
 EXPLANATIONS = {
     "Pending": ("EXP-002", "La transacción figura pendiente.", "A transação consta como pendente."),
     "Reversed": ("EXP-003", "La transacción figura reversada.", "A transação consta como revertida."),

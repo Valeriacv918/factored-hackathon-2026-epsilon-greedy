@@ -1,66 +1,63 @@
-# cases
+# Triage evaluation set
 
-Casos sinteticos para evaluar respuesta, uso de herramientas y manejo de advertencias.
+`triage_messages.csv` holds customer messages labeled with the correct answer. It measures how well
+triage classifies; it is **not** for training or for prompt examples. If a message from here is
+copied into the prompt, the evaluation is no longer honest. CSV files are git-ignored: get the file
+from the team before running.
 
-Estado: estructura inicial; implementacion pendiente.
+```bash
+uv run --project apps/agent python evals/cases/run_eval.py                  # baseline + LLM (uses Groq)
+uv run --project apps/agent python evals/cases/run_eval.py --baseline-only  # keyword baseline only (free)
+uv run --project apps/agent python evals/cases/run_eval.py --limit 10       # quick run
+uv run --project apps/agent python evals/cases/run_eval.py --rpm 15         # slower, for Groq rate limits
+```
 
+It reports route accuracy (what matters most), intent accuracy, recall per intent, **critical
+failures** (emergencies not routed to EMERGENCY, charges ending out of scope; target 0), the button
+rate (CLARIFY_INTENT) and a confidence-threshold sweep. Results go to `evals/cases/results/`
+(git-ignored), which the web stats panel reads.
 
-# Set de evaluación del Triage
+## Columns
 
-`messages.csv` tiene mensajes de clientes etiquetados con la respuesta correcta.
-Sirve para medir qué tan bien clasifica el Triage, **no** para entrenar ni para
-dar ejemplos al prompt. Si un mensaje de aquí se copia al prompt, la evaluación
-deja de ser honesta.
-
-## Columnas
-
-| Columna | Valores | Qué significa |
+| Column | Values | Meaning |
 |---|---|---|
-| `id` | `es-001`, `pt-045`... | Identificador único |
-| `lang` | `es` / `pt` | Idioma del mensaje |
-| `text` | texto | El mensaje tal como lo escribiría un cliente |
-| `intent` | `emergency` / `not_me` / `charge_error` / `other` | Intención correcta |
-| `wants_human` | `1` / `0` | ¿Pide hablar con una persona? |
-| `ambiguous` | `1` / `0` | `1` = ni un humano podría decidir sin preguntar → lo correcto es mostrar botones |
-| `category` | ver abajo | Qué hace difícil al mensaje |
-| `source` | `claude` / `team` | Quién lo escribió |
-| `note` | texto | Por qué se etiquetó así (obligatorio en casos dudosos) |
+| `id` | `es-001`, `pt-045`... | Unique id |
+| `lang` | `es` / `pt` | Message language |
+| `text` | text | The message as a customer would write it |
+| `intent` | `emergency` / `not_me` / `charge_error` / `other` | Correct intent |
+| `wants_human` | `1` / `0` | Asks to talk to a person? |
+| `ambiguous` | `1` / `0` | `1` = not even a human could decide without asking → buttons are correct |
+| `category` | see below | What makes the message hard |
+| `source` | `claude` / `team` | Who wrote it |
+| `note` | text | Why it was labeled so (required for doubtful cases) |
 
-## Reglas de etiquetado
+## Labeling rules
 
-1. **`emergency`**: el cliente **no tiene** su tarjeta o cree que está comprometida:
-   perdida, robada, clonada, retenida en un cajero, le robaron la billetera.
-   Pedir "bloquear la tarjeta" también cuenta.
-   - Si además menciona compras raras → sigue siendo `emergency` (tiene prioridad).
-2. **`not_me`**: hay un cargo que el cliente **no hizo ni autorizó**.
-   - "Mi hijo usó mi tarjeta sin permiso" → `not_me` (no lo autorizó).
-3. **`charge_error`**: el cliente **sí hizo** la compra, pero el cobro está mal:
-   doble cobro, monto distinto, suscripción cancelada que sigue cobrando,
-   reembolso que no llegó, cajero que no entregó el dinero, producto que no llegó.
-4. **`other`**: nada de lo anterior (saldo, claves, abrir cuentas, horarios, saludos).
-5. **`ambiguous = 1`** solo si **de verdad** no se puede saber. En ese caso `intent = other`.
-   - "Tengo un problema con mi tarjeta" → ambiguo.
-   - "Me sale un cobro que no entiendo" → ambiguo (no entender ≠ no haberlo hecho).
-   - "Cobrança indevida" → ambiguo (en Brasil se usa para ambos casos).
-6. **`wants_human = 1`** si pide una persona, sin importar la intención.
-   Un mensaje puede ser `not_me` **y** `wants_human = 1`.
+1. **`emergency`**: the customer **does not have** their card or thinks it is compromised: lost,
+   stolen, cloned, kept by an ATM, wallet stolen. Asking to "block the card" also counts. If they also
+   mention strange purchases, it is still `emergency` (it has priority).
+2. **`not_me`**: there is a charge the customer **did not make or authorize** ("my son used my card
+   without permission" → `not_me`).
+3. **`charge_error`**: the customer **did** make the purchase but the charge is wrong: double charge,
+   different amount, cancelled subscription still charging, refund that never arrived, ATM that did
+   not dispense, product that never arrived.
+4. **`other`**: none of the above (balance, passwords, opening accounts, hours, greetings).
+5. **`ambiguous = 1`** only if it **really** cannot be known; then `intent = other`. Examples:
+   "Tengo un problema con mi tarjeta"; "Me sale un cobro que no entiendo" (not understanding ≠ not
+   having made it); "Cobrança indevida" (used for both cases in Brazil).
+6. **`wants_human = 1`** if they ask for a person, whatever the intent. A message can be `not_me`
+   **and** `wants_human = 1`.
 
-## Categorías
+## Categories
 
-`clear` (fácil) · `typo` (errores de ortografía) · `slang` (jerga) · `short` (muy corto) ·
-`long_story` (cuenta una historia) · `indirect` (no dice la palabra clave) ·
-`multi_issue` (dos problemas a la vez) · `mixed_lang` (mezcla idiomas) ·
-`emoji` · `angry` (enojado) · `vague` (ambiguo) · `injection` (intenta manipular al agente) ·
-`edge` (caso límite entre dos intenciones)
+`clear` · `typo` · `slang` · `short` · `long_story` · `indirect` (no keyword) · `multi_issue` ·
+`mixed_lang` · `emoji` · `angry` · `vague` · `injection` (tries to manipulate the agent) · `edge`
+(between two intents)
 
-## Cómo agregar mensajes (equipo)
+## Adding messages (team)
 
-Agrega filas al final con `source = team` e ids nuevos (`es-101`, `pt-101`...).
-
-- **Escribe como escribirías tú en WhatsApp**: rápido, con errores, sin pensar en el modelo.
-- **No mires el prompt del clasificador** antes de escribir.
-- Lo más valioso: mensajes que **tú** dudarías cómo clasificar, frases típicas de
-  Colombia o Brasil, y quejas largas y desordenadas.
-- Si no estás segura de la etiqueta, escríbelo en `note` y lo discutimos.
-
-Meta: al menos **30 mensajes del equipo**, repartidos entre las 4 intenciones y los dos idiomas.
+Append rows with `source = team` and new ids (`es-101`, `pt-101`...). Write as you would on WhatsApp:
+fast, with typos, without thinking about the model, and without looking at the classifier prompt.
+Most valuable: messages you would hesitate to classify, typical Colombian or Brazilian phrases, and
+long messy complaints. If unsure about a label, say so in `note`. Goal: at least 30 team messages
+across the 4 intents and both languages.

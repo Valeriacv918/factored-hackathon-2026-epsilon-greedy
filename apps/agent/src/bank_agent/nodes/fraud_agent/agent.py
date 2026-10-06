@@ -1,6 +1,6 @@
 """Agente de fraude (fraud path), 100% codigo, sin LLM.
 
-Implementa el diagrama "3. Fraud path" de docs/STATE_MACHINE2.md:
+Implementa el diagrama "3. Fraud path" de docs/state-machine.md:
   (bloqueo si falta) -> STATUS -> POLICY -> CONFIRM_DISPUTE ->
   ASK_MORE_CHARGES -> DSP-013 -> ESCALATION o INFORM
 

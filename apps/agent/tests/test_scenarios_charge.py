@@ -1,4 +1,4 @@
-"""Escenarios del camino not_me / charge_error (docs/STATE_MACHINE2.md, secciones 1, 3 y 4).
+"""Escenarios del camino not_me / charge_error (docs/state-machine.md, secciones 1, 3 y 4).
 
 Cada escenario es una conversación completa contra el grafo real, con servicios
 sintéticos (sin red, MCP ni LLM): qué pausa ve el cliente, qué botón presiona y

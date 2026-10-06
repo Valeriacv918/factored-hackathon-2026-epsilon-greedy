@@ -1,6 +1,6 @@
 """Servicio de emergencia de tarjeta (perdida/robo): 100% codigo, sin LLM.
 
-Implementa el diagrama "2. Card emergency" de docs/STATE_MACHINE2.md:
+Implementa el diagrama "2. Card emergency" de docs/state-machine.md:
 SELECT_CARD -> CONFIRM_BLOCK -> BLOCK_AND_VERIFY -> ASK_CHARGE.
 
 Las confirmaciones del cliente llegan como booleanos de botones, nunca como

@@ -1,4 +1,4 @@
-"""Escenarios de emergencia de tarjeta (docs/STATE_MACHINE2.md, sección 2).
+"""Escenarios de emergencia de tarjeta (docs/state-machine.md, sección 2).
 
 SELECT_CARD → ¿ya bloqueada? → CONFIRM_BLOCK → BLOCK_AND_VERIFY → ASK_CHARGE.
 Cada escenario recorre el grafo real con servicios falsos y revisa pausas, final y herramientas.
