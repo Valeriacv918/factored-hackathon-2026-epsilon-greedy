@@ -26,11 +26,11 @@ def run(services, answers, message="perdí mi tarjeta"):
 
 
 @pytest.mark.parametrize("language", ["es", "pt"])
-def test_one_card_block_verified_then_replacement(language):
+def test_one_card_block_verified_then_resolved_without_human(language):
     s = FakeServices(intent="emergency", language=language)
     state, kinds = run(s, [YES, NO])
     assert kinds == ["confirm_block", "unrecognized_charge"]
-    assert (state["reason"], state["queue"], state["priority"]) == ("card_replacement", "cards", "P3")
+    assert (state["route"], state["outcome"]) == ("end", "card_blocked") and not state.get("queue")
     assert state["blocked_cards"] == ["card-1"] and state["block_verified_at"]["card-1"]
     assert s.calls.index("block_card") < s.calls.index("read_block")      # BLOCK_AND_VERIFY
 
@@ -49,7 +49,7 @@ def test_declining_an_extra_card_continues_without_escalating():
     state, kinds = run(s, [{"choice": "card-2"}, YES, NO, NO])
     assert kinds == ["select_card", "confirm_block", "confirm_block", "unrecognized_charge"]
     assert state["blocked_cards"] == ["card-2"] and state["skipped_cards"] == ["card-1"]
-    assert (state["reason"], state["priority"]) == ("card_replacement", "P3")
+    assert state["outcome"] == "card_blocked" and not state.get("priority")
 
 
 def test_extra_card_question_is_different_and_shows_last4():

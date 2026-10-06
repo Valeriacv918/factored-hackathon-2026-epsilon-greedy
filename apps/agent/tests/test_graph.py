@@ -148,12 +148,12 @@ def test_high_fraud_score_reaches_p1(fake_services):
     assert state["reason"] == "DSP-013" and state["priority"] == "P1"
 
 
-def test_lost_card_to_replacement(fake_services):
+def test_lost_card_block_only_ends_without_human(fake_services):
     services = fake_services(intent="emergency")
     graph, config, _ = start(services)
     resume(graph, config, "yes")
     state = resume(graph, config, "no")
-    assert state["queue"] == "cards" and state["reason"] == "card_replacement"
+    assert state["outcome"] == "card_blocked" and not state.get("queue")
 
 
 def test_free_text_cannot_confirm_a_mutation(fake_services):

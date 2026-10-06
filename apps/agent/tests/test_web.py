@@ -100,6 +100,14 @@ def test_identity_form_and_text_kinds():
     assert view["input"] == "text" and not pending.options and not pending.fields
 
 
+def test_follow_up_shows_the_resolved_result_and_yes_no_buttons():
+    view, pending = present({"kind": "follow_up", "message": "¿Puedo ayudarte con algo más?",
+                             "options": ["yes", "no"],
+                             "resolved": {"response": "Listo.", "outcome": "card_blocked"}})
+    assert view["resolved"] == {"response": "Listo.", "outcome": "card_blocked", "group": "resolved"}
+    assert [o["label"] for o in view["options"]] == ["Sí", "No"] and pending.options == ["yes", "no"]
+
+
 def test_resume_values_are_validated_against_the_pending_question():
     assert resume_value(Pending("select_card", options=["A", "B"]), {"index": 1}) == {"choice": "B"}
     for bad in ({"index": 2}, {"index": True}, {"index": "0"}, {"choice": "A"}):

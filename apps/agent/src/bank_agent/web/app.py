@@ -132,6 +132,10 @@ def present(question: dict[str, Any]) -> tuple[dict[str, Any], Pending]:
         view["card"] = masked_card(question.get("last4"), lang)
     if isinstance(question.get("transaction"), dict):
         view["transaction"] = transaction_view(question["transaction"])
+    if kind == "follow_up" and isinstance(question.get("resolved"), dict):
+        outcome = question["resolved"].get("outcome")
+        view["resolved"] = {"response": question["resolved"].get("response") or "",
+                            "outcome": outcome, "group": outcome_group(outcome)}
     return view, Pending(kind, options=options)
 
 
@@ -175,7 +179,8 @@ class AgentApp:
             services.close()
             raise
         graph = build_graph(services, checkpointer=InMemorySaver(), test_charge_error=True, test_fraud=True,
-                            test_escalation=True, test_card_emergency=True)   # = run_disputes.py --flow full
+                            test_escalation=True, test_card_emergency=True,   # = run_disputes.py --flow full
+                            follow_up=True)
         return cls(services, graph)
 
     def close(self) -> None:

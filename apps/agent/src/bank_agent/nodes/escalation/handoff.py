@@ -11,6 +11,7 @@ import unicodedata
 from decimal import Decimal, InvalidOperation
 
 from bank_agent.clients.contracts import ServiceFailure
+from bank_agent.observability import log_event
 from bank_agent.prompts.handoff import QUEUES, REASONS
 
 MAX_CHARS = 600
@@ -170,8 +171,10 @@ def write_narrative(services, facts: dict, language: str) -> tuple[str, str, lis
     try:
         draft = services.write_narrative(facts, language)
     except ServiceFailure:
+        log_event("narrative.fallback", issues=["model_unavailable"])
         return fallback, "template", ["model_unavailable"]
     issues = claim_check(draft, facts)
     if issues:
+        log_event("narrative.fallback", issues=issues)
         return fallback, "template", issues
     return draft.strip(), "llm", []

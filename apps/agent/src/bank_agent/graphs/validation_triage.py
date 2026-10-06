@@ -8,23 +8,35 @@ Login is a FORM with no LLM (same pieces as nodes/validator_agent in the dispute
 document, date of birth and product number go to services.verify_identity -> MCP, so no
 model ever sees identity data. The first message is dropped for the same reason.
 """
-import logging
 from copy import deepcopy
 from langgraph.graph import START, END, StateGraph
 from langgraph.types import interrupt
 from bank_agent.graphs.state import ConversationState
-from bank_agent.observability import logged_step
+from bank_agent.observability import log_failure, logged_step
 from bank_agent.nodes.triage_agent.router import decide
 from bank_agent.nodes.common import say, ask
 from bank_agent.nodes.validator_agent import FIELDS, MAX_FORM_PROMPTS, identity_form_values, identity_retry_message
 from bank_agent.nodes.triage_agent.schemas import Understanding, Intent, Route, Slots
 
 
-logger = logging.getLogger(__name__)
 CHOICES = ["emergency", "not_me", "charge_error", "other", "human"]
+# Outcomes after which the customer is offered another request (resolved + abstained, web/metrics.py).
+FOLLOW_UP_OUTCOMES = {"dispute_filed", "explained", "fraud_intake_complete", "approved", "card_blocked",
+                      "out_of_scope", "outside_window", "existing_case", "cancelled"}
+MAX_REQUESTS = 3
+# Per-request state reset when the customer asks for something else (node results merge into the
+# state, so keys are overwritten, not dropped). Conversation-wide facts (blocked cards, cases,
+# denied/risk transactions) stay for the handoff packet and fraud rules.
+REQUEST_RESET = dict(intent=None, intent_confidence=None, triage_route=None, triage_choice=None, slots={},
+                     charge_input="", charge_candidates=[], transaction=None, card_id=None, account_id=None,
+                     skipped_cards=[], reason=None, policy_rule=None, explanation_result_id=None,
+                     explanation_rule=None, queue=None, priority=None, outcome=None, response=None,
+                     message="", turns=1, clarification_attempts=0)
 
 def build_graph(services, *, checkpointer, policy=None, test_charge_error=False, test_fraud=False,
-                test_escalation=False, test_card_emergency=False):
+                test_escalation=False, test_card_emergency=False, follow_up=False):
+    """follow_up=True (web): after a resolved/abstained outcome ask for another request, and end
+    every conversation with a goodbye."""
     if test_escalation and not (test_fraud or test_card_emergency):
         raise ValueError("test_escalation requires test_fraud or test_card_emergency")
 
@@ -71,7 +83,7 @@ def build_graph(services, *, checkpointer, policy=None, test_charge_error=False,
             status = result.get("status")
             cid = services.validate_session(result["session_ref"]) if status in {"VERIFIED", "ALREADY_VERIFIED"} else None
         except Exception as exc:
-            logger.warning("Validation failed (%s)", type(exc).__name__)
+            log_failure(exc, "validation_unavailable")
             status, cid = "SERVICE_UNAVAILABLE", None
         if cid:
             s.update(customer_id=cid, session_ref=result["session_ref"], authenticated=True, route="request_wait",
@@ -90,8 +102,9 @@ def build_graph(services, *, checkpointer, policy=None, test_charge_error=False,
         return s
 
     def request_wait(s):
-        value = interrupt({"kind": "request_details", "language": s.get("language"),
-                           "message": say(s, "Identidad verificada. ¿Qué necesitas hacer ahora?", "Identidade verificada. Como posso ajudar?")})
+        message = (say(s, "Cuéntame qué más necesitas.", "Conte o que mais você precisa.") if s.get("requests", 1) > 1
+                   else say(s, "Identidad verificada. ¿Qué necesitas hacer ahora?", "Identidade verificada. Como posso ajudar?"))
+        value = interrupt({"kind": "request_details", "language": s.get("language"), "message": message})
         if not isinstance(value, dict) or not isinstance(value.get("text"), str) or not value["text"].strip():
             raise ValueError("Expected nonempty text")
         return {**s, "message": value["text"].strip(), "route": "triage_agent", "phase": "await_request"}
@@ -141,7 +154,7 @@ def build_graph(services, *, checkpointer, policy=None, test_charge_error=False,
                 s.update(route="end", outcome="out_of_scope",
                          response=say(s, "La solicitud está fuera del alcance de tarjetas y revisión de cargos.", "A solicitação está fora do escopo de cartões e revisão de cobranças."))
         except Exception as exc:
-            logger.warning("Triage failed (%s)", type(exc).__name__)
+            log_failure(exc, "triage_unavailable")
             fail(s, "triage_unavailable", say(s, "No fue posible clasificar la solicitud.", "Não foi possível classificar a solicitação."))
         return s
 
@@ -151,8 +164,45 @@ def build_graph(services, *, checkpointer, policy=None, test_charge_error=False,
             raise ValueError("Choose one of the supplied options")
         return {**s, "triage_choice": value["choice"], "route": "triage_agent", "phase": "await_intent"}
 
+    def follow_up_node(s):
+        """Show the result and offer another request. Direct interrupt (not ask()): no human
+        button here, and nothing runs before the pause because the node replays on resume."""
+        value = interrupt({"kind": "follow_up", "language": s.get("language"),
+                           "message": say(s, "¿Puedo ayudarte con algo más?", "Posso ajudar com mais alguma coisa?"),
+                           "options": ["yes", "no"],
+                           "resolved": {"response": s.get("response"), "outcome": s.get("outcome")}})
+        if not isinstance(value, dict) or value.get("choice") not in {"yes", "no"}:
+            raise ValueError("Choose one of the supplied options")
+        s = deepcopy(s)
+        if services.validate_session(s.get("session_ref")) != s.get("customer_id"):
+            s.update(route="end", phase="end", authenticated=False, customer_id="", outcome="authentication_required",
+                     response=say(s, "La sesión expiró. Inicia una nueva conversación.", "A sessão expirou. Inicie uma nova conversa."))
+            return s
+        if value["choice"] == "no":
+            s.update(route="close", phase="end", farewell=True,
+                     response=say(s, "Gracias por comunicarte. ¡Que tengas un buen día!", "Obrigado pelo contato. Tenha um ótimo dia!"))
+            return s
+        s.update(REQUEST_RESET, route="request_wait", phase="await_request", requests=s.get("requests", 1) + 1)
+        return s
+
+    def farewell(s):
+        if not s.get("farewell"):
+            s = {**s, "farewell": True, "response": (s.get("response") or "") + say(
+                s, " Gracias por comunicarte con nosotros. ¡Hasta pronto!", " Obrigado pelo contato. Até logo!")}
+        return {**s, "route": "close"}
+
+    def next_route(s):
+        if not follow_up or s["route"] != "end":
+            return s["route"]
+        if (s.get("authenticated") and s.get("outcome") in FOLLOW_UP_OUTCOMES
+                and s.get("requests", 1) < MAX_REQUESTS):
+            return "follow_up"
+        return "farewell"
+
     nodes = {"validator_agent": validator, "validation_wait": validation_wait,
              "request_wait": request_wait, "triage_agent": triage, "triage_wait": triage_wait}
+    if follow_up:
+        nodes.update(follow_up=follow_up_node, farewell=farewell)
     if test_charge_error or test_fraud:
         from bank_agent.graphs.charge_test import build_nodes
         from bank_agent.graphs.policy import Policy
@@ -186,6 +236,6 @@ def build_graph(services, *, checkpointer, policy=None, test_charge_error=False,
         return run
     for name, fn in nodes.items():
         builder.add_node(name, wrap(name, fn))
-        builder.add_conditional_edges(name, lambda s: s["route"], {n: n for n in nodes} | {"end": END})
+        builder.add_conditional_edges(name, next_route, {n: n for n in nodes} | {"end": END, "close": END})
     builder.add_edge(START, "validator_agent")
     return builder.compile(checkpointer=checkpointer)

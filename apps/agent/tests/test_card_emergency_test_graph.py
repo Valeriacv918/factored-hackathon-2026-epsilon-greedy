@@ -44,14 +44,14 @@ def kind(state):
     return state["__interrupt__"][0].value["kind"]
 
 
-def test_lost_card_blocks_verifies_then_replacement_without_ticket():
+def test_lost_card_blocks_verifies_then_ends_without_human():
     s = EmergencyServices(); g, c, r = start(s)
     assert kind(r) == "confirm_block" and "block_card" not in s.actions      # confirma antes de escribir
     r = g.invoke(Command(resume=YES), c)
     assert kind(r) == "unrecognized_charge" and r["blocked_cards"] == ["CARD-1"]
     assert s.actions.index("block_card") < s.actions.index("read_block")      # BLOCK_AND_VERIFY
     r = g.invoke(Command(resume=NO), c)
-    assert (r["outcome"], r["reason"], r["queue"], r["priority"]) == ("human_required", "card_replacement", "cards", "P3")
+    assert (r["route"], r["outcome"]) == ("end", "card_blocked") and r["blocked_cards"] == ["CARD-1"]
     assert "create_handoff" not in s.actions
 
 
@@ -102,13 +102,12 @@ def test_unrecognized_charge_continues_to_fraud_without_asking_to_block_again():
     assert kind(r) == "confirm_dispute" and s.actions.count("block_card") == 1
 
 
-def test_replacement_with_escalation_creates_verified_sandbox_ticket():
+def test_block_only_with_escalation_wired_still_creates_no_ticket():
     s = EmergencyServices(); g, c, _ = start(s, test_escalation=True)
     g.invoke(Command(resume=YES), c)
     r = g.invoke(Command(resume=NO), c)
-    assert (r["outcome"], r["reason"], r["ticket_id"]) == ("escalated", "card_replacement", "TICKET-1")
-    assert s.actions[-4:] == ["create_handoff", "read_handoff", "notify_employee", "read_notification"]
-    assert s.handoff_packet["blocked_cards"] == ["CARD-1"] and s.handoff_packet["queue"] == "cards"
+    assert r["outcome"] == "card_blocked" and not r.get("ticket_id")
+    assert "create_handoff" not in s.actions and "notify_employee" not in s.actions
 
 
 def test_without_the_flag_the_graph_still_stops_at_classification():

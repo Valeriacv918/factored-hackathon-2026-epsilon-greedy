@@ -44,8 +44,7 @@ SCENARIOS = [
         "oos_customer_corrects_to_emergency",
         "No encuentro la billetera", "other",
         steps=[(OOS, "emergency"), ("confirm_block", "yes"), ("unrecognized_charge", "no")],
-        expect={"outcome": "escalated", "intent": "emergency", "reason": "card_replacement",
-                "queue": "cards", "priority": "P3"},
+        expect={"outcome": "card_blocked", "intent": "emergency"},
         calls_absent=("find_transactions",),
     ),
 ]

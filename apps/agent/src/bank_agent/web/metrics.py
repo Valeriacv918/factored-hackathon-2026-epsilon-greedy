@@ -19,7 +19,7 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parents[5]
 
 # How a conversation ended (outcome values set by the graph nodes).
-RESOLVED = {"dispute_filed", "explained", "fraud_intake_complete", "approved"}   # verified, no human
+RESOLVED = {"dispute_filed", "explained", "fraud_intake_complete", "approved", "card_blocked"}   # verified, no human
 ESCALATED = {"escalated"}                                                         # verified handoff ticket
 HUMAN_NO_TICKET = {"human_required", "human_requested"}
 ABSTAINED = {"out_of_scope", "outside_window", "existing_case", "cancelled"}

@@ -7,7 +7,7 @@ from bank_agent.clients.contracts import ServiceFailure, SessionExpired
 from bank_agent.graphs.policy import Policy
 from bank_agent.graphs.state import ConversationState
 from bank_agent.nodes.common import HandoffRequested, escalate, finish, require_session
-from bank_agent.observability import logged_step
+from bank_agent.observability import log_failure, logged_step
 from bank_agent.nodes import (charge_error, escalation, fraud_agent, card_emergency_agent, validator_agent,
                               triage_agent)
 
@@ -47,7 +47,8 @@ def build_graph(services, *, checkpointer, policy=None):
                 result = finish(s, "authentication_required", "Inicia sesión para continuar.", "Entre na sua conta para continuar.")
             except HandoffRequested as exc:
                 result = escalate(exc.reason, "general", "P2" if s.get("intent") in {"not_me", "emergency"} else "P3")
-            except ServiceFailure:
+            except ServiceFailure as exc:
+                log_failure(exc, "tool_failure")
                 if name in {"escalation", "validator_agent"}:
                     result = finish(s, "service_unavailable", "No se pudo verificar la operación. Contacta atención humana.",
                                     "Não foi possível verificar a operação. Contate o atendimento humano.")

@@ -2,7 +2,7 @@
 
 from typing import Any, Literal, TypedDict
 
-Route = Literal["validator_agent", "validation_wait", "request_wait", "triage_agent", "triage_wait", "charge_extract", "charge_find", "charge_details", "charge_select", "charge_error", "charge_save", "fraud_agent", "escalation", "card_emergency_agent", "end"]
+Route = Literal["validator_agent", "validation_wait", "request_wait", "triage_agent", "triage_wait", "charge_extract", "charge_find", "charge_details", "charge_select", "charge_error", "charge_save", "fraud_agent", "escalation", "card_emergency_agent", "follow_up", "farewell", "close", "end"]
 
 
 class ConversationState(TypedDict, total=False):
@@ -35,6 +35,8 @@ class ConversationState(TypedDict, total=False):
     case_ids: list[str]
     clarification_attempts: int
     turns: int
+    requests: int  # Requests handled in this conversation (follow_up loops back to request_wait).
+    farewell: bool  # The closing response already says goodbye.
     reason: str
     policy_rule: str  # DSP-xxx that decided a charge (DSP-004, DSP-005, DSP-100...)
     explanation_result_id: str
