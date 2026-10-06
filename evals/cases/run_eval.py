@@ -1,9 +1,10 @@
-"""Evaluación del Triage: baseline (palabras clave) vs LLM, sobre messages.csv.
+"""Evaluación del Triage: baseline (palabras clave) vs LLM, sobre triage_messagesv2.csv.
 
 Uso (desde la carpeta principal del repo):
-  uv run python evals/triage/run_eval.py                  # baseline + LLM (usa Groq)
-  uv run python evals/triage/run_eval.py --baseline-only  # solo baseline (gratis)
-  uv run python evals/triage/run_eval.py --limit 10       # prueba rápida con 10 mensajes
+  uv run --project apps/agent --all-extras python evals/triage/run_eval.py                  # baseline + LLM (usa Groq)
+  uv run --project apps/agent --all-extras python evals/triage/run_eval.py --baseline-only  # solo baseline (gratis)
+  uv run --project apps/agent --all-extras python evals/triage/run_eval.py --limit 10       # prueba rápida con 10 mensajes
+  uv run --project apps/agent --all-extras python evals/triage/run_eval.py --rpm 15         # más lento si sigue el rate limit
 
 Qué mide:
   - Exactitud de RUTA: ¿el cliente llegó al lugar correcto? (lo que más importa)
@@ -13,6 +14,11 @@ Qué mide:
     (not_me / charge_error) que terminaron "fuera de alcance". Meta: 0.
   - Tasa de botones (CLARIFY_INTENT): preguntar mucho también es malo.
   - Barrido del umbral de confianza: para elegir CONFIDENCE_THRESHOLD con datos.
+
+Rate limit de Groq:
+  - --rpm limita las llamadas por minuto (pausa automática entre mensajes).
+  - Si Groq devuelve 429, o el clasificador devuelve el FALLBACK (confianza 0),
+    se espera (respetando Retry-After si viene) y se reintenta con backoff exponencial.
 """
 import argparse
 import csv
@@ -35,6 +41,8 @@ from bank_agent.nodes.triage_agent.schemas import Intent, Route  # noqa: E402
 
 DATA = Path(__file__).parent / "triage_messages.csv"
 RESULTS_DIR = Path(__file__).parent / "results"
+
+MAX_WAIT = 60.0  # tope de espera entre reintentos (s)
 
 
 # ---------------------------------------------------------------------------
@@ -65,19 +73,62 @@ def is_critical_miss(row, route: Route) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Manejo del rate limit
+# ---------------------------------------------------------------------------
+def is_rate_limit(exc: Exception) -> bool:
+    status = getattr(exc, "status_code", None) or getattr(getattr(exc, "response", None), "status_code", None)
+    msg = str(exc).lower()
+    return status == 429 or "rate limit" in msg or "rate_limit" in msg or "429" in msg
+
+
+def retry_after(exc: Exception):
+    """Segundos que Groq pide esperar (header Retry-After), si los manda."""
+    headers = getattr(getattr(exc, "response", None), "headers", None) or {}
+    try:
+        return float(headers.get("retry-after"))
+    except (TypeError, ValueError):
+        return None
+
+
+def call_with_retry(fn, text, max_retries, base_wait):
+    """Llama al clasificador; reintenta ante 429 o FALLBACK (confianza 0)."""
+    for attempt in range(max_retries + 1):
+        try:
+            t0 = time.perf_counter()
+            u = fn(text)
+            latency = time.perf_counter() - t0
+        except Exception as e:  # noqa: BLE001
+            if not is_rate_limit(e) or attempt == max_retries:
+                raise
+            wait = retry_after(e) or min(base_wait * 2 ** attempt, MAX_WAIT)
+            why = "429"
+        else:
+            if u.confidence != 0.0 or attempt == max_retries:
+                return u, latency
+            wait = min(base_wait * 2 ** attempt, MAX_WAIT)
+            why = "fallback"
+        print(f"\n    {why}: esperando {wait:.0f}s (reintento {attempt + 1}/{max_retries})", flush=True)
+        time.sleep(wait)
+
+
+# ---------------------------------------------------------------------------
 # Correr un clasificador sobre todos los mensajes
 # ---------------------------------------------------------------------------
-def run(name, understand_fn, rows, sleep=0.0):
+def run(name, understand_fn, rows, sleep=0.0, rpm=None, max_retries=0, base_wait=5.0):
+    min_interval = max(sleep, 60.0 / rpm if rpm else 0.0)
+    last_call = 0.0
     results = []
     for i, row in enumerate(rows, 1):
-        t0 = time.perf_counter()
-        u = understand_fn(row["text"])
-        latency = time.perf_counter() - t0
+        if min_interval:
+            gap = time.monotonic() - last_call
+            if gap < min_interval:
+                time.sleep(min_interval - gap)
+            last_call = time.monotonic()
+
+        u, latency = call_with_retry(understand_fn, row["text"], max_retries, base_wait)
         d = router.decide(row["text"], u)
         results.append({"row": row, "u": u, "route": d.route, "reason": d.reason, "latency": latency})
         print(f"\r  {name}: {i}/{len(rows)}", end="", flush=True)
-        if sleep:
-            time.sleep(sleep)
     print()
     return results
 
@@ -117,7 +168,7 @@ def summarize(name, results):
         "by_group": by_group,
         "avg_latency": sum(r["latency"] for r in results) / n,
         "reasons": Counter(r["reason"] for r in results),
-        # El FALLBACK del clasificador tiene confianza 0: si aparece, Groq falló
+        # El FALLBACK del clasificador tiene confianza 0: si aparece tras los reintentos, Groq falló
         "llm_failures": sum(r["u"].confidence == 0.0 for r in results) if name == "llm" else 0,
     }
 
@@ -162,8 +213,8 @@ def print_report(summaries):
 
     for s in summaries:
         if s["llm_failures"]:
-            print(f"\n⚠️  {s['llm_failures']} respuestas del LLM fueron FALLBACK (Groq falló o limitó la velocidad).")
-            print("    Los resultados del LLM no son confiables. Vuelve a correr con: --sleep 2")
+            print(f"\n⚠️  {s['llm_failures']} respuestas del LLM siguieron en FALLBACK tras los reintentos.")
+            print("    Los resultados del LLM no son confiables. Baja el ritmo: --rpm 10 --max-retries 8")
 
     for s in summaries:
         if s["critical"]:
@@ -208,17 +259,22 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--baseline-only", action="store_true")
     ap.add_argument("--limit", type=int, default=None)
-    ap.add_argument("--sleep", type=float, default=0.0, help="pausa entre llamadas (límite de Groq)")
+    ap.add_argument("--sleep", type=float, default=0.0, help="pausa mínima entre llamadas al LLM (s)")
+    ap.add_argument("--rpm", type=float, default=20, help="máximo de llamadas al LLM por minuto (0 = sin límite)")
+    ap.add_argument("--max-retries", type=int, default=5, help="reintentos ante 429 o fallback")
+    ap.add_argument("--base-wait", type=float, default=5.0, help="espera inicial del backoff (s), se duplica")
     args = ap.parse_args()
 
-    rows = list(csv.DictReader(open(DATA, encoding="utf-8")))[: args.limit]
+    with open(DATA, encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))[: args.limit]
     print(f"{len(rows)} mensajes de {DATA.name}")
 
     all_results = {"baseline": run("baseline", baseline_understand, rows)}
     if not args.baseline_only:
         from bank_agent.nodes.triage_agent.classifier import LLMClassifier
         clf = LLMClassifier()
-        all_results["llm"] = run("llm", clf.understand, rows, sleep=args.sleep)
+        all_results["llm"] = run("llm", clf.understand, rows, sleep=args.sleep, rpm=args.rpm or None,
+                                 max_retries=args.max_retries, base_wait=args.base_wait)
         print(f"Llamadas al LLM: {clf.calls} (reintentos incluidos)")
 
     print_report([summarize(n, r) for n, r in all_results.items()])
