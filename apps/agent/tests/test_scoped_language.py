@@ -35,8 +35,13 @@ def test_portuguese_is_detected_and_survives_identity_form():
 
 def test_short_ambiguous_greeting_requests_language_before_identity():
     s, g, cfg, result = start("Oi")
-    assert question(result)["kind"] == "language"
-    assert question(result)["options"] == ["es", "pt"]
+    q = question(result)
+    assert q["kind"] == "language"
+    assert q["options"] == ["es", "pt"]
+    assert "Selecciona tu idioma" in q["message"]
+    assert "Selecione seu idioma" in q["message"]
+    view, _ = present(q)
+    assert [option["label"] for option in view["options"]] == ["Español", "Português"]
     assert not s.calls
     result = g.invoke(Command(resume={"choice": "pt"}), cfg)
     assert question(result)["kind"] == "identity_form"

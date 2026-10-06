@@ -5,6 +5,10 @@ const OUTCOMES = {
   resolved: "Resuelta automáticamente", escalated: "Escalada con ticket", human_no_ticket: "Requiere humano",
   abstained: "Fuera de alcance", failed: "No completada", other: "Otro",
 };
+const OUTCOMES_PT = {
+  resolved: "Resolvida automaticamente", escalated: "Encaminhada com protocolo", human_no_ticket: "Requer atendimento",
+  abstained: "Fora do escopo", failed: "Não concluída", other: "Outro",
+};
 const INTENTS = {
   emergency: "Emergencia", not_me: "No reconocido", charge_error: "Cobro equivocado",
   other: "Otra", unclassified: "Sin clasificar",
@@ -69,6 +73,7 @@ function renderTrace(trace) {
 }
 
 function renderQuestion(question) {
+  const pt = question.language === "pt";
   const bubble = addMessage("agent", question.message || "");
   if (question.card) bubble.append(el("div", { class: "detail" }, el("span", { class: "card-chip", text: question.card })));
   if (question.transaction) {
@@ -81,9 +86,12 @@ function renderQuestion(question) {
   if (question.options) bubble.append(optionButtons(question));
   if (question.input === "text") {
     setComposer(true, question.kind === "transaction_details"
-      ? "Ej.: 45.90 USD el 12 de junio en Uber" : "Describe lo que necesitas…");
+      ? (pt ? "Ex.: 45,90 USD em 12 de junho no Uber" : "Ej.: 45.90 USD el 12 de junio en Uber")
+      : (pt ? "Descreva o que você precisa…" : "Describe lo que necesitas…"));
   } else {
-    setComposer(false, "Responde con las opciones de arriba");
+    setComposer(false, question.kind === "language"
+      ? "Usa os botões / Usa los botones de arriba"
+      : (pt ? "Responda com as opções acima" : "Responde con las opciones de arriba"));
   }
 }
 
@@ -97,6 +105,9 @@ function optionButtons(question) {
       if (busy || box.classList.contains("used")) return;
       box.classList.add("used");
       button.classList.add("chosen");
+      if (question.kind === "language" && ["es", "pt"].includes(option.value)) {
+        conversation.language = option.value;
+      }
       addMessage("user", option.label);
       send({ index: option.index });
     });
@@ -141,13 +152,16 @@ function identityForm(question) {
 }
 
 function renderDone(result) {
+  const pt = result.language === "pt";
   const bubble = addMessage("agent", result.response || "", `done ${result.group}`);
-  bubble.append(el("span", { class: `outcome-tag ${result.group}`, text: OUTCOMES[result.group] || result.outcome }));
-  setComposer(true, "Escribe para iniciar otra conversación…");
+  bubble.append(el("span", { class: `outcome-tag ${result.group}`,
+    text: (pt ? OUTCOMES_PT[result.group] : OUTCOMES[result.group]) || result.outcome }));
+  setComposer(true, pt ? "Escreva para iniciar outra conversa…" : "Escribe para iniciar otra conversación…");
 }
 
 function handle(result) {
-  conversation = { id: result.thread_id, pending: result.question || null, done: result.status === "done" };
+  conversation = { id: result.thread_id, pending: result.question || null, done: result.status === "done",
+    language: result.question?.language || result.language || conversation?.language || "es" };
   renderTrace(result.trace);
   if (result.status === "waiting") renderQuestion(result.question);
   else renderDone(result);
@@ -155,8 +169,14 @@ function handle(result) {
 }
 
 const ERRORS = {
-  agent_unavailable: "El servicio no está disponible en este momento. Intenta de nuevo en unos minutos.",
-  not_found: "La conversación expiró. Escribe para iniciar una nueva.",
+  agent_unavailable: {
+    es: "El servicio no está disponible en este momento. Intenta de nuevo en unos minutos.",
+    pt: "O serviço não está disponível no momento. Tente novamente em alguns minutos.",
+  },
+  not_found: {
+    es: "La conversación expiró. Escribe para iniciar una nueva.",
+    pt: "A conversa expirou. Escreva para iniciar uma nova.",
+  },
 };
 
 async function post(url, body) {
@@ -179,7 +199,11 @@ async function send(answer) {
     handle(result);
   } catch (err) {
     hideTyping();
-    addMessage("agent", ERRORS[err.code] || "No pude procesar esa respuesta. Intenta de nuevo.", "done failed");
+    const lang = conversation?.language === "pt" ? "pt" : "es";
+    const fallback = lang === "pt"
+      ? "Não consegui processar essa resposta. Tente novamente."
+      : "No pude procesar esa respuesta. Intenta de nuevo.";
+    addMessage("agent", ERRORS[err.code]?.[lang] || fallback, "done failed");
     if (err.code === "not_found" || err.code === "agent_unavailable") conversation = null;
     setComposer(true);
   } finally {

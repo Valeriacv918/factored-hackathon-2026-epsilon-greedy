@@ -100,7 +100,7 @@ primer formulario del usuario para descubrir el problema.
 El grafo completo llama al detector de validator_agent/language.py antes del
 formulario. Si el detector no decide entre español y portugués, muestra botones
 para elegir. La elección queda en el estado de la conversación y se transmite
-a los formularios y botones de la web. Los factores de identidad no se usan
-para detectar idioma ni se envían al modelo.
+a los formularios, botones, ayudas y respuestas finales de la web. Los factores
+de identidad no se usan para detectar idioma ni se envían al modelo.
 
 El idioma de conversación no traduce el panel estático de estadísticas.
