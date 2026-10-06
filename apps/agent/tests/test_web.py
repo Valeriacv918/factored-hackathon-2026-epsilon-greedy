@@ -153,6 +153,7 @@ def test_static_page_and_security_headers(web):
     client, _, _ = web
     page = client.get("/")
     assert page.status_code == 200 and "Epsilon Bank" in page.text
+    assert 'id="ui-lang"' in page.text            # ES/PT toggle for the interface text
     assert "default-src 'self'" in page.headers["content-security-policy"]
     assert client.get("/healthz").json() == {"ok": True}
 
