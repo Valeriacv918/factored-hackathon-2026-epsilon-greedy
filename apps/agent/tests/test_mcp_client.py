@@ -53,3 +53,25 @@ def test_requires_exactly_one_transport():
         McpToolClient()
     with pytest.raises(ValueError):
         McpToolClient(url="http://x", command="y")
+
+
+def test_stdio_passes_server_config_without_llm_credentials(monkeypatch):
+    import mcp.client.stdio
+    captured = {}
+    def capture(parameters):
+        captured["parameters"] = parameters
+        return object()
+    monkeypatch.setattr(mcp.client.stdio, "stdio_client", capture)
+    monkeypatch.setenv("SESSION_SIGNING_KEY", "test-signing-key-not-real")
+    monkeypatch.setenv("SANDBOX_SCENARIO_ID", "scenario-test")
+    monkeypatch.setenv("BQ_PROJECT", "project-test")
+    monkeypatch.setenv("MAX_BYTES_BILLED", "10000000")
+    monkeypatch.setenv("GROQ_API_KEY", "must-not-inherit")
+    c = McpToolClient(command=sys.executable)
+    c._transport()
+    env = captured["parameters"].env
+    assert env["SESSION_SIGNING_KEY"] == "test-signing-key-not-real"
+    assert env["SANDBOX_SCENARIO_ID"] == "scenario-test"
+    assert env["BQ_PROJECT"] == "project-test"
+    assert env["MAX_BYTES_BILLED"] == "10000000"
+    assert "GROQ_API_KEY" not in env

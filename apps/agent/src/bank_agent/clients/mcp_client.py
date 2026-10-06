@@ -8,6 +8,7 @@ calls are scheduled onto the loop and awaited with a timeout.
 import asyncio
 import concurrent.futures
 import logging
+import os
 import threading
 import time
 from pathlib import Path
@@ -26,6 +27,23 @@ def _error_code(result) -> str:
     """The server's message without the SDK's 'Error executing tool <name>: ' prefix."""
     text = " ".join(getattr(c, "text", "") for c in result.content or []).strip()
     return text.rpartition(": ")[2]
+
+
+# The SDK inherits only basic OS variables. Cloud Run has no .env file;
+# forward MCP configuration explicitly, keeping LLM keys in the parent.
+MCP_ENV_KEYS = frozenset({
+    "BQ_PROJECT", "GCP_PROJECT_ID", "BQ_DATASET", "BIGQUERY_CURATED_DATASET",
+    "BQ_LOCATION", "GCP_REGION", "BQ_BILLING_PROJECT",
+    "BQ_SANDBOX_DATASET", "BIGQUERY_SANDBOX_DATASET", "SANDBOX_SCENARIO_ID",
+    "SESSION_SIGNING_KEY", "SESSION_TTL_MINUTES", "IDENTITY_MAX_ATTEMPTS",
+    "IDENTITY_LOCKOUT_MINUTES", "DISPUTE_HISTORY_DAYS", "MAX_BYTES_BILLED",
+    "MAX_ROWS", "QUERY_TIMEOUT_S", "RATE_LIMIT_PER_MIN", "AMOUNT_TOLERANCE_PCT",
+    "GOOGLE_APPLICATION_CREDENTIALS", "GOOGLE_CLOUD_PROJECT", "GOOGLE_CLOUD_QUOTA_PROJECT",
+})
+
+
+def server_environment():
+    return {key: os.environ[key] for key in MCP_ENV_KEYS if key in os.environ}
 
 
 class McpToolClient:
@@ -55,7 +73,7 @@ class McpToolClient:
             return streamable_http_client(self._url)
         from mcp import StdioServerParameters
         from mcp.client.stdio import stdio_client
-        return stdio_client(StdioServerParameters(command=self._command, args=self._args, cwd=self._cwd))
+        return stdio_client(StdioServerParameters(command=self._command, args=self._args, cwd=self._cwd, env=server_environment()))
 
     async def _own(self, ready: concurrent.futures.Future) -> None:
         from mcp import ClientSession

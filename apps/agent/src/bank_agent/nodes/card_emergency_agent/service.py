@@ -24,6 +24,7 @@ class EmergencyState(str, Enum):
     ASK_CHARGE = "ASK_CHARGE"
     ESCALATED = "ESCALATED"
     HANDED_OFF = "HANDED_OFF"   # ask_charge=True -> continua en fraud_agent.evaluate_transaction
+    COMPLETED = "COMPLETED"     # ask_charge=False -> solo bloqueo, resuelto sin humano
 
 
 @dataclass(frozen=True)
@@ -47,7 +48,7 @@ class EmergencySession:
 @dataclass
 class EmergencyResult:
     state: EmergencyState
-    next_step: str   # "select_card" | "confirm_block" | "ask_charge" | "find_transaction" | "escalate"
+    next_step: str   # "select_card" | "confirm_block" | "ask_charge" | "find_transaction" | "escalate" | "done"
     cards: list = field(default_factory=list)          # [{product_number, masked}] para SELECT_CARD
     card: Optional[dict] = None
     escalation: Optional[EscalationRequest] = None
@@ -123,8 +124,10 @@ class CardEmergencyService:
     def ask_charge(self, session_id: str, has_charge: bool) -> EmergencyResult:
         es = self._session(session_id)
         if not has_charge:
-            # Emergencia de tarjeta sin cargo asociado: reemplazo, no es un caso de fraude.
-            return self._escalate(es, "cards", "P3", "card_replacement")
+            # Emergencia de tarjeta sin cargo asociado: el bloqueo ya está verificado; resuelto sin humano.
+            es.state = EmergencyState.COMPLETED
+            return EmergencyResult(state=es.state, next_step="done",
+                                   card={"product_number": es.selected_card, "status": "blocked"})
         es.state = EmergencyState.HANDED_OFF
         return EmergencyResult(state=es.state, next_step="find_transaction")
 

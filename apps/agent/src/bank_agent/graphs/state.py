@@ -2,7 +2,7 @@
 
 from typing import Any, Literal, TypedDict
 
-Route = Literal["validator_agent", "validation_wait", "request_wait", "triage_agent", "triage_wait", "charge_extract", "charge_find", "charge_details", "charge_select", "charge_error", "charge_save", "fraud_agent", "escalation", "card_emergency_agent", "end"]
+Route = Literal["validator_agent", "validation_wait", "request_wait", "triage_agent", "triage_wait", "charge_extract", "charge_find", "charge_details", "charge_select", "charge_error", "charge_save", "fraud_agent", "escalation", "card_emergency_agent", "follow_up", "farewell", "close", "end"]
 
 
 class ConversationState(TypedDict, total=False):
@@ -11,10 +11,11 @@ class ConversationState(TypedDict, total=False):
     message: str
     validation_input: str
     validation_status: str | None
-    identity_prompts: int  # login form attempts shown (format errors do not count as failed logins)
+    identity_prompts: int  # Identity forms shown; format errors do not count as failed logins.
     authenticated: bool
     triage_choice: str
     triage_route: str
+    skipped_cards: list[str]
     language: Literal["es", "pt"]
     customer_id: str
     route: Route
@@ -28,13 +29,14 @@ class ConversationState(TypedDict, total=False):
     card_id: str
     account_id: str
     blocked_cards: list[str]
-    skipped_cards: list[str]  
     suspended_accounts: list[str]
     denied_transactions: list[dict[str, Any]]
     risk_transactions: list[dict[str, Any]]
     case_ids: list[str]
     clarification_attempts: int
     turns: int
+    requests: int  # Requests handled in this conversation (follow_up loops back to request_wait).
+    farewell: bool  # The closing response already says goodbye.
     reason: str
     policy_rule: str  # DSP-xxx that decided a charge (DSP-004, DSP-005, DSP-100...)
     explanation_result_id: str

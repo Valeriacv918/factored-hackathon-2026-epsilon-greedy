@@ -8,23 +8,35 @@ Login is a FORM with no LLM (same pieces as nodes/validator_agent in the dispute
 document, date of birth and product number go to services.verify_identity -> MCP, so no
 model ever sees identity data. The first message is dropped for the same reason.
 """
-import logging
 from copy import deepcopy
 from langgraph.graph import START, END, StateGraph
 from langgraph.types import interrupt
 from bank_agent.graphs.state import ConversationState
-from bank_agent.observability import logged_step
+from bank_agent.observability import log_failure, logged_step
 from bank_agent.nodes.triage_agent.router import decide
-from bank_agent.nodes.common import say
+from bank_agent.nodes.common import say, ask
 from bank_agent.nodes.validator_agent import FIELDS, MAX_FORM_PROMPTS, identity_form_values, identity_retry_message
 from bank_agent.nodes.triage_agent.schemas import Understanding, Intent, Route, Slots
 
 
-logger = logging.getLogger(__name__)
 CHOICES = ["emergency", "not_me", "charge_error", "other", "human"]
+# Outcomes after which the customer is offered another request (resolved + abstained, web/metrics.py).
+FOLLOW_UP_OUTCOMES = {"dispute_filed", "explained", "fraud_intake_complete", "approved", "card_blocked",
+                      "out_of_scope", "outside_window", "existing_case", "cancelled"}
+MAX_REQUESTS = 3
+# Per-request state reset when the customer asks for something else (node results merge into the
+# state, so keys are overwritten, not dropped). Conversation-wide facts (blocked cards, cases,
+# denied/risk transactions) stay for the handoff packet and fraud rules.
+REQUEST_RESET = dict(intent=None, intent_confidence=None, triage_route=None, triage_choice=None, slots={},
+                     charge_input="", charge_candidates=[], transaction=None, card_id=None, account_id=None,
+                     skipped_cards=[], reason=None, policy_rule=None, explanation_result_id=None,
+                     explanation_rule=None, queue=None, priority=None, outcome=None, response=None,
+                     message="", turns=1, clarification_attempts=0)
 
 def build_graph(services, *, checkpointer, policy=None, test_charge_error=False, test_fraud=False,
-                test_escalation=False, test_card_emergency=False):
+                test_escalation=False, test_card_emergency=False, follow_up=False):
+    """follow_up=True (web): after a resolved/abstained outcome ask for another request, and end
+    every conversation with a goodbye."""
     if test_escalation and not (test_fraud or test_card_emergency):
         raise ValueError("test_escalation requires test_fraud or test_card_emergency")
 
@@ -41,7 +53,12 @@ def build_graph(services, *, checkpointer, policy=None, test_charge_error=False,
         s = deepcopy(s)
         s["phase"] = "validate"
         detect = getattr(services, "detect_language", None)
-        s["language"] = s.get("language") or (detect(s.get("message", "")) if detect else None) or "es"
+        language = s.get("language") or (detect(s.get("message", "")) if detect else "es")
+        if language not in {"es", "pt"}:
+            language = ask(s, services, "language", ["es", "pt"],
+                           "Selecciona tu idioma / Selecione seu idioma.",
+                           "Selecciona tu idioma / Selecione seu idioma.")
+        s["language"] = language
         s.update(route="validation_wait", authenticated=False, identity_prompts=0,
                  response=say(s, "Para ayudarte necesito verificar tu identidad.",
                               "Para ajudar, preciso verificar sua identidade."))
@@ -55,7 +72,7 @@ def build_graph(services, *, checkpointer, policy=None, test_charge_error=False,
         prompts = s.get("identity_prompts", 0)
         if prompts >= MAX_FORM_PROMPTS:
             return {**s, "route": "end", "outcome": "human_required", "reason": "too_many_forms",
-                    "response": "No fue posible validar tu identidad. Se requiere revisión humana; no se ha creado una derivación."}
+                    "response": say(s, "No fue posible validar tu identidad. Se requiere revisión humana; no se ha creado una derivación.", "Não foi possível validar sua identidade. É necessária uma revisão humana; nenhum encaminhamento foi criado.")}
         value = interrupt({"kind": "identity_form", "language": s.get("language"), "message": s["response"],
                            "fields": list(FIELDS), "hints": {"date_of_birth": "AAAA-MM-DD / DD/MM/AAAA"}})
         fields = identity_form_values(value)
@@ -66,27 +83,28 @@ def build_graph(services, *, checkpointer, policy=None, test_charge_error=False,
             status = result.get("status")
             cid = services.validate_session(result["session_ref"]) if status in {"VERIFIED", "ALREADY_VERIFIED"} else None
         except Exception as exc:
-            logger.warning("Validation failed (%s)", type(exc).__name__)
+            log_failure(exc, "validation_unavailable")
             status, cid = "SERVICE_UNAVAILABLE", None
         if cid:
             s.update(customer_id=cid, session_ref=result["session_ref"], authenticated=True, route="request_wait",
-                     response="Identidad verificada. Describe la solicitud que deseas atender.",
+                     response=say(s, "Identidad verificada. Describe la solicitud que deseas atender.", "Identidade verificada. Descreva o que você precisa."),
                      validation_status="VERIFIED")
         elif status == "LOCKED":
             s.update(route="end", authenticated=False, outcome="human_required", reason="LOCKED",
                      validation_status=status,
-                     response="No fue posible validar tu identidad. Se requiere revisión humana; no se ha creado una derivación.")
+                     response=say(s, "No fue posible validar tu identidad. Se requiere revisión humana; no se ha creado una derivación.", "Não foi possível validar sua identidade. É necessária uma revisão humana; nenhum encaminhamento foi criado."))
         elif status in {"FAILED", "INVALID_FORMAT", "MISSING_FIELDS"}:
             s.update(route="validation_wait", authenticated=False, validation_status=status,
                      response=identity_retry_message(s, result), identity_prompts=prompts + 1)
         else:
-            fail(s, "validation_unavailable", "La validación no está disponible. No se consultarán tus productos.")
+            fail(s, "validation_unavailable", say(s, "La validación no está disponible. No se consultarán tus productos.", "A validação não está disponível. Seus produtos não serão consultados."))
             s["authenticated"] = False
         return s
 
     def request_wait(s):
-        value = interrupt({"kind": "request_details",
-                           "message": "Identidad verificada. ¿Qué necesitas hacer ahora?"})
+        message = (say(s, "Cuéntame qué más necesitas.", "Conte o que mais você precisa.") if s.get("requests", 1) > 1
+                   else say(s, "Identidad verificada. ¿Qué necesitas hacer ahora?", "Identidade verificada. Como posso ajudar?"))
+        value = interrupt({"kind": "request_details", "language": s.get("language"), "message": message})
         if not isinstance(value, dict) or not isinstance(value.get("text"), str) or not value["text"].strip():
             raise ValueError("Expected nonempty text")
         return {**s, "message": value["text"].strip(), "route": "triage_agent", "phase": "await_request"}
@@ -98,7 +116,7 @@ def build_graph(services, *, checkpointer, policy=None, test_charge_error=False,
             cid = validated(s)
             if not cid or cid != s.get("customer_id"):
                 s.update(route="end", authenticated=False, customer_id="",
-                         outcome="authentication_required", response="La sesión expiró. Inicia una nueva conversación.")
+                         outcome="authentication_required", response=say(s, "La sesión expiró. Inicia una nueva conversación.", "A sessão expirou. Inicie uma nova conversa."))
                 return s
             choice = s.pop("triage_choice", None)
             if choice:
@@ -112,18 +130,18 @@ def build_graph(services, *, checkpointer, policy=None, test_charge_error=False,
                      intent_confidence=u.confidence, slots=u.slots.model_dump(exclude_none=True),
                      reason=decision.reason, triage_route=decision.route.value)
             if decision.route == Route.CLARIFY_INTENT:
-                s.update(route="triage_wait", response="¿Cuál de estas opciones describe tu solicitud?")
+                s.update(route="triage_wait", response=say(s, "¿Cuál de estas opciones describe tu solicitud?", "Qual destas opções descreve sua solicitação?"))
             elif decision.route == Route.EMERGENCY:
                 if test_card_emergency:
                     s.update(route="card_emergency_agent", phase="start", intent="emergency")
                 else:
                     s.update(route="end", outcome="ready_for_card_emergency",
-                             response="Clasificación: emergencia de tarjeta. ...")
+                             response=say(s, "Clasificación: emergencia de tarjeta. ...", "Classificação: emergência com cartão."))
             elif decision.route == Route.FIND_TRANSACTION and ((test_charge_error and decision.intent == Intent.CHARGE_ERROR) or (test_fraud and decision.intent in {Intent.NOT_ME, Intent.CHARGE_ERROR})):
                 s.update(route="charge_extract", phase="extract", slots={})
             elif decision.route == Route.FIND_TRANSACTION:
                 s.update(route="end", outcome="ready_for_transaction_search",
-                         response="Clasificación: revisar un cargo. El siguiente paso es buscar la transacción; esta prueba termina antes de esa búsqueda.")
+                         response=say(s, "Clasificación: revisar un cargo. El siguiente paso es buscar la transacción; esta prueba termina antes de esa búsqueda.", "Classificação: revisar uma cobrança. O próximo passo é buscar a transação; este teste termina antes dessa busca."))
             elif decision.route == Route.ESCALATION:
                 if test_escalation:
                     priority = "P2" if decision.intent in {Intent.NOT_ME, Intent.EMERGENCY} else "P3"
@@ -131,23 +149,60 @@ def build_graph(services, *, checkpointer, policy=None, test_charge_error=False,
                              queue="general", priority=priority)
                 else:
                     s.update(route="end", outcome="human_requested",
-                             response="Solicitud de atención humana identificada. No se ha creado un ticket.")
+                             response=say(s, "Solicitud de atención humana identificada. No se ha creado un ticket.", "Solicitação de atendimento humano identificada. Nenhum ticket foi criado."))
             else:
                 s.update(route="end", outcome="out_of_scope",
-                         response="La solicitud está fuera del alcance de tarjetas y revisión de cargos.")
+                         response=say(s, "La solicitud está fuera del alcance de tarjetas y revisión de cargos.", "A solicitação está fora do escopo de cartões e revisão de cobranças."))
         except Exception as exc:
-            logger.warning("Triage failed (%s)", type(exc).__name__)
-            fail(s, "triage_unavailable", "No fue posible clasificar la solicitud.")
+            log_failure(exc, "triage_unavailable")
+            fail(s, "triage_unavailable", say(s, "No fue posible clasificar la solicitud.", "Não foi possível classificar a solicitação."))
         return s
 
     def triage_wait(s):
-        value = interrupt({"kind": "clarify_intent", "message": s["response"], "options": CHOICES})
+        value = interrupt({"kind": "clarify_intent", "language": s.get("language"), "message": s["response"], "options": CHOICES})
         if not isinstance(value, dict) or value.get("choice") not in CHOICES:
             raise ValueError("Choose one of the supplied options")
         return {**s, "triage_choice": value["choice"], "route": "triage_agent", "phase": "await_intent"}
 
+    def follow_up_node(s):
+        """Show the result and offer another request. Direct interrupt (not ask()): no human
+        button here, and nothing runs before the pause because the node replays on resume."""
+        value = interrupt({"kind": "follow_up", "language": s.get("language"),
+                           "message": say(s, "¿Puedo ayudarte con algo más?", "Posso ajudar com mais alguma coisa?"),
+                           "options": ["yes", "no"],
+                           "resolved": {"response": s.get("response"), "outcome": s.get("outcome")}})
+        if not isinstance(value, dict) or value.get("choice") not in {"yes", "no"}:
+            raise ValueError("Choose one of the supplied options")
+        s = deepcopy(s)
+        if services.validate_session(s.get("session_ref")) != s.get("customer_id"):
+            s.update(route="end", phase="end", authenticated=False, customer_id="", outcome="authentication_required",
+                     response=say(s, "La sesión expiró. Inicia una nueva conversación.", "A sessão expirou. Inicie uma nova conversa."))
+            return s
+        if value["choice"] == "no":
+            s.update(route="close", phase="end", farewell=True,
+                     response=say(s, "Gracias por comunicarte. ¡Que tengas un buen día!", "Obrigado pelo contato. Tenha um ótimo dia!"))
+            return s
+        s.update(REQUEST_RESET, route="request_wait", phase="await_request", requests=s.get("requests", 1) + 1)
+        return s
+
+    def farewell(s):
+        if not s.get("farewell"):
+            s = {**s, "farewell": True, "response": (s.get("response") or "") + say(
+                s, " Gracias por comunicarte con nosotros. ¡Hasta pronto!", " Obrigado pelo contato. Até logo!")}
+        return {**s, "route": "close"}
+
+    def next_route(s):
+        if not follow_up or s["route"] != "end":
+            return s["route"]
+        if (s.get("authenticated") and s.get("outcome") in FOLLOW_UP_OUTCOMES
+                and s.get("requests", 1) < MAX_REQUESTS):
+            return "follow_up"
+        return "farewell"
+
     nodes = {"validator_agent": validator, "validation_wait": validation_wait,
              "request_wait": request_wait, "triage_agent": triage, "triage_wait": triage_wait}
+    if follow_up:
+        nodes.update(follow_up=follow_up_node, farewell=farewell)
     if test_charge_error or test_fraud:
         from bank_agent.graphs.charge_test import build_nodes
         from bank_agent.graphs.policy import Policy
@@ -171,7 +226,8 @@ def build_graph(services, *, checkpointer, policy=None, test_charge_error=False,
         def run(state):
             with logged_step(state.get("conversation_id"), name, state.get("phase")) as step:
                 result = fn(deepcopy(state))
-                step.update(next=result["route"], phase=result.get("phase", state.get("phase")))
+                step.update(next=result["route"], phase=result.get("phase", state.get("phase")),
+                            state={**state, **result})
             result["trace"] = state.get("trace", []) + [{
                 "node": name, "phase": result.get("phase", state.get("phase")), "next": result["route"],
                 "at": services.now().isoformat(),
@@ -180,6 +236,6 @@ def build_graph(services, *, checkpointer, policy=None, test_charge_error=False,
         return run
     for name, fn in nodes.items():
         builder.add_node(name, wrap(name, fn))
-        builder.add_conditional_edges(name, lambda s: s["route"], {n: n for n in nodes} | {"end": END})
+        builder.add_conditional_edges(name, next_route, {n: n for n in nodes} | {"end": END, "close": END})
     builder.add_edge(START, "validator_agent")
     return builder.compile(checkpointer=checkpointer)

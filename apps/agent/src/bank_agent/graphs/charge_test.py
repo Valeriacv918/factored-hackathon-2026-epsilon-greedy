@@ -2,7 +2,8 @@
 from langgraph.types import interrupt
 from bank_agent.clients.contracts import ServiceFailure, SessionExpired
 from bank_agent.nodes import charge_error
-from bank_agent.nodes.common import HandoffRequested, require_session, number
+from bank_agent.nodes.common import HandoffRequested, require_session, number, say
+from bank_agent.observability import log_failure
 
 def terminal(outcome, response, **extra):
     return dict(route="end", phase="end", outcome=outcome, response=response, **extra)
@@ -12,7 +13,7 @@ def build_nodes(services, policy, *, test_fraud=False, test_escalation=False, te
         if test_escalation:
             return dict(route="escalation", phase="start", reason=reason,
                         queue="fraud" if s.get("intent") == "not_me" else "general", priority="P2")
-        return terminal("human_requested", "Solicitud de atención humana identificada; no se creó un ticket.")
+        return terminal("human_requested", say(s, "Solicitud de atención humana identificada; no se creó un ticket.", "Solicitação de atendimento humano identificada; nenhum ticket foi criado."))
 
     def extract(s):
         parsed = services.understand(s.get("charge_input") or s["message"], s["language"])
@@ -41,16 +42,17 @@ def build_nodes(services, policy, *, test_fraud=False, test_escalation=False, te
             raise ServiceFailure("Ownership mismatch")
         if not candidates or result.get("has_more"):
             if s.get("clarification_attempts",0) >= policy.max_clarifications:
-                return handoff(s, "transaction_unresolved") if test_escalation else terminal("transaction_unresolved", "No se pudo identificar el cargo con los datos proporcionados.")
+                return handoff(s, "transaction_unresolved") if test_escalation else terminal("transaction_unresolved", say(s, "No se pudo identificar el cargo con los datos proporcionados.", "Não foi possível identificar a cobrança com os dados fornecidos."))
             return dict(route="charge_details", phase="clarify", charge_candidates=[],
                         reason="no_matches" if not candidates else "too_many_matches")
         return dict(route="charge_select", phase="select", charge_candidates=candidates, reason="")
 
     def details(s):
         prefix = "No encontré coincidencias con esos filtros. " if s.get("reason") == "no_matches" else ("Hay varios movimientos posibles. " if s.get("reason") == "too_many_matches" else "")
-        reply = interrupt({"kind":"transaction_details","message":prefix +
+        reply = interrupt({"kind":"transaction_details","language":s.get("language"),"message":say(s, prefix +
             "Indica o corrige la fecha (o un rango de fechas), el monto y la moneda si la conoces. "
-            "El comercio es opcional; puedes omitirlo si no aparece."})
+            "El comercio es opcional; puedes omitirlo si no aparece.",
+            "Informe ou corrija a data (ou um intervalo), o valor e a moeda, se souber. O estabelecimento é opcional.")})
         require_session(s,services)
         if not isinstance(reply,dict) or not isinstance(reply.get("text"),str) or not reply["text"].strip():
             raise ValueError("Expected nonempty text")
@@ -59,20 +61,20 @@ def build_nodes(services, policy, *, test_fraud=False, test_escalation=False, te
 
     def select(s):
         candidates=s["charge_candidates"]
-        reply=interrupt({"kind":"select_transaction","message":"Selecciona el cargo que quieres revisar.",
+        reply=interrupt({"kind":"select_transaction","language":s.get("language"),"message":say(s, "Selecciona el cargo que quieres revisar.", "Selecione a cobrança que deseja revisar."),
             "options":[t["id"] for t in candidates]+["none","human"],
             "transactions":[{k:t.get(k) for k in ("id","date","amount","currency")} | {"date":t.get("local_date") or t.get("date"),
-                         "timezone":t.get("customer_timezone"), "merchant":t.get("merchant") or "Sin comercio informado"} for t in candidates]})
+                         "timezone":t.get("customer_timezone"), "merchant":t.get("merchant") or say(s, "Sin comercio informado", "Estabelecimento não informado")} for t in candidates]})
         require_session(s,services)
         choice=reply.get("choice") if isinstance(reply,dict) else None
         if choice=="human":
             if test_escalation:
                 return {"route":"escalation", "phase":"start", "reason":"requested_human",
                         "queue":"fraud", "priority":"P2", "risk_transactions":candidates}
-            return terminal("human_requested","Solicitud de atención humana identificada; no se creó un ticket.")
+            return terminal("human_requested",say(s, "Solicitud de atención humana identificada; no se creó un ticket.", "Solicitação de atendimento humano identificada; nenhum ticket foi criado."))
         if choice=="none":
             if s.get("clarification_attempts",0)>=policy.max_clarifications:
-                return handoff(s, "transaction_unresolved") if test_escalation else terminal("transaction_unresolved","No se pudo identificar el cargo.")
+                return handoff(s, "transaction_unresolved") if test_escalation else terminal("transaction_unresolved",say(s, "No se pudo identificar el cargo.", "Não foi possível identificar a cobrança."))
             return dict(route="charge_details",phase="clarify")
         tx=next((t for t in candidates if t["id"]==choice),None)
         if tx is None:
@@ -88,7 +90,7 @@ def build_nodes(services, policy, *, test_fraud=False, test_escalation=False, te
                         denied_transactions=list(denied.values()), risk_transactions=list(risks.values()),
                         reason="not_me" if s.get("intent") == "not_me" else "fraud_score")
         if score is None:
-            return handoff(s, "missing_fraud_score") if test_escalation else terminal("human_required","El cargo no tiene un puntaje de riesgo válido para continuar.", reason="missing_fraud_score")
+            return handoff(s, "missing_fraud_score") if test_escalation else terminal("human_required",say(s, "El cargo no tiene un puntaje de riesgo válido para continuar.", "A cobrança não possui uma pontuação de risco válida para continuar."), reason="missing_fraud_score")
         if score>policy.fraud_score:
             return terminal("ready_for_fraud","El cargo requiere revisión de fraude; esa ruta queda fuera de esta prueba.",
                 transaction=tx, reason="fraud_score")
@@ -97,9 +99,9 @@ def build_nodes(services, policy, *, test_fraud=False, test_escalation=False, te
     def evaluate(s):
         status = s["transaction"]["status"]
         if status == "Approved":
-            return terminal("approved", "La transacción figura aprobada.")
+            return terminal("approved", say(s, "La transacción figura aprobada.", "A transação consta como aprovada."))
         if status not in charge_error.EXPLANATIONS:
-            return terminal("unknown_status", "No fue posible interpretar el estado de la transacción.")
+            return terminal("unknown_status", say(s, "No fue posible interpretar el estado de la transacción.", "Não foi possível interpretar o status da transação."))
         rule, es, pt = charge_error.EXPLANATIONS[status]
         return dict(route="charge_save", phase="save", explanation_rule=rule,
                     response=pt if s.get("language") == "pt" else es)
@@ -123,12 +125,14 @@ def build_nodes(services, policy, *, test_fraud=False, test_escalation=False, te
                 require_session(s,services)
                 return fn(s)
             except SessionExpired:
-                return terminal("authentication_required","La sesión expiró. Inicia una nueva conversación.",
+                return terminal("authentication_required",say(s, "La sesión expiró. Inicia una nueva conversación.", "A sessão expirou. Inicie uma nova conversa."),
                     authenticated=False,customer_id="")
             except HandoffRequested:
                 return handoff(s, "requested_human")
-            except ServiceFailure:
-                return terminal("service_unavailable","No fue posible completar y verificar el resultado. No se confirma el guardado.")
+            except ServiceFailure as exc:
+                log_failure(exc, "charge_tool_failure")
+                return terminal("service_unavailable",say(s, "Lo sentimos, tuvimos un problema técnico y no pudimos completar tu solicitud. Por favor intenta de nuevo en unos minutos.", "Desculpe, tivemos um problema técnico e não conseguimos concluir sua solicitação. Tente novamente em alguns minutos."),
+                    reason="charge_tool_failure")
         return run
 
     return {name:guard(fn) for name,fn in {

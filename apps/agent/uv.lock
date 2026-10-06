@@ -47,6 +47,8 @@ dependencies = [
     { name = "langgraph" },
     { name = "lingua-language-detector" },
     { name = "mcp" },
+    { name = "starlette" },
+    { name = "uvicorn" },
 ]
 
 [package.dev-dependencies]
@@ -62,6 +64,8 @@ requires-dist = [
     { name = "langgraph", specifier = ">=1.0,<2" },
     { name = "lingua-language-detector", specifier = ">=2.2,<3" },
     { name = "mcp", specifier = ">=2.2,<3" },
+    { name = "starlette", specifier = ">=0.40" },
+    { name = "uvicorn", specifier = ">=0.30" },
 ]
 
 [package.metadata.requires-dev]

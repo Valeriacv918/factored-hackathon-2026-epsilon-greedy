@@ -53,10 +53,12 @@ Every event has these fields:
 | Event | When | Fields |
 |---|---|---|
 | `step` | every graph node run, in both graphs | `phase`, `next` (route chosen), `ms`. Plus `waiting: true` when the node paused for the customer (interrupt), or `error` (exception type) when it raised |
-| `llm.call` | every chat-model call | `step` (`understanding`, `triage`, `narrative`, `validator`), `model`, `ms`, `status` (`ok`/`error`), `input_tokens`, `output_tokens`, `error`. With `LOG_LLM_CONTENT=1` also `messages` and `output` |
+| `llm.call` | every chat-model call | `step` (`understanding`, `triage`, `narrative`, `validator`), `model`, `ms`, `status` (`ok`/`error`), `input_tokens`, `output_tokens`. On error: `error` (exception type), `error_detail` (provider message, 500 chars max) and, when the provider sends them, `status_code` and `error_code` (e.g. `401`, `invalid_api_key`). With `LOG_LLM_CONTENT=1` also `messages` and `output`, and on error `failed_generation` (Groq's rejected model output) |
 | `llm.result` | after the agent parses the LLM output | depends on `step`: **understanding** `intent`, `confidence`, `slots`, `wants_human` · **triage** `intent`, `confidence`, `wants_human`, `attempt` (or `fallback: true`) · **narrative** `chars` · **validator** `status`, `next_step`, `authenticated`, `language`, `language_source` (`detected`, `sticky`, `default` while unclear, `choice` when the customer named one) |
 | `mcp.call` | every MCP tool call | `tool`, `args` (sensitive keys `<redacted>`), `ms`, `status`, `error` (the server's error text) |
-| `conversation.summary` | when a node routes to `end` | `steps`, `llm_calls`, `input_tokens`, `output_tokens`, `llm_ms`, `mcp_calls`, `mcp_ms`, `errors` |
+| `service.failure` | a node gave up and the conversation ends as `service_unavailable` (or escalates, in the disputes graph). Level `WARNING` | `reason` (e.g. `charge_tool_failure`, `validation_unavailable`, `triage_unavailable`), `error` (exception type), `detail` (the agent's own message, e.g. `Explanation receipt mismatch`, 300 chars max), `cause` (type of the underlying exception, e.g. `AuthenticationError`, `ValidationError`; never its text) |
+| `narrative.fallback` | the escalation used the template instead of the LLM narrative | `issues`: rule names, `model_unavailable` or claim-check findings such as `promise`, `unknown_number:999` |
+| `conversation.summary` | when a node routes to `end` | counts: `steps`, `step_ms`, `llm_calls`, `input_tokens`, `output_tokens`, `llm_ms`, `mcp_calls`, `mcp_ms`, `errors` (failed LLM/MCP calls and node exceptions; the web UI's "tool errors"), `failures` (`service.failure` events), `duration_ms`. Outcome: `outcome`, `reason`, `intent`, `language`, `triage_route`, `queue`, `priority`, `validation_status`, `authenticated`, `turns`, `ticket_created`, `cases_filed`, `cards_blocked` |
 | `log` | any other log record from `bank_agent.*` | `logger`, `message` |
 
 ### MCP server (`service: mcp`)
@@ -81,7 +83,15 @@ generic "BigQuery is unavailable; try again.".
 {"service":"mcp","event":"bq.query","conversation_id":"cli-1a2b3c4d","node":"fraud_agent","tool":"block_card","sql_hash":"5f0c1e2d3a4b","status":"ok","rows":0,"bytes":0}
 {"service":"mcp","event":"tool","conversation_id":"cli-1a2b3c4d","node":"fraud_agent","tool":"block_card","ms":3120.8,"status":"ok"}
 {"service":"agent","event":"mcp.call","conversation_id":"cli-1a2b3c4d","node":"fraud_agent","tool":"block_card","args":{"card_id":"PRD-123","idempotency_key":"cli-1a2b3c4d:block:PRD-123"},"ms":3141.0,"status":"ok"}
-{"service":"agent","event":"conversation.summary","conversation_id":"cli-1a2b3c4d","node":null,"steps":14,"llm_calls":3,"input_tokens":4210,"output_tokens":388,"llm_ms":2950.1,"mcp_calls":9,"mcp_ms":14820.6,"errors":0}
+{"service":"agent","event":"conversation.summary","conversation_id":"cli-1a2b3c4d","node":null,"steps":14,"llm_calls":3,"input_tokens":4210,"output_tokens":388,"llm_ms":2950.1,"mcp_calls":9,"mcp_ms":14820.6,"errors":0,"failures":0,"outcome":"escalated","reason":"DSP-013"}
+```
+
+### Example: a charge-error conversation that fails on the LLM (trimmed)
+
+```json
+{"service":"agent","event":"llm.call","conversation_id":"web-6da6b725","node":"charge_extract","step":"understanding","ms":518.6,"status":"error","error":"AuthenticationError","status_code":401,"error_code":"invalid_api_key","error_detail":"Invalid API Key"}
+{"service":"agent","event":"service.failure","level":"WARNING","conversation_id":"web-6da6b725","node":"charge_extract","reason":"charge_tool_failure","error":"ServiceFailure","detail":"Understanding unavailable","cause":"AuthenticationError"}
+{"service":"agent","event":"conversation.summary","conversation_id":"web-6da6b725","node":null,"llm_calls":1,"errors":1,"failures":1,"outcome":"service_unavailable","reason":"charge_tool_failure","intent":"charge_error"}
 ```
 
 ## 3. Configuration
@@ -119,6 +129,7 @@ With `jq`:
 jq -c 'select(.conversation_id == "cli-1a2b3c4d") | {event, node, step, tool, status, next, ms}' logs/agent.jsonl
 jq -c 'select(.event == "conversation.summary")' logs/agent.jsonl             # cost per conversation
 jq -c 'select(.status == "error" or .error)' logs/agent.jsonl                 # failures
+jq -c 'select(.event == "service.failure") | {conversation_id, node, reason, detail, cause}' logs/agent.jsonl
 jq -c 'select(.event == "llm.result")' logs/agent.jsonl                       # what the LLM decided
 ```
 
@@ -128,8 +139,16 @@ Questions it answers:
   `next` route it chose. The last step before the summary routed to `end`.
 - **What did the LLM decide?** `llm.result` (intent, confidence, validation status). To see
   the prompt itself, rerun with `--debug`.
+- **Why did the conversation end in `service_unavailable`?** The `service.failure` event:
+  which node gave up (`node`), why (`detail`) and what triggered it (`cause`). If `cause`
+  is a provider error, the `llm.call` just before it has the provider's code and message.
+  If `cause` is null after an `mcp.call` with `status: ok`, the agent rejected the result
+  itself (e.g. a receipt that didn't match).
 - **Why did a tool fail?** The agent's `mcp.call` has the server's error text. The server's
   `bq.query` with the same `conversation_id` has BigQuery's message.
+- **Why did an LLM call fail?** `llm.call` with `status: error`: `status_code`,
+  `error_code` and `error_detail` (e.g. `429` `rate_limit_exceeded` when Groq's daily token
+  quota is used up).
 - **What did it cost?** `conversation.summary`: tokens, LLM and MCP time, number of calls.
 
 In Cloud Logging, filter with `jsonPayload.conversation_id="cli-1a2b3c4d"`.
@@ -158,7 +177,9 @@ ORDER BY bytes DESC
   `date_of_birth`, `product_number` and `product_numbers` in MCP arguments (shown as
   `<redacted>`). A handoff `packet` is logged as `reason` and `queue` only.
 - **Not logged by default:** prompts, LLM replies, the validator's reply, the handoff
-  narrative (only its length).
+  narrative (only its length), and Groq's `failed_generation` on LLM errors.
+- **Exception causes by type only.** `service.failure` never logs the cause's text: a
+  pydantic `ValidationError` quotes the invalid value, which can be what the customer typed.
 - **`LOG_LLM_CONTENT=1` logs what the customer typed**, including identity factors in
   validator prompts. Use it only on your own machine, never in a deployed service, and
   delete `logs/agent.jsonl` afterwards.
@@ -175,6 +196,10 @@ ORDER BY bytes DESC
 - **New LLM call site:** attach `llm_config("<step>")` to the runnable
   (`.with_config(...)`) or to the `invoke` config. Log the parsed decision with
   `log_event("llm.result", step=...)`.
+- **New failure handler:** wherever a node catches an exception and ends or escalates the
+  conversation, call `log_failure(exc, "<reason>")` and put the same `reason` on the
+  returned state, so the summary says why. Keep `ServiceFailure` messages free of customer
+  data: they are logged as `detail`.
 - **New MCP tool:** nothing to do. The middleware and the agent's client already log it.
   If it takes a sensitive argument, add the name to `SENSITIVE` in
   `bank_agent/observability.py`.

@@ -80,7 +80,7 @@ class McpServices:
         self._client, self._sessions, self._understanding = client, sessions, understanding
         self._clock, self._detect, self._narrator = clock, language_detector, narrator
         self._validation_agents = {}
-        self._identity_sessions = {}   # conversation_id -> IdentityValidator session id (login form)
+        self._identity_sessions = {}
         self._identity_validator = None
         self._triage_classifier = None
 
@@ -111,8 +111,7 @@ class McpServices:
 
     def verify_identity(self, conversation_id: str, document_number: str, date_of_birth: str,
                         product_number: str) -> dict[str, Any]:
-        """Login form: the three factors go straight to IdentityValidator -> MCP verify_identity.
-        No LLM sees them. Returns only the status and the opaque session_ref, never customer data."""
+        """Verify form factors through MCP and return only status plus an opaque session reference."""
         validator = self._validator()
         if conversation_id not in self._identity_sessions:
             self._identity_sessions[conversation_id] = validator.new_session().session_id

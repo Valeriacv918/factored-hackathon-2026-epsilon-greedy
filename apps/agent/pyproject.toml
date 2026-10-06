@@ -14,7 +14,13 @@ dependencies = [
     "langchain>=1.4,<2",
     "langchain-groq>=1.1,<2",
     "lingua-language-detector>=2.2,<3",
+    # Web front (bank_agent/web): HTTP API + static files. Both already come with mcp.
+    "starlette>=0.40",
+    "uvicorn>=0.30",
 ]
+
+[project.scripts]
+bank-web = "bank_agent.web.app:main"
 
 [dependency-groups]
 # python-dotenv: only scripts/ and tests/integration load .env.
@@ -22,6 +28,9 @@ dev = ["pytest>=8,<10", "python-dotenv>=1.2,<2"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+bank_agent = ["web/static/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
