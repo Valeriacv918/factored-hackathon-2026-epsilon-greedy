@@ -61,7 +61,7 @@ flowchart TD
     AB -- yes --> ASK
     BV --> ASK{"ASK_CHARGE<br/>buttons: any charge you don't recognize?"}
     ASK -- yes --> FIND([FIND_TRANSACTION · intent = not_me · block already done])
-    ASK -- no --> ESCP3[["ESCALATION<br/>cards · P3 · card replacement"]]
+    ASK -- no --> DONE(["END · card_blocked<br/>resolved, no human"])
 ```
 
 ## 3. Fraud path — protect first

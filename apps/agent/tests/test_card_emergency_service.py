@@ -5,7 +5,7 @@ import pytest
 
 from bank_agent.clients.fraud_repository import Card, InMemoryCardRepository
 from bank_agent.clients.identity import CustomerRecord, InMemoryIdentityChecker, Product
-from bank_agent.nodes.card_emergency_agent.service import CardEmergencyService
+from bank_agent.nodes.card_emergency_agent.service import CardEmergencyService, EmergencyState
 from bank_agent.nodes.validator_agent.validator import IdentityValidator
 
 CUSTOMER_ID = "1020304050"
@@ -109,16 +109,15 @@ def test_no_card_on_file_escalates(authenticated_session):
     assert r.escalation.reason == "no_card_on_file"
 
 
-def test_no_recognized_charge_after_block_escalates_card_replacement(authenticated_session):
+def test_no_recognized_charge_after_block_completes_without_escalation(authenticated_session):
     validator, session_id = authenticated_session
     service = make_service(validator)
     service.start(session_id)
     service.confirm_block(session_id, True)
 
     r = service.ask_charge(session_id, False)
-    assert r.next_step == "escalate"
-    assert r.escalation.queue == "cards" and r.escalation.priority == "P3"
-    assert r.escalation.reason == "card_replacement"
+    assert r.next_step == "done" and r.state == EmergencyState.COMPLETED
+    assert r.escalation is None
 
 
 def test_recognized_charge_hands_off_to_fraud_agent(authenticated_session):

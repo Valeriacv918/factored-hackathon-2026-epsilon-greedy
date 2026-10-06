@@ -181,6 +181,7 @@ function renderTrace(trace) {
 }
 
 function renderQuestion(question) {
+  if (question.resolved) renderOutcome({ ...question.resolved, language: question.language });
   const bubble = addMessage("agent", question.message || "");
   if (question.card) bubble.append(el("div", { class: "detail" }, el("span", { class: "card-chip", text: question.card })));
   if (question.transaction) {
@@ -254,10 +255,14 @@ function identityForm(question) {
   return form;
 }
 
-function renderDone(result) {
+function renderOutcome(result) {
   const bubble = addMessage("agent", result.response || "", `done ${result.group}`);
   bubble.append(el("span", { class: `outcome-tag ${result.group}`,
     text: say(result.language, "outcomes")[result.group] || result.outcome }));
+}
+
+function renderDone(result) {
+  renderOutcome(result);
   setComposer(true, "ph_new", result.language);
 }
 
