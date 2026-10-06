@@ -19,7 +19,7 @@ To run it locally, see the [Quickstart](../README.md#quickstart-run-locally).
 | Connections | The MCP client and the compiled graph are created once at startup (`lifespan`). If configuration is missing or the subprocess fails, the revision fails to start instead of failing on the first form. |
 | Secrets | Environment variables only. The browser receives no configuration. CSP `default-src 'self'`. |
 | Language | The language detector runs before the form; if it cannot choose between Spanish and Portuguese, the customer picks with buttons (also an es/pt toggle in the UI). The choice is kept in the conversation state and used by forms, buttons and replies. The stats panel is not translated. |
-| Stats | `GET /api/metrics`: conversations of this process (from `conversation.summary`) and the latest offline triage evaluation (`evals/cases/results`, optional; shown as unavailable in a fresh checkout). |
+| Stats | `GET /api/metrics`: conversations of this process (from `conversation.summary`) and the latest offline triage evaluation shipped in `evals/cases/results`. |
 
 ## Cloud Run
 
@@ -63,10 +63,11 @@ sobre los dos secretos, además de los permisos de BigQuery que ya tiene `bank-m
 ## Preparación del contexto de build
 
 Cloud Build utiliza `.gcloudignore` y Docker utiliza `.dockerignore`. Se incluyen
-solo los proyectos de agente y MCP; no se envían `.env`, entornos virtuales ni
-credenciales locales. Los resultados offline de evaluaciones son opcionales:
-una copia limpia del repositorio no los contiene y el panel los muestra como
-no disponibles. Las métricas de las conversaciones sí se recopilan en ejecución.
+los proyectos de agente y MCP y los resultados offline versionados en
+`evals/cases/results`; el set fuente `evals/cases/triage_messages.csv` se conserva
+en el repositorio, pero no se copia a la imagen. No se envían `.env`, entornos
+virtuales ni credenciales locales. El panel muestra la corrida offline incluida
+y las métricas de conversaciones recopiladas en ejecución.
 
 La cuenta de ejecución usa su identidad de Cloud Run para BigQuery; no se
 incluyen archivos JSON de cuentas de servicio ni ADC personales en la imagen.

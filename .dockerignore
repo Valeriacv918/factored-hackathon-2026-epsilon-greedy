@@ -12,6 +12,10 @@
 !apps/mcp-server/uv.lock
 !apps/mcp-server/src/
 !apps/mcp-server/src/**
+!evals/
+!evals/cases/
+!evals/cases/results/
+!evals/cases/results/**
 **/.venv
 **/__pycache__
 **/*.egg-info
