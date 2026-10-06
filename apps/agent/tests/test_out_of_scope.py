@@ -1,4 +1,4 @@
-"""Escenarios de OUT_OF_SCOPE (docs/STATE_MACHINE2.md, sección 1).
+"""Escenarios de OUT_OF_SCOPE (docs/state-machine.md, sección 1).
 
 Cuando el clasificador dice "other", el agente dice qué puede hacer y ofrece las
 intenciones como botones. Así un error del clasificador no deja al cliente atrapado:

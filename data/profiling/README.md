@@ -1,6 +1,6 @@
-# Perfiles
+# Profiles
 
-Scripts SQL existentes para ejecutar en BigQuery us-central1. Persisten auditoria;
-no publican curated. Validar permisos y tabla raw antes de ejecutarlos.
-Los diagnosticos pueden fijar un snapshot historico: revisar disponibilidad de
-Time Travel antes de reutilizarlos. No son pasos automaticos del DAG actual.
+SQL profiles and diagnostics to run in BigQuery (`us-central1`). They write observations to audit
+tables; they do not publish curated data. Check permissions and the raw table before running them.
+Diagnostics may pin a historical snapshot: check Time Travel availability before reusing them.
+They are not automatic steps of any pipeline.

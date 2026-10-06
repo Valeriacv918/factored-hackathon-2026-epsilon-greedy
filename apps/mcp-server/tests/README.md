@@ -1,31 +1,32 @@
-# tests
+# MCP server tests
 
-Pruebas del servidor MCP. Desde la raíz:
+From the repo root:
 
 ```bash
 uv sync --project apps/mcp-server
-uv run --project apps/mcp-server pytest apps/mcp-server                 # unitarias: sin GCP ni red (CI)
-uv run --project apps/mcp-server pytest apps/mcp-server -m integration  # dry run en BigQuery (opcional)
+uv run --project apps/mcp-server pytest apps/mcp-server                 # unit: no GCP or network (CI)
+uv run --project apps/mcp-server pytest apps/mcp-server -m integration  # BigQuery dry run (opt-in)
 ```
 
-| Archivo | Qué cubre |
+| File | Covers |
 |---|---|
-| `conftest.py` | `FakeGateway` (responde por nombre de herramienta y registra cada consulta), clave de firma conocida, estado del servidor limpio; fixtures `gateway`, `token`, `signing_key` |
-| `test_contracts.py` | `contracts/mcp/*.json` coincide con las firmas de las herramientas (regenerar con `scripts/export_contracts.py`) |
-| `test_identity.py` | `verify_identity`: parámetros normalizados, token firmado, intentos y bloqueo |
-| `test_session.py` | Tokens de sesión (firma, expiración, manipulación) y `LoginThrottle` |
-| `test_mapping.py` | Traducción de filas de BigQuery a los campos del agente (`services/mapping.py`) |
-| `test_search.py` | Construcción parametrizada de la consulta de `find_transactions` (slots, ventana de fechas, tolerancia de monto) |
-| `test_sandbox.py` | Herramientas del sandbox: escenario, cliente del token, hashes, recibos, rechazos, esquema del paquete de derivación |
-| `test_sql_dry_run.py` | `integration`: compila cada sentencia de `sql/queries.py` en BigQuery con dry run (no lee ni escribe datos) |
+| `conftest.py` | `FakeGateway` (answers by tool name and records every query), a known signing key, clean server state; fixtures `gateway`, `token`, `signing_key` |
+| `test_contracts.py` | `contracts/mcp/*.json` matches the tool signatures (regenerate with `scripts/export_contracts.py`) |
+| `test_identity.py` | `verify_identity`: normalized parameters, signed token, attempts and lockout |
+| `test_session.py` | Session tokens (signature, expiry, tampering) and `LoginThrottle` |
+| `test_mapping.py` | BigQuery rows → agent fields (`services/mapping.py`) |
+| `test_search.py` | Parameterized `find_transactions` query (slots, date window, amount tolerance) |
+| `test_timezones.py`, `test_fx.py` | Local-day date windows; currency conversion |
+| `test_sandbox.py` | Sandbox tools: scenario, token customer, hashes, receipts, refusals, handoff packet schema |
+| `test_charge_results.py` | `save_charge_explanation`: ownership, session, receipts and retries |
+| `test_observability.py` | JSON logging |
+| `test_sql_dry_run.py` | `integration`: compiles every statement of `sql/queries.py` in BigQuery with a dry run (reads and writes nothing) |
 
-**Qué no prueban las unitarias.** `FakeGateway` devuelve las filas que el test le da,
-así que comprueban lo que decide y envía Python, no el SQL: titularidad,
-elegibilidad y deduplicación viven en las consultas. El dry run detecta errores de
-compilación y de permisos; el comportamiento de las consultas se comprueba en vivo
-(ver `docs/mcp-sandbox.md`). Para comprobar los permisos de despliegue, ejecutar el
-dry run impersonando a `bank-mcp`.
+**What unit tests do not cover.** `FakeGateway` returns the rows the test gives it, so the tests
+check what Python decides and sends, not the SQL: ownership, eligibility and deduplication live in
+the queries. The dry run catches compilation and permission errors; query behavior is checked live
+(see `docs/mcp-sandbox.md`). To check deployment permissions, run the dry run impersonating `bank-mcp`.
 
-Las pruebas en vivo del agente contra este servidor están en
-`apps/agent/tests/integration/`. Mismas convenciones que en `apps/agent/tests/README.md`:
-sin `__init__.py`, ayudas como fixtures en `conftest.py`, importar `bank_mcp...`.
+The agent's live tests against this server are in `apps/agent/tests/integration/`. Same
+conventions as `apps/agent/tests/README.md`: no `__init__.py`, helpers as fixtures in
+`conftest.py`, import `bank_mcp...`.

@@ -1,6 +1,6 @@
 """Contrato del Triage: qué entra, qué sale.
 
-Dos estados de la máquina de estados (STATE_MACHINE.md):
+Dos estados de la máquina de estados (docs/state-machine.md):
 - UNDERSTAND (LLM): lee el mensaje y devuelve un `Understanding`.
 - TRIAGE (código): con eso decide la ruta y devuelve un `TriageDecision`.
 """

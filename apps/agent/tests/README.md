@@ -1,64 +1,61 @@
-# Pruebas del agente
+# Agent tests
 
-Se ejecutan en el entorno propio del agente (`apps/agent/.venv`), nunca en el
-entorno raíz. Desde la raíz del repositorio:
+They run in the agent's own environment (`apps/agent/.venv`), never the root one. From the repo root:
 
 ```bash
-uv sync --project apps/agent                                 # una vez
-uv run --project apps/agent pytest apps/agent                # unitarias (por defecto, y en CI)
-uv run --project apps/agent pytest apps/agent -m integration # integración en vivo (opcional)
+uv sync --project apps/agent                                 # once
+uv run --project apps/agent pytest apps/agent                # unit tests (default, and CI)
+uv run --project apps/agent pytest apps/agent -m integration # live integration (opt-in)
 ```
 
-Desde `apps/agent` basta `uv run pytest` (o `uv run pytest -m integration`).
+From `apps/agent`, `uv run pytest` (or `uv run pytest -m integration`) is enough.
 
-## Organización
+## Layout
 
-| Archivo | Qué cubre |
+| File | Covers |
 |---|---|
-| `conftest.py` | `FakeServices` y la fixture `fake_services`: servicios sintéticos en memoria |
-| `test_graph.py` | Grafo de disputas: ES/PT, confirmaciones, aislamiento de clientes, sesiones, políticas, reintentos, verificación, bloqueo, disputas y escalamiento |
-| `test_scenarios_charge.py`, `test_out_of_scope.py` | Conversaciones completas de los caminos not_me / charge_error y fuera de alcance |
-| `test_sessions.py` | Resolución de sesiones (`StaticSessions`, `ValidatorSessions`) y vencimiento de tokens |
-| `test_escalation_handoff.py` | Resumen para el empleado: claim check, plantilla de respaldo, narrador y escalamiento en el grafo |
-| `test_mcp_services.py` | `McpServices` con un cliente MCP falso: lista de herramientas y argumentos permitidos, sesión, reloj; detector de idioma real (lingua) |
-| `test_mcp_client.py` | `McpToolClient` por stdio contra `mcp_echo_server.py` (errores, timeouts) |
-| `test_identity_client.py` | `McpIdentityChecker`: qué envía a `verify_identity`, cómo interpreta las respuestas y cómo la sesión validada aporta el token |
-| `test_understanding.py` | Extracción con LLM simulado; slots alineados con `contracts/mcp` |
-| `test_triage_*.py` | Contrato, reglas, router y clasificador del Triage |
-| `test_validator_validation.py` | Validador de identidad e idioma, con datos sintéticos |
-| `test_validator_agent_flow.py` | Agente validador completo con LLM simulado |
-| `test_validation_triage_graph.py` | Grafo por defecto: validación por MCP y triage |
-| `test_fraud_agent.py`, `test_card_emergency_service.py` | Agentes de fraude y de emergencia de tarjeta con repositorios en memoria |
-| `integration/test_live_mcp.py` | En vivo: servidor MCP real y BigQuery (ver abajo) |
+| `conftest.py` | `FakeServices` and the `fake_services` fixture: in-memory synthetic services |
+| `test_graph.py` | Older general graph (`disputes.py`): ES/PT, confirmations, customer isolation, sessions, policies, retries, verification, blocks, disputes and escalation |
+| `test_validation_triage_graph.py`, `test_full_flow.py`, `test_follow_up.py` | Main graph: MCP identity validation, triage, all routes, follow-up requests |
+| `test_charge_test_graph.py`, `test_fraud_test_graph.py`, `test_card_emergency_test_graph.py` | Each route wired into the main graph |
+| `test_scenarios_*.py`, `test_out_of_scope.py` | Full conversations per path (not_me / charge_error, card emergency, out of scope) |
+| `test_sessions.py` | Session resolution (`StaticSessions`, `ValidatorSessions`) and token expiry |
+| `test_escalation_handoff.py` | Employee summary: claim check, fallback template, narrator and escalation |
+| `test_mcp_services.py` | `McpServices` with a fake MCP client: allowed tools and arguments, session, clock; real language detector (lingua) |
+| `test_mcp_client.py` | `McpToolClient` over stdio against `mcp_echo_server.py` (errors, timeouts) |
+| `test_identity_client.py` | `McpIdentityChecker`: what it sends to `verify_identity` and how it reads answers |
+| `test_understanding.py` | Extraction with a simulated LLM; slots aligned with `contracts/mcp` |
+| `test_triage_*.py` | Triage contract, rules, router and classifier |
+| `test_validator_*.py`, `test_scoped_language.py` | Identity validator and language, with synthetic data |
+| `test_fraud_agent.py`, `test_card_emergency_service.py` | Fraud and card-emergency agents with in-memory repositories |
+| `test_web.py` | Web app endpoints, conversation ownership, interrupts |
+| `test_observability.py`, `test_failure_logging.py` | JSON logging and failure events |
+| `integration/test_live_mcp.py` | Live: real MCP server and BigQuery (below) |
 
-**Unitarias:** sin red, GCP ni modelos.
+**Unit tests:** no network, GCP or models.
 
-**Integración** (`integration/`, marcador `integration`): levantan el servidor MCP
-real con `uv run --project apps/mcp-server bank-mcp`, en su propio entorno, y
-consultan `bank_curated` con tus credenciales ADC (ver `apps/mcp-server/README.md`).
-Solo lectura: con `SANDBOX_SCENARIO_ID` también prueban las lecturas del sandbox, pero
-nunca escriben (una escritura añade filas al escenario compartido). Usan el cliente de la entrada `dev` de `DEV_SESSIONS`, el mismo de
-`run_disputes.py --session dev`. Si falta, se omiten (*skipped*).
+**Integration** (`integration/`, marker `integration`): starts the real MCP server with
+`uv run --project apps/mcp-server bank-mcp` in its own environment and queries `bank_curated`
+with your ADC credentials (see `apps/mcp-server/README.md`). Read only: with
+`SANDBOX_SCENARIO_ID` it also tests sandbox reads, but never writes (a write adds rows to the
+shared scenario). It uses the `dev` entry of `DEV_SESSIONS`, the same as
+`run_disputes.py --session dev`. If missing, tests are skipped.
 
-## Cómo leer el resultado
+## Reading the result
 
-- `N passed, M deselected`: ejecución por defecto; las M son las de integración.
-  `addopts = "-m 'not integration'"` (en `pyproject.toml`) las deja fuera a propósito.
-- Con `-m integration` es al revés: corren esas y las unitarias quedan *deselected*.
-- *skipped* significa que una prueba seleccionada no pudo correr (p. ej., falta
-  `DEV_SESSIONS` o `uv`), no que haya fallado.
+- `N passed, M deselected`: default run; the M are integration tests, excluded on purpose by
+  `addopts = "-m 'not integration'"` in `pyproject.toml`.
+- With `-m integration` it is the opposite.
+- *skipped* means a selected test could not run (e.g. `DEV_SESSIONS` or `uv` missing), not a failure.
 
-## Convenciones
+## Conventions
 
-- **Sin `__init__.py` en `tests/`.** Hacía que pytest alterara `sys.path` y
-  rompía importaciones.
-- **Ayudas compartidas como fixtures en `conftest.py`**, no módulos importados por
-  nombre (`from fakes import ...`).
-- **Importar siempre `bank_agent...`**, nunca `src.bank_agent...`: el paquete
-  está instalado, y `src.` carga una segunda copia (dos `settings`, `isinstance`
-  que falla).
-- Una prueba nueva que necesite GCP, red o un modelo real va en `integration/`
-  con el marcador; todo lo demás debe correr sin conexión.
+- **No `__init__.py` in `tests/`.** It made pytest alter `sys.path` and broke imports.
+- **Shared helpers are fixtures in `conftest.py`**, not modules imported by name.
+- **Always import `bank_agent...`**, never `src.bank_agent...`: the package is installed, and
+  `src.` loads a second copy (two `settings`, failing `isinstance`).
+- A new test that needs GCP, network or a real model goes in `integration/` with the marker;
+  everything else must run offline.
 
-La calidad del LLM (p. ej., el set del Triage) se mide en `evals/`, no aquí: son
-métricas, no pruebas de pasa/falla.
+LLM quality (e.g. the triage set) is measured in `evals/`, not here: those are metrics, not
+pass/fail tests.

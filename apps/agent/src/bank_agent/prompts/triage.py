@@ -1,10 +1,10 @@
 """Prompt del clasificador del Triage (estado UNDERSTAND).
 
 Reglas para editar este archivo:
-- NO copies aquí mensajes de evals/triage/messages.csv: la evaluación dejaría
+- NO copies aquí mensajes de evals/cases/triage_messages.csv: la evaluación dejaría
   de ser honesta. Los ejemplos de abajo son inventados y distintos.
 - Si cambias las definiciones, cambia también la guía de etiquetado
-  (evals/triage/README.md) para que digan lo mismo.
+  (evals/cases/README.md) para que digan lo mismo.
 """
 
 TRIAGE_SYSTEM_PROMPT = """Eres el clasificador de solicitudes de clientes de un banco que atiende a clientes con español

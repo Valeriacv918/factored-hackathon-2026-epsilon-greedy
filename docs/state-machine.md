@@ -1,25 +1,28 @@
-# State machine v4 — unrecognized charges, semi-autonomous fraud response, employee handoff
+# Conversation state machine (v4)
 
 The state machine is the conversation script, written in code. **The LLM never chooses the next state;
 code does, based on verified data.** The LLM only (a) extracts slots from the customer's words,
 (b) writes customer replies and (c) writes the 2–3 line narrative of the employee summary — always from
 facts the code gives it, always checked by the claim checker.
 
-Goals it serves (see `PROBLEM.md`): **cut processing time and cost per case**, **protect the customer
+Goals it serves: **cut processing time and cost per case**, **protect the customer
 immediately when it may be fraud** (semi-autonomous: the agent proposes, the customer confirms), and
 **hand the employee a complete, verified summary** when a human is needed.
 
-## What changed from v3 and why
+## Implementation notes
 
-| Change | Why |
-|---|---|
-| Split into one overview + three small path diagrams | v3 was one tangled diagram; each path can now be read, coded and tested on its own |
-| Card emergency asks **"is there a charge you don't recognize?"** after the block | Links the emergency to a concrete transaction when there is one, instead of always escalating |
-| Fraud path asks **"another charge?"** (max 3) after each one | Makes `DSP-013` "≥ 2 charges denied" reachable without the removed checklist |
-| Escalation is now its own sub-flow: **queue + priority by rule → narrative → claim check → ticket → notify employee → inform customer** | Implements `HANDOFF.md` (employee summary) |
-| Customer **declines the block** → P1 to the fraud team | The riskiest situation must reach a human first |
-| Every state is tagged with whether it calls the LLM | Cost per case is a headline metric; the LLM runs in few states |
-| Timestamps `reported_at`, `block_verified_at`, `case_verified_at`, `handoff_at` | Processing-time metrics |
+The graph that runs (`graphs/validation_triage.py`, used by the web app and
+`scripts/run_disputes.py --flow full`) follows these diagrams with two differences:
+
+- **Identity first.** Before UNDERSTAND, the customer fills an identity form (document,
+  date of birth, product number) checked by the MCP `verify_identity` tool. No LLM sees it.
+- **Charge error.** Pending / Reversed / Declined: the explanation (`EXP-002/003/006`) is
+  saved with `save_charge_explanation`, read back, and the conversation ends; there is no
+  CONFIRM_EXPLANATION step. Approved ends with "the transaction is approved" (no dispute
+  from this path).
+
+Demo thresholds (90 days, 500 USD, score 30, max 3 charges) live in `graphs/policy.py:Policy`.
+They are not real bank policies.
 
 ## 1. Overview
 
@@ -139,7 +142,7 @@ flowchart TD
 | BLOCK_AND_VERIFY | Code | `block_card`, read back, log `block_verified_at` | – |
 | ASK_CHARGE / ASK_MORE_CHARGES | UI | "Is there a (another) charge you don't recognize?" | – |
 | STATUS | Code | Reads `transaction_status` | – |
-| POLICY | Code (`policy.py`) | Rules in order, returns decision + rule ID | – |
+| POLICY | Code (`graphs/policy.py`) | Rules in order, returns decision + rule ID | – |
 | EXPLAIN | LLM + claim check | Words the `EXP-xxx` explanation from the transaction record | ✅ |
 | CONFIRM_EXPLANATION | UI | "Understood" / "It's still wrong" | – |
 | CONFIRM_DISPUTE | UI | Summary of the charge + "File dispute" / "No" | – |
@@ -163,7 +166,7 @@ cost per case low and every decision auditable.
 | **Reversed** | Block → no dispute → more charges? → `DSP-013` | Explain reversal (`EXP-003`) |
 | **Declined** | Block (an attempt is a compromise signal) → no dispute → `DSP-013` | Explain decline (`EXP-006`) |
 
-### Policy (`policy.py`) — first match wins
+### Policy (`graphs/policy.py`) — first match wins
 
 | ID | Condition | Outcome |
 |---|---|---|
@@ -178,7 +181,7 @@ cost per case low and every decision auditable.
 | DSP-013 | Fraud path and (any score > 30, any amount > 500 USD, or ≥ 2 charges denied) | Escalate to fraud team |
 | DSP-100 | None of the above | File dispute after confirmation |
 
-### Explanations (`explain.py`)
+### Explanations (`nodes/charge_error`)
 
 | ID | Status | Customer is told |
 |---|---|---|
@@ -189,7 +192,7 @@ cost per case low and every decision auditable.
 An explanation never closes a case by itself (the "still wrong" button is always there), and for `not_me`
 the block is offered **even when the status explains the charge**.
 
-### Escalation queue and priority (details in `HANDOFF.md`)
+### Escalation queue and priority
 
 | Trigger | Queue | Priority |
 |---|---|---|
@@ -217,40 +220,6 @@ the block is offered **even when the status explains the charge**.
 | Block card · file dispute | Agent proposes → customer confirms (button) → agent executes and reads back |
 | Escalate and notify the employee | Automatic, by rule |
 | Unblock, refund, promise money or deadlines | Never — always a human |
-
-## Contract changes
-
-```python
-class Intent(str, Enum):
-    NOT_ME = "not_me"                  # "I didn't make this purchase"
-    CHARGE_ERROR = "charge_error"      # "I made it, but the charge is wrong"
-    EMERGENCY = "emergency"  # lost / stolen card
-    OTHER = "other"
-
-class AgentState(str, Enum):
-    VALIDATE_SESSION, UNDERSTAND, TRIAGE, CLARIFY_INTENT, OUT_OF_SCOPE,
-    FIND_TRANSACTION, CLARIFY_TRANSACTION, ROUTE,
-    SELECT_CARD, CONFIRM_BLOCK, BLOCK_AND_VERIFY, ASK_CHARGE, ASK_MORE_CHARGES,
-    STATUS, POLICY, EXPLAIN, CONFIRM_EXPLANATION, CONFIRM_DISPUTE, FILE_AND_VERIFY,
-    BUILD_HANDOFF, WRITE_NARRATIVE, CREATE_TICKET, NOTIFY_EMPLOYEE,
-    INFORM, CLOSE_EXPLAINED, DENY_AND_CLOSE, DONE
-
-# ConversationState — new / changed fields
-intent: Intent | None = None
-intent_confidence: float | None = None
-path: Literal["fraud", "charge_error", "emergency"] | None = None
-explanation_rule: str | None = None             # EXP-xxx
-denied_transaction_ids: list[str] = []          # for DSP-013 and ASK_MORE_CHARGES (max 3)
-block_declined: bool = False                    # → P1
-reported_at: datetime | None = None
-block_verified_at: datetime | None = None
-case_verified_at: datetime | None = None
-handoff_at: datetime | None = None
-llm_calls: int = 0                              # cost per case
-```
-
-`HandoffPacket` gains `queue`, `priority`, `customer_quote`, `narrative`, `not_done`, `next_steps`,
-`told_customer`, `transcript_ref` (see `HANDOFF.md`).
 
 ## Metrics each part produces
 

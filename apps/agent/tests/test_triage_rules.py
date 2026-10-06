@@ -1,5 +1,5 @@
 """Tests de las reglas fijas y del baseline del Triage.
-Los mensajes de aquí NO están en evals/triage/messages.csv (para no contaminar la evaluación)."""
+Los mensajes de aquí NO están en evals/cases/triage_messages.csv (para no contaminar la evaluación)."""
 import pytest
 
 from bank_agent.nodes.triage_agent.rules import (asks_for_human, baseline_understand, contains_any,

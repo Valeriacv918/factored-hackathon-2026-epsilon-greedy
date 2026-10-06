@@ -1,6 +1,6 @@
 """Reglas de politica del flujo de fraude: 100% codigo, sin LLM.
 
-Implementa, para el path de fraude, las reglas de docs/STATE_MACHINE2.md:
+Implementa, para el path de fraude, las reglas de docs/state-machine.md:
 - DSP-004: disputa abierta duplicada para la misma transaccion.
 - DSP-005: la transaccion es mas vieja que la ventana permitida.
 - DSP-013: score > umbral, monto > umbral, o >= 2 cargos no disputados

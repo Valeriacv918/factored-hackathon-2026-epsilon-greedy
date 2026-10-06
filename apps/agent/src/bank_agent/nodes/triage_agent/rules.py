@@ -2,7 +2,7 @@
 
 Dos usos:
 1. REGLAS DE SEGURIDAD que se aplican siempre, digan lo que diga el LLM
-   (STATE_MACHINE.md, reglas globales 1 y 2):
+   (docs/state-machine.md, reglas globales 1 y 2):
    - palabras de robo/pérdida/emergencia  → emergencia de tarjeta
    - pedir una persona         → escalar a humano
 2. BASELINE: un clasificador simple de palabras clave. Sirve para comparar:
@@ -34,7 +34,7 @@ def contains_any(text: str, phrases: list[str]) -> bool:
 # ============================================================================
 # TU PARTE 1: las frases
 # - Escríbelas en minúsculas y SIN tildes ("perdi", no "Perdí").
-# - NO mires evals/triage/messages.csv mientras las escribes.
+# - NO mires evals/cases/triage_messages.csv mientras las escribes.
 # - Corre los tests para ver cuáles frases te faltan.
 # ============================================================================
 
