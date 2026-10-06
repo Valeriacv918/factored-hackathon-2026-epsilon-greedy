@@ -1,6 +1,6 @@
 """Tests del clasificador LLM con un LLM FALSO (no gasta llamadas a Groq).
 Lo que se prueba aquí es nuestro código alrededor del LLM, no la calidad
-del LLM: eso se mide en la evaluación (evals/triage)."""
+del LLM: eso se mide en la evaluación (evals/cases)."""
 import datetime as dt
 
 from bank_agent.nodes.triage_agent.classifier import FALLBACK, LLMClassifier, system_prompt, today

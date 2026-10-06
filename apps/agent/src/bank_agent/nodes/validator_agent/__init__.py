@@ -1,4 +1,4 @@
-"""Nodo validator_agent del grafo de disputas (STATE_MACHINE2: DETECT_LANGUAGE + VALIDATE_SESSION).
+"""Nodo validator_agent del grafo de disputas (docs/state-machine.md: DETECT_LANGUAGE + VALIDATE_SESSION).
 
 Login con FORMULARIO, sin LLM: el documento, la fecha de nacimiento y el producto van en
 campos separados directo a IdentityValidator -> MCP verify_identity. Ningún LLM ve esos datos

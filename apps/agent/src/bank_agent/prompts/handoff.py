@@ -1,4 +1,4 @@
-"""Textos del resumen para el empleado (STATE_MACHINE2,  WRITE_NARRATIVE).
+"""Textos del resumen para el empleado (docs/state-machine.md,  WRITE_NARRATIVE).
 
 REASONS lo usan el prompt (para que el LLM entienda el código del motivo) y la
 plantilla de respaldo. Si un nodo escala con un motivo nuevo, agrégalo

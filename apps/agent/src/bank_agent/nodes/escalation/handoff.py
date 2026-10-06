@@ -1,4 +1,4 @@
-"""WRITE_NARRATIVE + claim check (STATE_MACHINE2, sección 5). 100% código salvo la llamada al modelo.
+"""WRITE_NARRATIVE + claim check (docs/state-machine.md, sección 5). 100% código salvo la llamada al modelo.
 
 1. build_facts: arma los HECHOS VERIFICADOS desde el estado. Es lo único que ve el LLM:
    nunca el mensaje del cliente (puede traer instrucciones) ni su customer_id.

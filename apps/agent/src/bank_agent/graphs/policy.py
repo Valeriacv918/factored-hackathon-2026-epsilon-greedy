@@ -1,4 +1,4 @@
-"""Versioned demo policy from STATE_MACHINE2, not a bank or legal policy."""
+"""Versioned demo policy from docs/state-machine.md, not a bank or legal policy."""
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal

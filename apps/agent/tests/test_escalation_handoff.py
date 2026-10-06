@@ -1,4 +1,4 @@
-"""Resumen para el empleado (STATE_MACHINE2, sección 5): WRITE_NARRATIVE + claim check.
+"""Resumen para el empleado (docs/state-machine.md, sección 5): WRITE_NARRATIVE + claim check.
 
 Meta del documento: "Handoff summaries with all required fields and no unsupported facts: 100%".
 El claim check es código: se prueba con narrativas buenas y con trampas (datos inventados,

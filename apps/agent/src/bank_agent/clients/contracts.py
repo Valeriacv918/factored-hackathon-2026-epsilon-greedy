@@ -16,7 +16,7 @@ class Services(Protocol):
     Every tool must validate the session and enforce ownership server-side. Mutations
     must atomically deduplicate by idempotency_key and return the original receipt
     on retries. read_* must independently read persisted state. Monetary values are
-    decimal strings, timestamps timezone-aware. See clients/README.md for schemas.
+    decimal strings, timestamps timezone-aware. See apps/agent/README.md and contracts/mcp for schemas.
     """
 
     def now(self) -> datetime: ...

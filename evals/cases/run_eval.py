@@ -1,10 +1,10 @@
 """Evaluación del Triage: baseline (palabras clave) vs LLM, sobre triage_messagesv2.csv.
 
 Uso (desde la carpeta principal del repo):
-  uv run --project apps/agent --all-extras python evals/triage/run_eval.py                  # baseline + LLM (usa Groq)
-  uv run --project apps/agent --all-extras python evals/triage/run_eval.py --baseline-only  # solo baseline (gratis)
-  uv run --project apps/agent --all-extras python evals/triage/run_eval.py --limit 10       # prueba rápida con 10 mensajes
-  uv run --project apps/agent --all-extras python evals/triage/run_eval.py --rpm 15         # más lento si sigue el rate limit
+  uv run --project apps/agent --all-extras python evals/cases/run_eval.py                  # baseline + LLM (usa Groq)
+  uv run --project apps/agent --all-extras python evals/cases/run_eval.py --baseline-only  # solo baseline (gratis)
+  uv run --project apps/agent --all-extras python evals/cases/run_eval.py --limit 10       # prueba rápida con 10 mensajes
+  uv run --project apps/agent --all-extras python evals/cases/run_eval.py --rpm 15         # más lento si sigue el rate limit
 
 Qué mide:
   - Exactitud de RUTA: ¿el cliente llegó al lugar correcto? (lo que más importa)

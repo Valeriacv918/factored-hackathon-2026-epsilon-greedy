@@ -70,7 +70,7 @@ To deploy on Cloud Run, see [web front and deployment](docs/deploy-web.md).
 | **Data platform** | `data/` pipelines (ingestion, Dataform, profiling) and their contracts |
 | **Infrastructure** | `infra/` (BigQuery sandbox) and the root `Dockerfile` (Cloud Run image) |
 | **Quality** | `evals/` (LLM evaluations) and `scripts/verify/` (local checks) |
-| **Docs** | `docs/` (architecture, state machine, operations, policies) |
+| **Docs** | `docs/` (architecture, state machine, MCP/sandbox, deploy, data platform) |
 
 ```text
 .
@@ -96,14 +96,13 @@ To deploy on Cloud Run, see [web front and deployment](docs/deploy-web.md).
 │
 ├── infra/
 │   ├── bigquery/sandbox/       Simulation storage: schema, grants, reads, audits
-│   └── cloud-run/, workflows/, iam/, inventory/
-├── config/environments/        Future non-secret application configuration
+│   └── inventory/              GCP inventory snapshot (2026-10-01)
 │
-├── evals/                      Synthetic cases, runners and result conventions
+├── evals/cases/                Triage evaluation set and runner
 ├── scripts/
 │   ├── run_disputes.py         Terminal demo of the full flow (also chat_*.py, try_triage.py)
 │   └── verify/                 Local checks (check_local.py, sandbox_contract.py, audits)
-├── docs/                       Architecture, state machine, operations, quality, policies
+├── docs/                       Architecture, state machine, MCP/sandbox, deploy, data platform
 │
 ├── Dockerfile                  Web front + agent + MCP server in one Cloud Run image
 ├── .env.example                Configuration template (copy to .env)
@@ -151,36 +150,19 @@ Do not commit credentials, runtime .env files, service account keys, or
 
 ## GCP pipelines
 
-Existing target: project `hackaton-509923`, region `us-central1`.
-Review configuration and permissions before running cloud commands.
+Project `hackaton-509923`, region `us-central1`. Review configuration and permissions
+before running cloud commands.
 
-- Ingestion: `data/ingestion` validates CSV contracts, reconciles row counts,
+- **Ingestion** (`data/ingestion`): validates CSV contracts, reconciles row counts,
   publishes raw tables and writes audit events.
-- Transformation: `data/dataform` contains the seven curated table pipelines.
-- Profiling: `data/profiling` writes observations to BigQuery audit tables.
-- Orchestration across Cloud Run and Dataform remains pending.
+- **Transformation** (`data/dataform`): the seven curated table pipelines. The
+  `Sync Dataform` GitHub workflow validates, uploads and compiles them on `main`
+  ([setup](docs/github-gcp-connection.md)); running a table stays a manual step.
+- **Profiling** (`data/profiling`): writes observations to BigQuery audit tables.
+- **Sandbox** ([infra/bigquery/sandbox](infra/bigquery/sandbox/README.md)): storage for
+  the simulated actions, deployed separately from Dataform.
 
-In Cloud Shell, from the repository root:
-
-```bash
-cd data/dataform
-python3 upload_workspace.py
-# Only after COMPILED, select the intended table:
-python3 execute_compilation.py --table daily_exchange_rates
-```
-
-These commands upload and execute cloud work. They are not local setup commands.
-Wait for completion, then use the corresponding `verify_*.sql`. Do not execute
-all tags together or concurrent runs. See [the runbook](docs/runbook.md).
-`data/ingestion/setup.sh` provisions resources and deploys customers; it is not
-a routine command or a deployment script for every existing job.
-
-All seven structural raw contracts are now present. The missing four were recovered
-from the October 1 GCP export; see [contract inventory](data/contracts/raw/README.md)
-and [GCP audit results](docs/gcp-audit-2026-10-01.md). The `Sync Dataform` GitHub
-Actions workflow now validates, uploads, and compiles Dataform changes on `main`;
-it becomes active after the one-time Workload Identity Federation setup in
-[GitHub to Google Cloud](docs/github-gcp-connection.md). It does not execute SQL.
+Run order, statuses, quality rules and the GCP audit: [data platform](docs/data-platform.md).
 
 ## Local verification
 
@@ -198,31 +180,13 @@ Local tests do not replace Dataform compilation and BigQuery execution.
 ## Documentation
 
 - [Architecture](docs/architecture.md)
-- [Conversation state machine](docs/STATE_MACHINE2.md)
-- [Web front and deployment](docs/deploy-web.md) (Spanish)
+- [Conversation state machine](docs/state-machine.md)
 - [MCP and sandbox](docs/mcp-sandbox.md)
-- [Validation and triage local graph](docs/validation-triage-local.md) (Spanish)
-- [Operations and recovery](docs/runbook.md)
+- [Web front and deployment](docs/deploy-web.md)
 - [Logging and observability](docs/observability.md)
-- [Data quality rules and exceptions](docs/data-quality.md)
-- [Business policy research](docs/policies.md)
+- [Data platform: operations, quality and audit](docs/data-platform.md)
+- [GitHub to Google Cloud](docs/github-gcp-connection.md)
 - [Original profiling findings](docs/findings_tables.txt)
-- [Migration inventory](docs/migration-inventory.md)
-
-Each deployable component stays independently configurable. Future MCP tools
-must handle data quality flags and unresolved references explicitly. A complaint
-link to a product does not establish ownership or authorize product access.
-
-## Banking sandbox (data engineering)
-
-The simulation storage is versioned in
-[infra/bigquery/sandbox](infra/bigquery/sandbox/README.md), with its
-[versioned contract](data/contracts/sandbox/bank_sandbox_v1.json).
-It includes scenario isolation, effective card-state queries, receipt checks,
-and quality audits. Deployment is separate from Dataform. Cloud Shell results
-shared on October 4 confirm the schema, permissions checks and one persisted
-simulated card block with its audit. See the [handoff](docs/sandbox-handoff.md)
-for evidence and limits. The MCP server writes card blocks, disputes, handoffs and
-notifications to it; see [MCP and sandbox](docs/mcp-sandbox.md).
-
-Offline check: `python scripts/verify/sandbox_contract.py --check`.
+- Component READMEs: [agent](apps/agent/README.md), [MCP server](apps/mcp-server/README.md),
+  [Dataform](data/dataform/README.md), [ingestion](data/ingestion/README.md),
+  [sandbox](infra/bigquery/sandbox/README.md), [evals](evals/cases/README.md)
