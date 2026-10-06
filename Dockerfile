@@ -19,7 +19,7 @@ RUN uv sync --project apps/agent --frozen --no-dev \
  && uv sync --project apps/mcp-server --frozen --no-dev
 
 RUN useradd --create-home --uid 10001 app && chown -R app /app
-USER app
+USER 10001:10001
 
 ENV MCP_SERVER_COMMAND=/app/apps/mcp-server/.venv/bin/bank-mcp PORT=8080
 EXPOSE 8080
