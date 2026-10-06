@@ -80,7 +80,6 @@ class McpServices:
         self._client, self._sessions, self._understanding = client, sessions, understanding
         self._clock, self._detect, self._narrator = clock, language_detector, narrator
         self._validation_agents = {}
-        self._identity_sessions = {}   # conversation_id -> IdentityValidator session id (login form)
         self._identity_validator = None
         self._triage_classifier = None
 
@@ -95,31 +94,16 @@ class McpServices:
         return cls(client, StaticSessions.from_string(env.get("DEV_SESSIONS", "")), understanding, clock=clock,
                    narrator=LlmNarrator.from_model_id(model_id))
 
-    def _validator(self):
+    def validation_agent(self, conversation_id):
         from bank_agent.clients.identity import McpIdentityChecker
         from bank_agent.nodes.validator_agent.validator import IdentityValidator
+        from bank_agent.nodes.validator_agent.agent import ValidationAgent
         if self._identity_validator is None:
             # Real time for authentication TTL; historical clock is for transaction searches.
             self._identity_validator = IdentityValidator(McpIdentityChecker(self._client))
-        return self._identity_validator
-
-    def validation_agent(self, conversation_id):
-        from bank_agent.nodes.validator_agent.agent import ValidationAgent
         if conversation_id not in self._validation_agents:
-            self._validation_agents[conversation_id] = ValidationAgent(self._validator())
+            self._validation_agents[conversation_id] = ValidationAgent(self._identity_validator)
         return self._validation_agents[conversation_id]
-
-    def verify_identity(self, conversation_id: str, document_number: str, date_of_birth: str,
-                        product_number: str) -> dict[str, Any]:
-        """Login form: the three factors go straight to IdentityValidator -> MCP verify_identity.
-        No LLM sees them. Returns only the status and the opaque session_ref, never customer data."""
-        validator = self._validator()
-        if conversation_id not in self._identity_sessions:
-            self._identity_sessions[conversation_id] = validator.new_session().session_id
-        session_ref = self._identity_sessions[conversation_id]
-        result = validator.verify(session_ref, document_number, date_of_birth, product_number)
-        return {"status": result.status.value, "attempts_left": result.attempts_left,
-                "missing_fields": list(result.missing_fields), "session_ref": session_ref}
 
     def triage_understand(self, text):
         from bank_agent.nodes.triage_agent.classifier import LLMClassifier
@@ -129,7 +113,6 @@ class McpServices:
 
     def close(self) -> None:
         self._validation_agents.clear()
-        self._identity_sessions.clear()
         self._client.close()
 
     def now(self) -> dt.datetime:
