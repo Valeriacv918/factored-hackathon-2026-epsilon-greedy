@@ -6,20 +6,30 @@ AI-first **transaction-dispute intake** agent for a LATAM bank (Spanish and Port
 
 ## Status
 
-This repository combines the GCP data pipelines, a LangGraph agent, its web front and an
-MCP server. The agent runs an executable six-component LangGraph workflow (Spanish and
-Portuguese) and talks to an MCP server over BigQuery. The server reads `bank_curated`
-and records simulated card blocks, disputes, handoffs and notifications in
-`bank_sandbox` ([MCP and sandbox](docs/mcp-sandbox.md)). The web front, the agent and
-the MCP server (as a stdio subprocess) run in one container deployed on Cloud Run
-([web front and deployment](docs/deploy-web.md)). See
-[agent setup](apps/agent/README.md) and [MCP server](apps/mcp-server/README.md).
+This repository combines the existing analysis notebook with the GCP data
+pipelines, a LangGraph agent and an MCP server.
+The deployed web application runs the LangGraph identity-validation and triage
+flow in Spanish and Portuguese and talks to an MCP server over BigQuery. It
+detects the conversation language before identity verification, asks the user
+to choose Spanish or Portuguese when a short greeting is ambiguous, and keeps
+the selected language throughout the forms and responses. Identity factors are
+submitted through a form directly to MCP verification, not sent to the LLM.
+The MCP server reads `bank_curated` and records simulated card blocks, disputes,
+handoffs and notifications in `bank_sandbox`
+([MCP and sandbox](docs/mcp-sandbox.md)).
+
+**Live web app:** [Epsilon Bank](https://bank-agent-web-jpr3xtgwsa-uc.a.run.app)
+on Cloud Run in `us-central1`. The app, MCP subprocess configuration and
+Spanish/Portuguese language-selection flow are deployed. See the
+[web deployment guide](docs/deploy-web.md), [agent setup](apps/agent/README.md)
+and [MCP server](apps/mcp-server/README.md) for implementation details and
+operational limits. Account tools remain pending.
 
 ## Try it online
 
-### 👉 [Open the live demo](https://bank-agent-web-676773032351.us-central1.run.app/)
+### 👉 [Open the live demo](https://bank-agent-demo-676773032351.us-east4.run.app/)
 
-https://bank-agent-web-676773032351.us-central1.run.app/
+https://bank-agent-demo-676773032351.us-east4.run.app/
 
 No setup needed. It's the same web app as the local run below, deployed on Cloud Run.
 Card blocks, disputes and handoffs are simulated in the sandbox, never real.
@@ -120,7 +130,7 @@ Run `uv sync --project apps/<app>` once before testing an app.
 | MCP server unit tests | `apps/mcp-server/tests/` | yes | `uv run --project apps/mcp-server pytest apps/mcp-server` |
 | Live integration (agent → MCP → BigQuery) | `apps/agent/tests/integration/` | no (opt-in) | `uv run --project apps/agent pytest apps/agent -m integration` |
 | LLM quality evaluations | `evals/` | no | metrics, not pass/fail |
-| Data pipeline checks | `data/ingestion`, `data/dataform/tests` | Dataform only | `python scripts/verify/check_local.py` (see below) |
+| Data pipeline checks | `data/ingestion`, `data/dataform/tests`, `infra/bigquery/sandbox` | Dataform source sync/compile only | `python scripts/verify/check_local.py` (see below) |
 
 Unit tests need no network, GCP or model. Integration tests need, in `.env`:
 
@@ -148,11 +158,51 @@ Do not replace the source subdirectories with dataset exports.
 Do not commit credentials, runtime .env files, service account keys, or
 `last_compilation.json`.
 
-## GCP pipelines
+## Data engineering status
 
 Project `hackaton-509923`, region `us-central1`. Review configuration and permissions
 before running cloud commands.
 
+- **Raw contracts:** all seven structural contracts are versioned in
+  `data/contracts/raw/`.
+- **Ingestion:** `data/ingestion` implements CSV contract validation, row-count
+  reconciliation, raw-table publication and audit events. The GCP audit
+  recorded seven Cloud Run Jobs with successful latest runs as of October 1,
+  2026; this is a point-in-time snapshot, not a live status check.
+- **Transformation:** `data/dataform` contains seven curated table pipelines,
+  contracts, generation tests and table verification queries.
+- **Profiling:** `data/profiling` contains BigQuery profiling and diagnostic
+  queries for the source tables.
+- **Dataform CI:** the `Sync Dataform` GitHub Actions workflow validates,
+  uploads and compiles source on `main`. Its latest recorded successful run was
+  October 3, 2026. It does not execute SQL or publish curated tables.
+- **Still to automate:** there is no end-to-end orchestrator connecting the
+  Cloud Run ingestion jobs to Dataform, and curated-table execution remains a
+  separate, reviewed operation. The initial orchestration area is documented
+  in [`infra/workflows`](infra/workflows/README.md); the GCP audit and
+  [Dataform guide](data/dataform/README.md) describe the execution boundaries.
+
+In Cloud Shell, from the repository root:
+
+```bash
+cd data/dataform
+python3 upload_workspace.py
+# Only after COMPILED, select the intended table:
+python3 execute_compilation.py --table daily_exchange_rates
+```
+
+These commands upload and execute cloud work. They are not local setup commands.
+Wait for completion, then use the corresponding `verify_*.sql`. Do not execute
+all tags together or concurrent runs. See [the runbook](docs/runbook.md).
+`data/ingestion/setup.sh` provisions resources and deploys customers; it is not
+a routine command or a deployment script for every existing job.
+
+All seven structural raw contracts are now present. The missing four were recovered
+from the October 1 GCP export; see [contract inventory](data/contracts/raw/README.md)
+and [GCP audit results](docs/gcp-audit-2026-10-01.md). GitHub-to-GCP
+authentication for the Dataform workflow is configured; see
+[GitHub to Google Cloud](docs/github-gcp-connection.md). The workflow compiles
+changes but does not execute SQL.
 - **Ingestion** (`data/ingestion`): validates CSV contracts, reconciles row counts,
   publishes raw tables and writes audit events.
 - **Transformation** (`data/dataform`): the seven curated table pipelines. The
@@ -172,10 +222,10 @@ With Python and Node on PATH, run from the repository root:
 python scripts/verify/check_local.py
 ```
 
-This runs CSV validation unit tests and all seven Dataform generation tests.
-It requires no cloud credentials and does not deploy anything. Full ingestion
-integration mocks additionally require `data/ingestion/requirements.txt`.
-Local tests do not replace Dataform compilation and BigQuery execution.
+This runs CSV validation unit tests, Dataform generation tests and sandbox
+contract checks. It requires no cloud credentials and does not deploy anything.
+The GitHub workflow separately validates and compiles Dataform source; neither
+local checks nor compilation replace reviewed BigQuery table execution.
 
 ## Documentation
 
@@ -187,6 +237,32 @@ Local tests do not replace Dataform compilation and BigQuery execution.
 - [Data platform: operations, quality and audit](docs/data-platform.md)
 - [GitHub to Google Cloud](docs/github-gcp-connection.md)
 - [Original profiling findings](docs/findings_tables.txt)
+- [Migration inventory](docs/migration-inventory.md)
+
+Each deployable component stays independently configurable. Future MCP tools
+must handle data quality flags and unresolved references explicitly. A complaint
+link to a product does not establish ownership or authorize product access.
+
+## Submission checklist (due Oct 5 to hackathon.admin@factored.ai)
+
+- [x] Deployed link: [Epsilon Bank](https://bank-agent-web-jpr3xtgwsa-uc.a.run.app)
+- [ ] 4-6 slide presentation
+- [ ] Video pitch: working demo + core architecture decisions
+- [ ] Demo cases in ES and PT: normal resolution, ambiguous/unsupported, human-required
+
+## Banking sandbox (data engineering)
+
+The simulation storage is versioned in
+[infra/bigquery/sandbox](infra/bigquery/sandbox/README.md), with its
+[versioned contract](data/contracts/sandbox/bank_sandbox_v1.json).
+It includes scenario isolation, effective card-state queries, receipt checks,
+and quality audits. Deployment is separate from Dataform. Cloud Shell results
+shared on October 4 confirm the schema, permissions checks and one persisted
+simulated card block with its audit. See the [handoff](docs/sandbox-handoff.md)
+for evidence and limits. The MCP server writes card blocks, disputes, handoffs and
+notifications to it; see [MCP and sandbox](docs/mcp-sandbox.md). Account tools are still pending.
+
+Offline check: `python scripts/verify/sandbox_contract.py --check`.
 - Component READMEs: [agent](apps/agent/README.md), [MCP server](apps/mcp-server/README.md),
   [Dataform](data/dataform/README.md), [ingestion](data/ingestion/README.md),
   [sandbox](infra/bigquery/sandbox/README.md), [evals](evals/cases/README.md)

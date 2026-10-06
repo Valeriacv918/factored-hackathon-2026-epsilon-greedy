@@ -69,3 +69,7 @@ gcp-audit-*/
 build/
 dist/
 *.egg-info/
+
+# Reviewed offline evaluation shipped with the demo
+!evals/cases/triage_messages.csv
+!evals/cases/results/triage_20261005_211220.csv

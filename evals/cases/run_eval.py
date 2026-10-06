@@ -1,4 +1,4 @@
-"""Evaluación del Triage: baseline (palabras clave) vs LLM, sobre triage_messagesv2.csv.
+"""Evaluación del Triage: baseline (palabras clave) vs LLM, sobre triage_messages.csv.
 
 Uso (desde la carpeta principal del repo):
   uv run --project apps/agent --all-extras python evals/cases/run_eval.py                  # baseline + LLM (usa Groq)
